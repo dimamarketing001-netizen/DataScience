@@ -4,8 +4,6 @@ import logging
 import json
 
 # --- Конфигурация ---
-# Важно: Замените URL ниже на ваш реальный вебхук для входящих запросов в Битрикс24.
-# Этот вебхук должен иметь права на доступ к CRM.
 B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/" # <--- ВАШ ВЕБХУК ЗДЕСЬ
 
 # Настройка логирования
@@ -68,9 +66,12 @@ def get_leads():
     return jsonify([]), 500
 
 # --- Главный маршрут ---
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'POST']) # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
 def index():
     """Отображает главную страницу приложения."""
+    # Логируем данные, которые приходят от Битрикс24 при открытии
+    if request.method == 'POST':
+        app.logger.info(f"Приложение открыто из Битрикс24 с данными: {request.form.to_dict()}")
     return render_template('index.html')
 
 if __name__ == '__main__':
