@@ -5,55 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Статистика по лидам</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <!-- Изменена версия для сброса кэша -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='custom_styles.css') }}?v=1.3">
+    <!-- Ссылка на стили временно удалена, чтобы ничего не мешало -->
 </head>
 <body>
-    <div id="loader-overlay" class="loader-overlay" style="display: none;">
-        <div class="loader"></div>
+    <!-- Все фильтры и лишние элементы убраны. Оставлен только целевой контейнер. -->
+    <div id="dashboard-container" class="dashboard-container">
+        <!-- Если вы видите этот текст, значит JS не сработал. -->
     </div>
 
-    <div class="workarea-content-paddings">
-        <div class="ui-form-title">
-            <div class="ui-form-title-text">Статистика по лидам</div>
-        </div>
-
-        <!-- Блок фильтров -->
-        <div class="filter-container">
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                    <input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата">
-                </div>
-            </div>
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                    <input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата">
-                </div>
-            </div>
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                     <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                    <select id="sourceFilter" class="ui-ctl-element">
-                        <option value="">Все источники</option>
-                        <!-- Источники будут загружены сюда -->
-                    </select>
-                </div>
-            </div>
-             <div class="filter-item">
-                <button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button>
-            </div>
-        </div>
-
-        <!-- Дашборд для статистики -->
-        <div id="dashboard-container" class="dashboard-container">
-            <!-- Сюда будет вставлен текст "Привет" -->
-        </div>
-    </div>
-
+    <!-- Скрипты осталвяем, меняем версию на v=1.4 -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <!-- Изменена версия для сброса кэша -->
-    <script src="{{ url_for('static', filename='script.js') }}?v=1.3"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=1.4"></script>
 </body>
 </html>
