@@ -65,15 +65,92 @@ def get_leads():
         return jsonify(leads_response['result'])
     return jsonify([]), 500
 
+# --- НОВЫЕ МАРШРУТЫ ДЛЯ КАССЫ ---
+@app.route('/api/cashbox_initial_data', methods=['GET'])
+def get_cashbox_initial_data():
+    """Загружает списки сотрудников и подрядчиков для формы Кассы."""
+    batch_payload = {
+        'halt': 0,
+        'cmd': {
+            'users': 'user.get?filter[ACTIVE]=Y',
+            'sources': 'crm.status.list?filter[ENTITY_ID]=SOURCE'
+        }
+    }
+    response = b24_call_method('batch', batch_payload)
+    if response and response.get('result', {}).get('result'):
+        users_result = response['result']['result'].get('users', [])
+        sources_result = response['result']['result'].get('sources', [])
+        
+        users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in users_result]
+        sources = [{'ID': source['STATUS_ID'], 'NAME': source['NAME']} for source in sources_result]
+        return jsonify({'users': users, 'sources': sources})
+    return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
+
+@app.route('/api/search_contacts', methods=['GET'])
+def search_contacts():
+    """Ищет контакты по имени или фамилии."""
+    query = request.args.get('query', '')
+    if not query or len(query) < 3:
+        return jsonify([])
+    
+    filter_params = {'%FULL_NAME': query}
+    
+    response = b24_call_method('crm.contact.list', {
+        'filter': filter_params,
+        'select': ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME'],
+        'limit': 10
+    })
+    
+    if response and response.get('result'):
+        contacts = [{'ID': contact['ID'], 'NAME': f"{contact.get('LAST_NAME', '')} {contact.get('NAME', '')} {contact.get('SECOND_NAME', '')}".strip()} for contact in response['result']]
+        return jsonify(contacts)
+    return jsonify([])
+
+@app.route('/api/add_expense', methods=['POST'])
+def add_expense():
+    """Добавляет расход в Универсальный список Битрикс24."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Нет данных для сохранения'}), 400
+
+    RPA_LIST_ID = 2 
+    
+    fields = {
+        'UF_RPA_2_NAME': data.get('name'),
+        'UF_RPA_2_1775648993353': data.get('date'),
+        'UF_RPA_2_1775649025545': data.get('amount'),
+        'UF_RPA_2_1775649039905': data.get('category_text'),
+        'UF_RPA_2_1775649163870': data.get('comment')
+    }
+
+    if data.get('employee_id'):
+        fields['UF_RPA_2_1775649074479'] = data['employee_id']
+    if data.get('contractor_id'):
+        fields['UF_RPA_2_1775649104323'] = data['contractor_id']
+    if data.get('client_id'):
+        fields['UF_RPA_2_1775649130020'] = data['client_id']
+
+    try:
+        response = b24_call_method('rpa.item.add', {
+            'entityTypeId': RPA_LIST_ID,
+            'fields': fields
+        })
+        if response and response.get('result'):
+            return jsonify({'success': True, 'id': response['result']['item']['id']})
+        else:
+            app.logger.error(f"Ошибка от rpa.item.add: {response}")
+            return jsonify({'success': False, 'error': response.get('error_description', 'Неизвестная ошибка Битрикс24')}), 500
+    except Exception as e:
+        app.logger.error(f"Исключение при добавлении расхода в Битрикс24: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # --- Главный маршрут ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """Отображает главную страницу приложения."""
-    # Логируем данные, которые приходят от Битрикс24 при открытии
     if request.method == 'POST':
         app.logger.info(f"Приложение открыто из Битрикс24 с данными: {request.form.to_dict()}")
     return render_template('index.html')
 
 if __name__ == '__main__':
-    # Для локального тестирования. На сервере используйте Gunicorn или аналоги.
     app.run(debug=True, port=5002)

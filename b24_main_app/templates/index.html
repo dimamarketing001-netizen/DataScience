@@ -24,6 +24,29 @@
         .modal-text { margin-bottom: 20px; text-align: left; }
         .modal-buttons { display: flex; justify-content: center; gap: 10px; }
         .btn-fixed-width { width: 100px; }
+
+        /* Стили для поиска клиентов */
+        .client-search-results {
+            border: 1px solid #eef2f4;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #fff;
+            position: absolute; /* Для позиционирования под полем ввода */
+            width: calc(100% - 2px); /* Ширина как у поля ввода */
+            z-index: 100;
+            display: none; /* Скрыто по умолчанию */
+        }
+        .client-search-results-item {
+            padding: 8px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .client-search-results-item:hover {
+            background-color: #f5f5f5;
+        }
+        .client-search-wrapper {
+            position: relative; /* Для позиционирования результатов */
+        }
     </style>
 </head>
 <body>
@@ -102,7 +125,13 @@
                 <div id="client-fields" class="dynamic-field">
                     <div class="ui-form-row">
                         <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
-                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска..."></div></div>
+                        <div class="ui-form-content client-search-wrapper">
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                <input type="text" id="expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
+                            </div>
+                            <div id="client-search-results" class="client-search-results"></div>
+                            <input type="hidden" id="selected-client-id">
+                        </div>
                     </div>
                 </div>
 

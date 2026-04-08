@@ -6,7 +6,7 @@ BX24.ready(() => {
     const mainMenu = document.getElementById('main-menu');
     const cashboxScreen = document.getElementById('cashbox-screen');
     const statisticsScreen = document.getElementById('statistics-screen');
-    
+
     const gotoCashboxBtn = document.getElementById('goto-cashbox');
     const gotoStatisticsBtn = document.getElementById('goto-statistics');
     const backButtons = document.querySelectorAll('.back-button');
@@ -52,26 +52,57 @@ BX24.ready(() => {
     const confirmBtn = document.getElementById('modal-confirm-btn');
     const cancelBtn = document.getElementById('modal-cancel-btn');
 
-    function showCustomConfirm(text, data) {
+    // Элементы для поиска клиентов
+    const clientSearchInput = document.getElementById('expense-client-search');
+    const clientSearchResults = document.getElementById('client-search-results');
+    const selectedClientIdInput = document.getElementById('selected-client-id');
+
+    let availableEmployees = [];
+    let availableContractors = [];
+
+    function showCustomConfirm(text) {
         return new Promise(resolve => {
-            modalText.innerHTML = text; // Используем innerHTML для поддержки тегов
+            modalText.innerHTML = text;
             modal.style.display = 'flex';
             confirmBtn.onclick = () => { modal.style.display = 'none'; resolve(true); };
             cancelBtn.onclick = () => { modal.style.display = 'none'; resolve(false); };
         });
     }
 
-    function initializeCashbox() {
+    async function initializeCashbox() {
         console.log("Initializing Cashbox Screen...");
-        flatpickr("#expense-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
+        showLoader();
+        try {
+            // Загрузка начальных данных для кассы (сотрудники, подрядчики)
+            const response = await fetch('api/cashbox_initial_data');
+            if (!response.ok) throw new Error('Failed to load cashbox initial data');
+            const data = await response.json();
 
-        const employees = ["Попов", "Мирзоев", "Аптряев", "Иванова", "Васильев", "Коротаева", "Константинов", "Карпенко", "Хайнова", "Григорий"];
-        const contractors = ["Лидпрайм", "Верба", "2ГИС", "Клик.Ру", "Яндекс", "МТТ", "Битрикс", "Сбер", "Т-банк", "Дельта"];
-        
-        const employeeSelect = document.getElementById('expense-employee');
-        const contractorSelect = document.getElementById('expense-contractor');
-        employees.forEach(name => employeeSelect.add(new Option(name, name)));
-        contractors.forEach(name => contractorSelect.add(new Option(name, name)));
+            availableEmployees = data.users || [];
+            availableContractors = data.sources || [];
+
+            const employeeSelect = document.getElementById('expense-employee');
+            const contractorSelect = document.getElementById('expense-contractor');
+
+            // Очищаем и заполняем списки
+            employeeSelect.innerHTML = '<option value="">Выберите сотрудника...</option>';
+            availableEmployees.forEach(user => {
+                employeeSelect.add(new Option(user.NAME, user.ID));
+            });
+
+            contractorSelect.innerHTML = '<option value="">Выберите подрядчика...</option>';
+            availableContractors.forEach(source => {
+                contractorSelect.add(new Option(source.NAME, source.ID));
+            });
+
+        } catch (error) {
+            console.error("Error fetching cashbox initial data:", error);
+            // Можно вывести сообщение об ошибке пользователю
+        } finally {
+            hideLoader();
+        }
+
+        flatpickr("#expense-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
 
         expenseCategory.addEventListener('change', (event) => {
             Object.values(dynamicFields).forEach(field => field.style.display = 'none');
@@ -79,35 +110,98 @@ BX24.ready(() => {
             if (dynamicFields[selectedCategory]) {
                 dynamicFields[selectedCategory].style.display = 'block';
             }
+            // Сбрасываем поля клиента при смене категории
+            clientSearchInput.value = '';
+            selectedClientIdInput.value = '';
+            clientSearchResults.innerHTML = '';
+            clientSearchResults.style.display = 'none';
         });
 
-        const clientSearchInput = document.getElementById('expense-client-search');
+        // Логика поиска клиентов
+        let searchTimeout;
         clientSearchInput.addEventListener('input', (event) => {
+            clearTimeout(searchTimeout);
             const searchTerm = event.target.value;
-            if (searchTerm.length > 2) console.log(`Ищем клиента: ${searchTerm}`);
+
+            if (searchTerm.length > 2) {
+                searchTimeout = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`api/search_contacts?query=${encodeURIComponent(searchTerm)}`);
+                        if (!response.ok) throw new Error('Failed to search contacts');
+
+                        const contacts = await response.json();
+
+                        clientSearchResults.innerHTML = '';
+                        if (contacts.length > 0) {
+                            contacts.forEach(contact => {
+                                const item = document.createElement('div');
+                                item.className = 'client-search-results-item';
+                                item.textContent = contact.NAME;
+                                item.dataset.id = contact.ID;
+                                item.addEventListener('click', () => {
+                                    clientSearchInput.value = contact.NAME;
+                                    selectedClientIdInput.value = contact.ID;
+                                    clientSearchResults.style.display = 'none';
+                                });
+                                clientSearchResults.appendChild(item);
+                            });
+                            clientSearchResults.style.display = 'block';
+                        } else {
+                            clientSearchResults.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error("Error searching contacts:", error);
+                        clientSearchResults.style.display = 'none';
+                    }
+                }, 300); // Задержка 300мс перед поиском
+            } else {
+                clientSearchResults.innerHTML = '';
+                clientSearchResults.style.display = 'none';
+                selectedClientIdInput.value = ''; // Сбрасываем ID, если запрос слишком короткий
+            }
         });
 
+        // Скрываем результаты поиска при клике вне поля
+        document.addEventListener('click', (event) => {
+            if (!clientSearchInput.contains(event.target) && !clientSearchResults.contains(event.target)) {
+                clientSearchResults.style.display = 'none';
+            }
+        });
+
+
+        // Обработка отправки формы
         expenseForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const formData = {
                 date: document.getElementById('expense-date').value,
-                amount: document.getElementById('expense-amount').value,
+                amount: parseFloat(document.getElementById('expense-amount').value), // Преобразуем в число
                 category: expenseCategory.options[expenseCategory.selectedIndex].text,
                 category_val: expenseCategory.value,
                 comment: document.getElementById('expense-comment').value,
+                name: '' // Будет сгенерировано
             };
 
             let details = '';
             if (formData.category_val === 'employees') {
-                formData.employee = document.getElementById('expense-employee').value;
+                const employeeSelect = document.getElementById('expense-employee');
+                formData.employee_id = employeeSelect.value;
+                formData.employee_name = employeeSelect.options[employeeSelect.selectedIndex].text;
                 formData.paymentType = document.getElementById('expense-payment-type').value;
-                details = `<li>Сотрудник: <strong>${formData.employee}</strong></li><li>Тип: <strong>${formData.paymentType}</strong></li>`;
+                details = `<li>Сотрудник: <strong>${formData.employee_name}</strong></li><li>Тип: <strong>${formData.paymentType}</strong></li>`;
+                formData.name = `ЗП/Мотивация: ${formData.employee_name}`;
             } else if (formData.category_val === 'marketing') {
-                formData.contractor = document.getElementById('expense-contractor').value;
-                details = `<li>Подрядчик: <strong>${formData.contractor}</strong></li>`;
+                const contractorSelect = document.getElementById('expense-contractor');
+                formData.contractor_id = contractorSelect.value;
+                formData.contractor_name = contractorSelect.options[contractorSelect.selectedIndex].text;
+                details = `<li>Подрядчик: <strong>${formData.contractor_name}</strong></li>`;
+                formData.name = `Маркетинг: ${formData.contractor_name}`;
             } else if (formData.category_val === 'clients') {
-                formData.client = document.getElementById('expense-client-search').value;
-                details = `<li>Клиент: <strong>${formData.client}</strong></li>`;
+                formData.client_id = selectedClientIdInput.value;
+                formData.client_name = clientSearchInput.value;
+                details = `<li>Клиент: <strong>${formData.client_name}</strong></li>`;
+                formData.name = `Расход по клиенту: ${formData.client_name}`;
+            } else {
+                formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`; // Генерируем название из категории и комментария
             }
 
             const confirmationText = `
@@ -121,14 +215,46 @@ BX24.ready(() => {
                 </ul>
             `;
 
-            const isConfirmed = await showCustomConfirm(confirmationText, formData);
+            const isConfirmed = await showCustomConfirm(confirmationText);
 
             if (isConfirmed) {
-                console.log("Сохраняем расход:", formData);
-                // Здесь будет вызов BX24.callMethod для сохранения в универсальный список
-                alert("Расход сохранен (в консоли)");
-                expenseForm.reset();
-                Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+                showLoader();
+                try {
+                    const saveResponse = await fetch('api/add_expense', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: formData.name,
+                            date: formData.date,
+                            amount: formData.amount,
+                            category_text: formData.category,
+                            comment: formData.comment,
+                            employee_id: formData.employee_id || null,
+                            contractor_id: formData.contractor_id || null,
+                            client_id: formData.client_id || null,
+                            payment_type: formData.paymentType || null // Если нужно сохранять тип выплаты
+                        }),
+                    });
+
+                    if (!saveResponse.ok) {
+                        const errorData = await saveResponse.json();
+                        throw new Error(errorData.error || 'Ошибка при сохранении расхода');
+                    }
+
+                    const result = await saveResponse.json();
+                    console.log("Расход успешно сохранен:", result);
+                    alert("Расход успешно сохранен!");
+                    expenseForm.reset();
+                    Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+                    clientSearchResults.innerHTML = '';
+                    clientSearchResults.style.display = 'none';
+                    selectedClientIdInput.value = '';
+                } catch (error) {
+                    console.error("Ошибка сохранения расхода:", error);
+                    alert(`Ошибка при сохранении расхода: ${error.message}`);
+                } finally {
+                    hideLoader();
+                }
             } else {
                 console.log("Сохранение отменено пользователем.");
             }
@@ -142,9 +268,9 @@ BX24.ready(() => {
     const endDateInput = document.getElementById('endDate');
     const sourceFilter = document.getElementById('sourceFilter');
     const applyFilterBtn = document.getElementById('apply-filter-btn');
-    
+
     let sortedStatuses = [];
-    
+
     function initializeStatistics() {
         console.log("Initializing Statistics Screen...");
         if (!dashboardContainer || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
@@ -167,7 +293,7 @@ BX24.ready(() => {
             if (data.sources) {
                 data.sources.forEach(source => {
                     const option = document.createElement('option');
-                    option.value = source.STATUS_ID;
+                    option.value = source.STATUS_ID; // Используем ID источника
                     option.textContent = source.NAME;
                     sourceFilter.appendChild(option);
                 });
