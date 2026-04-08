@@ -59,7 +59,6 @@ BX24.ready(() => {
 
     let availableEmployees = [];
     let availableContractors = [];
-    let availableCategories = []; // <--- Сохраняем категории здесь
 
     function showCustomConfirm(text) {
         return new Promise(resolve => {
@@ -74,23 +73,16 @@ BX24.ready(() => {
         console.log("Initializing Cashbox Screen...");
         showLoader();
         try {
-            // Загрузка начальных данных для кассы (сотрудники, подрядчики, КАТЕГОРИИ)
             const response = await fetch('api/cashbox_initial_data');
             if (!response.ok) throw new Error('Failed to load cashbox initial data');
             const data = await response.json();
 
-            // --- ОТЛАДКА ---
-            console.log("Полные данные, полученные от /api/cashbox_initial_data:", data);
-            // --- КОНЕЦ ОТЛАДКИ ---
-
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
-            availableCategories = data.categories || []; // <--- Сохраняем полученные категории
 
             const employeeSelect = document.getElementById('expense-employee');
             const contractorSelect = document.getElementById('expense-contractor');
 
-            // Очищаем и заполняем списки
             employeeSelect.innerHTML = '<option value="">Выберите сотрудника...</option>';
             availableEmployees.forEach(user => {
                 employeeSelect.add(new Option(user.NAME, user.ID));
@@ -116,7 +108,6 @@ BX24.ready(() => {
             if (dynamicFields[selectedCategory]) {
                 dynamicFields[selectedCategory].style.display = 'block';
             }
-            // Сбрасываем поля клиента при смене категории
             clientSearchInput.value = '';
             selectedClientIdInput.value = '';
             clientSearchResults.innerHTML = '';
@@ -134,9 +125,7 @@ BX24.ready(() => {
                     try {
                         const response = await fetch(`api/search_contacts?query=${encodeURIComponent(searchTerm)}`);
                         if (!response.ok) throw new Error('Failed to search contacts');
-
                         const contacts = await response.json();
-
                         clientSearchResults.innerHTML = '';
                         if (contacts.length > 0) {
                             contacts.forEach(contact => {
@@ -159,32 +148,29 @@ BX24.ready(() => {
                         console.error("Error searching contacts:", error);
                         clientSearchResults.style.display = 'none';
                     }
-                }, 300); // Задержка 300мс перед поиском
+                }, 300);
             } else {
                 clientSearchResults.innerHTML = '';
                 clientSearchResults.style.display = 'none';
-                selectedClientIdInput.value = ''; // Сбрасываем ID, если запрос слишком короткий
+                selectedClientIdInput.value = '';
             }
         });
 
-        // Скрываем результаты поиска при клике вне поля
         document.addEventListener('click', (event) => {
             if (!clientSearchInput.contains(event.target) && !clientSearchResults.contains(event.target)) {
                 clientSearchResults.style.display = 'none';
             }
         });
 
-
-        // Обработка отправки формы
         expenseForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const formData = {
                 date: document.getElementById('expense-date').value,
                 amount: parseFloat(document.getElementById('expense-amount').value),
-                category: expenseCategory.options[expenseCategory.selectedIndex].text, // Текст, напр. "Сотрудники"
-                category_val: expenseCategory.value, // Значение, напр. "employees"
+                category: expenseCategory.options[expenseCategory.selectedIndex].text,
+                category_val: expenseCategory.value,
                 comment: document.getElementById('expense-comment').value,
-                name: '' // Будет сгенерировано
+                name: ''
             };
 
             let details = '';
@@ -207,7 +193,6 @@ BX24.ready(() => {
                 details = `<li>Клиент: <strong>${formData.client_name}</strong></li>`;
                 formData.name = `Расход по клиенту: ${formData.client_name}`;
             } else {
-                // Для прочих категорий, у которых нет доп. полей
                 if (formData.category) {
                      formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`;
                 } else {
@@ -231,28 +216,6 @@ BX24.ready(() => {
             if (isConfirmed) {
                 showLoader();
                 try {
-                    // --- ОТЛАДКА ---
-                    console.log(`[ОТЛАДКА] Ищем ID для категории: "${formData.category}"`);
-                    console.log("[ОТЛАДКА] Поиск будет производиться в этом массиве:", availableCategories);
-                    // --- КОНЕЦ ОТЛАДКИ ---
-
-                    // Находим ID категории по ее текстовому названию
-                    const selectedCategoryObject = availableCategories.find(cat => cat.value === formData.category);
-
-                    // --- ОТЛАДКА ---
-                    console.log("[ОТЛАДКА] Результат поиска (найденный объект):", selectedCategoryObject);
-                    // --- КОНЕЦ ОТЛАДКИ ---
-
-                    const categoryId = selectedCategoryObject ? selectedCategoryObject.id : null;
-
-                    // Проверка, что ID найден, если категория была выбрана
-                    if (!categoryId && formData.category_val) {
-                         // Проверяем, что категория не пустая, чтобы не ругаться на "Выберите категорию"
-                        if (formData.category && formData.category !== 'Выберите категорию...') {
-                            throw new Error(`Не удалось найти ID для категории "${formData.category}". Проверьте, что название в HTML-коде совпадает с названием в Битрикс24.`);
-                        }
-                    }
-
                     const saveResponse = await fetch('api/add_expense', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -260,7 +223,8 @@ BX24.ready(() => {
                             name: formData.name,
                             date: formData.date,
                             amount: formData.amount,
-                            category_id: categoryId, // <--- Отправляем ID категории
+                            // УПРОЩЕНО: Просто отправляем текст категории
+                            category_text: formData.category,
                             comment: formData.comment,
                             employee_id: formData.employee_id || null,
                             contractor_id: formData.contractor_id || null,
@@ -278,7 +242,6 @@ BX24.ready(() => {
                     console.log("Расход успешно сохранен:", result);
                     alert("Расход успешно сохранен!");
                     expenseForm.reset();
-                    // Сбрасываем все динамические поля и результаты поиска
                     Object.values(dynamicFields).forEach(field => field.style.display = 'none');
                     clientSearchInput.value = '';
                     clientSearchResults.innerHTML = '';
@@ -330,7 +293,7 @@ BX24.ready(() => {
             if (data.sources) {
                 data.sources.forEach(source => {
                     const option = document.createElement('option');
-                    option.value = source.STATUS_ID; // Используем ID источника
+                    option.value = source.STATUS_ID;
                     option.textContent = source.NAME;
                     sourceFilter.appendChild(option);
                 });
