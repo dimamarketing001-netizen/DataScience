@@ -82,12 +82,13 @@ def get_leads():
 # --- НОВЫЕ МАРШРУТЫ ДЛЯ КАССЫ ---
 @app.route('/api/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
-    """Загружает списки сотрудников и подрядчиков для формы Кассы."""
+    """Загружает списки сотрудников и подрядчиков для формы Кассы, а также все доступные списки для отладки."""
     batch_payload = {
         'halt': 0,
         'cmd': {
             'users': 'user.get?filter[ACTIVE]=Y&admin=false',
             'sources': 'crm.status.list?filter[ENTITY_ID]=SOURCE',
+            'all_lists': 'lists.get?IBLOCK_TYPE_ID=lists' # Added to fetch all lists
         }
     }
     response = b24_call_method('batch', batch_payload)
@@ -95,8 +96,15 @@ def get_cashbox_initial_data():
         result = response['result']['result']
         users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in result.get('users', [])]
         sources = [{'ID': source['STATUS_ID'], 'NAME': source['NAME']} for source in result.get('sources', [])]
+        all_lists = result.get('all_lists', []) # Get all lists
+        
         # Возвращаем пустой массив категорий, т.к. автоопределение не работает
-        return jsonify({'users': users, 'sources': sources, 'categories': []})
+        return jsonify({
+            'users': users, 
+            'sources': sources, 
+            'categories': [],
+            'debug_all_lists': all_lists # Include all lists for debugging
+        })
 
     return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
 
