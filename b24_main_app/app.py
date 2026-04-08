@@ -84,13 +84,13 @@ def get_leads():
 # --- НОВЫЕ МАРШРУТЫ ДЛЯ КАССЫ ---
 @app.route('/api/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
-    """Загружает списки сотрудников, подрядчиков и поля RPA для формы Кассы."""
+    """Загружает списки сотрудников, подрядчиков и поля списка для формы Кассы."""
     batch_payload = {
         'halt': 0,
         'cmd': {
             'users': 'user.get?filter[ACTIVE]=Y&admin=false',
             'sources': 'crm.status.list?filter[ENTITY_ID]=SOURCE',
-            # ИЗМЕНЕНО: Используем lists.field.get для получения полей универсального списка
+            # ИСПОЛЬЗУЕМ КЛАССИЧЕСКИЙ API ДЛЯ СПИСКОВ
             'list_fields': f'lists.field.get?IBLOCK_TYPE_ID={IBLOCK_TYPE_ID}&IBLOCK_ID={LIST_ID}'
         }
     }
@@ -100,19 +100,19 @@ def get_cashbox_initial_data():
         users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in result.get('users', [])]
         sources = [{'ID': source['STATUS_ID'], 'NAME': source['NAME']} for source in result.get('sources', [])]
 
-        # ИЗМЕНЕНО: Парсим ответ от lists.field.get
         categories = []
         list_fields_data = result.get('list_fields', {})
-        if list_fields_data and 'UF_RPA_2_1775649039905' in list_fields_data:
-            category_field = list_fields_data['UF_RPA_2_1775649039905']
-            # Для полей типа 'enumeration' (список) значения находятся в ключе 'LIST'
-            if category_field.get('USER_TYPE_ID') == 'enumeration' and 'LIST' in category_field:
-                # Преобразуем в формат, который ожидает фронтенд: {'id': ..., 'value': ...}
-                categories = [{'id': item['ID'], 'value': item['VALUE']} for item in category_field['LIST']]
+        if list_fields_data:
+            # Ищем поле "Категория" по его ID
+            category_field_key = 'UF_RPA_2_1775649039905'
+            if category_field_key in list_fields_data:
+                category_field = list_fields_data[category_field_key]
+                if category_field.get('USER_TYPE_ID') == 'enumeration' and 'DISPLAY_VALUES_FORM' in category_field:
+                    # DISPLAY_VALUES_FORM содержит пары {ID: "Значение"}
+                    categories = [{'id': id, 'value': value} for id, value in category_field['DISPLAY_VALUES_FORM'].items()]
 
         return jsonify({'users': users, 'sources': sources, 'categories': categories})
 
-    # Обработка ошибок, если batch не удался
     error_details = "Неизвестная ошибка"
     if response and response.get('result', {}).get('result_error'):
         error_details = response['result']['result_error']
@@ -151,6 +151,7 @@ def add_expense():
     if not data:
         return jsonify({'error': 'Нет данных для сохранения'}), 400
 
+    # Собираем все поля для отправки
     fields = {
         'UF_RPA_2_NAME': data.get('name'),
         'UF_RPA_2_1775648993353': data.get('date'),
@@ -158,10 +159,8 @@ def add_expense():
         'UF_RPA_2_1775649163870': data.get('comment')
     }
 
-    # Используем ID категории, а не текст
     if data.get('category_id'):
         fields['UF_RPA_2_1775649039905'] = data['category_id']
-
     if data.get('employee_id'):
         fields['UF_RPA_2_1775649074479'] = int(data['employee_id'])
     if data.get('contractor_id'):
@@ -170,24 +169,25 @@ def add_expense():
         fields['UF_RPA_2_1775649130020'] = int(data['client_id'])
 
     try:
-        # При добавлении элемента можно использовать rpa.item.add, он более универсален
-        # Если он тоже будет давать сбой, его нужно будет заменить на lists.element.add
-        response = b24_call_method('rpa.item.add', {
-            'entityTypeId': LIST_ID,
-            'fields': fields
-        })
+        # ПОЛНОСТЬЮ ПЕРЕХОДИМ НА КЛАССИЧЕСКИЙ API СПИСКОВ
+        params = {
+            'IBLOCK_TYPE_ID': IBLOCK_TYPE_ID,
+            'IBLOCK_ID': LIST_ID,
+            'FIELDS': fields
+        }
+        response = b24_call_method('lists.element.add', params)
 
-        # Успешный ответ от rpa.item.add содержит 'item'
-        if response and response.get('item'):
-            item_id = response['item']['id']
-            app.logger.info(f"RPA элемент успешно добавлен, ID: {item_id}")
+        # Успешный ответ от lists.element.add содержит ID элемента в ключе 'result'
+        if response and response.get('result'):
+            item_id = response['result']
+            app.logger.info(f"Элемент списка успешно добавлен, ID: {item_id}")
             return jsonify({'success': True, 'id': item_id})
         else:
             error_from_b24 = response.get('error_description', response.get('error', 'Неизвестная ошибка Битрикс24 API'))
-            app.logger.error(f"Битрикс24 API вернул ошибку при добавлении расхода: {error_from_b24}")
+            app.logger.error(f"Битрикс24 API вернул ошибку при добавлении элемента списка: {error_from_b24}")
             return jsonify({'success': False, 'error': error_from_b24}), 500
     except Exception as e:
-        app.logger.error(f"Исключение при добавлении расхода в Битрикс24: {e}", exc_info=True)
+        app.logger.error(f"Исключение при добавлении элемента в список Битрикс24: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
