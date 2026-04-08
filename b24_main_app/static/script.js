@@ -30,10 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Инициализация ---
         function initialize() {
-            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-
-            applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
+            if (startDateInput) {
+                flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
+            }
+            if (endDateInput) {
+                flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
+            }
+            if (applyFilterBtn) {
+                applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
+            }
 
             fetchInitialData();
         }
@@ -47,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
 
-                if (data.sources) {
+                if (data.sources && sourceFilter) {
                     data.sources.forEach(source => {
                         const option = document.createElement('option');
                         option.value = source.STATUS_ID;
@@ -73,9 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
         async function fetchLeadsAndRenderDashboard() {
             showLoader();
             const queryParams = new URLSearchParams({
-                startDate: startDateInput.value,
-                endDate: endDateInput.value,
-                source: sourceFilter.value
+                startDate: startDateInput ? startDateInput.value : '',
+                endDate: endDateInput ? endDateInput.value : '',
+                source: sourceFilter ? sourceFilter.value : ''
             });
 
             try {
