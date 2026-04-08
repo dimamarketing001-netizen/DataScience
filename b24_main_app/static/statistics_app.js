@@ -7,11 +7,9 @@ BX24.ready(() => {
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Убираем активность со всех вкладок и панелей
             tabs.forEach(t => t.classList.remove('ui-tabs-item-active'));
             tabPanes.forEach(p => p.classList.remove('active'));
 
-            // Добавляем активность нужной вкладке
             tab.classList.add('ui-tabs-item-active');
             const targetPaneId = tab.dataset.tabId;
             const targetPane = document.getElementById(targetPaneId);
@@ -21,25 +19,25 @@ BX24.ready(() => {
         });
     });
 
-    // --- ЛОГИКА СТАТИСТИКИ (остается без изменений) ---
-    const dashboardContainer = document.getElementById('dashboard-container');
+    // --- ОБЩИЕ ЭЛЕМЕНТЫ И ФУНКЦИИ ---
     const loaderOverlay = document.getElementById('loader-overlay');
+    const showLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'flex'; };
+    const hideLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'none'; };
+
+    // --- ЛОГИКА СТАТИСТИКИ ---
+    const dashboardContainer = document.getElementById('dashboard-container');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
     const sourceFilter = document.getElementById('sourceFilter');
     const applyFilterBtn = document.getElementById('apply-filter-btn');
+    
+    let sortedStatuses = [];
 
-    if (!dashboardContainer || !loaderOverlay || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
-        console.error("Критическая ошибка: Один или несколько ключевых элементов для вкладки 'Статистика' не найдены.");
-        // Не прерываем весь скрипт, чтобы вкладка "Касса" могла работать
-    } else {
+    // Проверяем, есть ли на странице элементы для статистики, и если да - запускаем логику
+    if (dashboardContainer && startDateInput && endDateInput && sourceFilter && applyFilterBtn) {
         initializeStatistics();
     }
     
-    let sortedStatuses = [];
-    const showLoader = () => loaderOverlay.style.display = 'flex';
-    const hideLoader = () => loaderOverlay.style.display = 'none';
-
     function initializeStatistics() {
         console.log("Initializing Statistics Tab...");
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
