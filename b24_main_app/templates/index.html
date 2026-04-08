@@ -5,17 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Статистика по лидам</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
-    <!-- Ссылка на стили временно удалена, чтобы ничего не мешало -->
 </head>
 <body>
-    <!-- Все фильтры и лишние элементы убраны. Оставлен только целевой контейнер. -->
+    <!-- Максимально упрощенная структура для теста -->
     <div id="dashboard-container" class="dashboard-container">
-        <!-- Если вы видите этот текст, значит JS не сработал. -->
+        <!-- Сюда будет вставлен текст "Привет" -->
     </div>
 
-    <!-- Скрипты осталвяем, меняем версию на v=1.4 -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=1.4"></script>
+    <!-- Ссылаемся на совершенно новый файл, чтобы обойти кэш -->
+    <script src="{{ url_for('static', filename='statistics_app.js') }}"></script>
 </body>
 </html>
