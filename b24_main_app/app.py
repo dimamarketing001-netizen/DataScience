@@ -23,6 +23,7 @@ def b24_call_method(method, params={}):
         app.logger.info(
             f"Вызов метода: {method} с параметрами: {json.dumps(params, ensure_ascii=False)}")  # Добавлено логирование параметров
         response = requests.post(url, json=params)
+        app.logger.info(f"Ответ от Битрикс24 (статус {response.status_code}): {response.text}")
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
