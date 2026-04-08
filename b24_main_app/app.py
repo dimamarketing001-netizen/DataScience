@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import requests
 import logging
 import json
+import time # Added import for time
 
 # --- Конфигурация ---
 B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/"  # <--- ВАШ ВЕБХУК ЗДЕСЬ
@@ -130,9 +131,13 @@ def add_expense():
     if not data:
         return jsonify({'error': 'Нет данных для сохранения'}), 400
 
+    # Generate a unique ELEMENT_CODE using a timestamp
+    element_code = f"expense_{int(time.time())}"
+
     # Собираем все поля для отправки
     fields = {
-        'UF_RPA_2_NAME': data.get('name'),
+        'NAME': data.get('name', f"Расход {element_code}"), # Standard NAME field, with a fallback
+        'UF_RPA_2_NAME': data.get('name'), # Custom field for name, if it's also needed
         'UF_RPA_2_1775648993353': data.get('date'),
         'UF_RPA_2_1775649025545': data.get('amount'),
         'UF_RPA_2_1775649163870': data.get('comment'),
@@ -151,6 +156,7 @@ def add_expense():
         params = {
             'IBLOCK_TYPE_ID': IBLOCK_TYPE_ID,
             'IBLOCK_ID': LIST_ID,
+            'ELEMENT_CODE': element_code, # Add ELEMENT_CODE as required by the API
             'FIELDS': fields
         }
         response = b24_call_method('lists.element.add', params)
