@@ -1,5 +1,4 @@
-// BX24.ready гарантирует, что и DOM, и API Битрикс24 готовы к работе.
-// Лишняя обертка DOMContentLoaded удалена, чтобы избежать конфликтов.
+// Используем только BX24.ready, как в рабочем примере.
 BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
@@ -11,31 +10,11 @@ BX24.ready(() => {
     const sourceFilter = document.getElementById('sourceFilter');
     const applyFilterBtn = document.getElementById('apply-filter-btn');
 
-    // --- Централизованная проверка всех важных элементов ---
-    // Эта проверка остается как дополнительная мера безопасности.
-    const requiredElements = {
-        dashboardContainer,
-        loaderOverlay,
-        startDateInput,
-        endDateInput,
-        sourceFilter,
-        applyFilterBtn
-    };
-
-    for (const name in requiredElements) {
-        if (!requiredElements[name]) {
-            const errorMessage = `Критическая ошибка: Элемент DOM '${name}' не найден. Работа скрипта прекращена.`;
-            console.error(errorMessage);
-            const body = document.querySelector('body');
-            if (body) {
-                body.innerHTML = `<div style="padding: 20px; text-align: center; font-family: sans-serif; color: #a00; background-color: #fee;">
-                                    <h1>Ошибка инициализации приложения</h1>
-                                    <p>${errorMessage}</p>
-                                    <p>Убедитесь, что приложение установлено корректно и все файлы на месте.</p>
-                                 </div>`;
-            }
-            return; // Прекращаем выполнение скрипта
-        }
+    // --- Главная проверка ---
+    // Если ключевого элемента нет на странице, дальнейшее выполнение бессмысленно.
+    if (!dashboardContainer) {
+        console.error("Критическая ошибка: Элемент #dashboard-container не найден. Убедитесь, что загружен правильный HTML. Скрипт остановлен.");
+        return;
     }
 
     console.log("Success: All required DOM elements are found. Starting statistics app...");
@@ -44,14 +23,27 @@ BX24.ready(() => {
     let sortedStatuses = [];
 
     // --- Вспомогательные функции ---
-    const showLoader = () => loaderOverlay.style.display = 'flex';
-    const hideLoader = () => loaderOverlay.style.display = 'none';
+    const showLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'flex'; };
+    const hideLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'none'; };
 
     // --- Инициализация ---
     function initialize() {
-        flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-        flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-        applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
+        // Безопасно инициализируем календари
+        if (startDateInput) {
+            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
+        }
+        if (endDateInput) {
+            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
+        }
+        
+        // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Безопасно добавляем обработчик событий
+        if (applyFilterBtn) {
+            applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
+        } else {
+            // Эта ошибка не должна появиться, если HTML корректен, но это хорошая страховка.
+            console.error("Элемент #apply-filter-btn не найден. Кнопка 'Применить' не будет работать.");
+        }
+        
         fetchInitialData();
     }
 
@@ -63,7 +55,7 @@ BX24.ready(() => {
             if (!response.ok) throw new Error('Failed to load initial data');
             const data = await response.json();
 
-            if (data.sources) {
+            if (data.sources && sourceFilter) {
                 data.sources.forEach(source => {
                     const option = document.createElement('option');
                     option.value = source.STATUS_ID;
@@ -80,7 +72,7 @@ BX24.ready(() => {
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
-            dashboardContainer.innerHTML = `<p>Ошибка загрузки данных для фильтров.</p>`;
+            if (dashboardContainer) dashboardContainer.innerHTML = `<p>Ошибка загрузки данных для фильтров.</p>`;
         } finally {
             hideLoader();
         }
@@ -88,10 +80,11 @@ BX24.ready(() => {
 
     async function fetchLeadsAndRenderDashboard() {
         showLoader();
+        // Проверяем наличие полей перед использованием их значений
         const queryParams = new URLSearchParams({
-            startDate: startDateInput.value,
-            endDate: endDateInput.value,
-            source: sourceFilter.value
+            startDate: startDateInput ? startDateInput.value : '',
+            endDate: endDateInput ? endDateInput.value : '',
+            source: sourceFilter ? sourceFilter.value : ''
         });
 
         try {
@@ -101,7 +94,7 @@ BX24.ready(() => {
             renderDashboard(leads);
         } catch (error) {
             console.error("Error fetching leads:", error);
-            dashboardContainer.innerHTML = `<p>Ошибка загрузки лидов.</p>`;
+            if (dashboardContainer) dashboardContainer.innerHTML = `<p>Ошибка загрузки лидов.</p>`;
         } finally {
             hideLoader();
         }
@@ -109,6 +102,7 @@ BX24.ready(() => {
 
     // --- Отрисовка дашборда ---
     function renderDashboard(leads) {
+        if (!dashboardContainer) return;
         dashboardContainer.innerHTML = '';
         const totalLeads = leads.length;
 

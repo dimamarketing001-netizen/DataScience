@@ -6,7 +6,8 @@
     <title>Статистика по лидам</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='custom_styles.css') }}?v=1.1">
+    <!-- Изменена версия для сброса кэша -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='custom_styles.css') }}?v=1.2">
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay" style="display: none;">
@@ -52,7 +53,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <!-- Добавлен параметр ?v=1.1 для сброса кэша -->
-    <script src="{{ url_for('static', filename='script.js') }}?v=1.1"></script>
+    <!-- Изменена версия для сброса кэша -->
+    <script src="{{ url_for('static', filename='script.js') }}?v=1.2"></script>
 </body>
 </html>
