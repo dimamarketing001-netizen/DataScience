@@ -9,6 +9,13 @@ BX24.ready(function() {
     const applyFilterBtn = document.getElementById('apply-filter-btn');
     const dashboardContainer = document.getElementById('dashboard-container');
 
+    // --- Критическая проверка перед запуском ---
+    if (!applyFilterBtn) {
+        console.error("Critical Error: Button with ID 'apply-filter-btn' not found in the DOM. Please check if the correct HTML file is loaded.");
+        alert("Критическая ошибка: не найден ключевой элемент управления. Проверьте консоль.");
+        return; // Прекращаем выполнение, если кнопка не найдена
+    }
+
     // --- Глобальные переменные ---
     let statuses = []; // Сохраняем статусы для использования при отрисовке
 
@@ -22,7 +29,7 @@ BX24.ready(function() {
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
 
-        // Добавление обработчика событий
+        // Добавление обработчика событий (теперь безопасно)
         applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
 
         // Загрузка данных для фильтров и первая отрисовка
@@ -38,7 +45,6 @@ BX24.ready(function() {
             
             const data = await response.json();
             
-            // Заполняем фильтр по источникам
             if (data.sources) {
                 data.sources.forEach(source => {
                     const option = document.createElement('option');
@@ -48,12 +54,10 @@ BX24.ready(function() {
                 });
             }
 
-            // Сохраняем статусы
             if (data.statuses) {
                 statuses = data.statuses;
             }
 
-            // Загружаем лиды с фильтрами по умолчанию
             fetchLeadsAndRenderDashboard();
 
         } catch (error) {
@@ -66,11 +70,11 @@ BX24.ready(function() {
 
     async function fetchLeadsAndRenderDashboard() {
         showLoader();
-        const startDate = startDateInput.value;
-        const endDate = endDateInput.value;
-        const source = sourceFilter.value;
-
-        const queryParams = new URLSearchParams({ startDate, endDate, source });
+        const queryParams = new URLSearchParams({
+            startDate: startDateInput.value,
+            endDate: endDateInput.value,
+            source: sourceFilter.value
+        });
 
         try {
             const response = await fetch(`/api/leads?${queryParams}`);
@@ -89,7 +93,7 @@ BX24.ready(function() {
 
     // --- Отрисовка дашборда ---
     function renderDashboard(leads) {
-        dashboardContainer.innerHTML = ''; // Очищаем контейнер
+        dashboardContainer.innerHTML = '';
         const totalLeads = leads.length;
 
         if (totalLeads === 0) {
@@ -97,13 +101,11 @@ BX24.ready(function() {
             return;
         }
 
-        // Группируем лиды по статусам
         const statusCounts = leads.reduce((acc, lead) => {
             acc[lead.STATUS_ID] = (acc[lead.STATUS_ID] || 0) + 1;
             return acc;
         }, {});
 
-        // Создаем карточки для каждого статуса
         statuses.forEach(status => {
             const count = statusCounts[status.STATUS_ID] || 0;
             const conversion = totalLeads > 0 ? ((count / totalLeads) * 100).toFixed(2) : 0;
