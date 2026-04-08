@@ -1,0 +1,1 @@
+web: gunicorn b24_main_app.app:app
