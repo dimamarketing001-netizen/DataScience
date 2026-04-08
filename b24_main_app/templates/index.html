@@ -6,8 +6,55 @@
     <title>Финансы и Статистика</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <!-- Используем относительный путь -->
     <link rel="stylesheet" href="static/custom_styles.css">
+    <style>
+        /* Стили для главного меню и карточек */
+        .main-menu {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            padding: 40px 20px;
+        }
+        .menu-card {
+            width: 250px;
+            padding: 20px;
+            border: 1px solid #eef2f4;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background-color: #fff;
+        }
+        .menu-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        .menu-card-icon {
+            font-size: 48px;
+            color: #2fc6f6;
+            margin-bottom: 15px;
+        }
+        .menu-card-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .menu-card-description {
+            font-size: 14px;
+            color: #828b95;
+        }
+        /* Стили для экранов и кнопки "Назад" */
+        .app-screen {
+            display: none; /* Все экраны по умолчанию скрыты */
+        }
+        .app-screen.active {
+            display: block; /* Активный экран показывается */
+        }
+        .back-button {
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay" style="display: none;">
@@ -15,64 +62,59 @@
     </div>
 
     <div class="workarea-content-paddings">
-        <!-- Блок с вкладками -->
-        <div class="ui-tabs">
-            <div class="ui-tabs-nav">
-                <div class="ui-tabs-item ui-tabs-item-active" data-tab-id="tab-cashbox">
-                    <div class="ui-tabs-title">Касса</div>
+
+        <!-- ЭКРАН: ГЛАВНОЕ МЕНЮ -->
+        <div id="main-menu" class="app-screen active">
+            <div class="ui-form-title">
+                <div class="ui-form-title-text">Выберите раздел</div>
+            </div>
+            <div class="main-menu">
+                <div id="goto-cashbox" class="menu-card">
+                    <div class="menu-card-icon">💰</div>
+                    <div class="menu-card-title">Касса</div>
+                    <div class="menu-card-description">Внесение и учет расходов, зарплат и прочих финансовых операций.</div>
                 </div>
-                <div class="ui-tabs-item" data-tab-id="tab-statistics">
-                    <div class="ui-tabs-title">Статистика</div>
+                <div id="goto-statistics" class="menu-card">
+                    <div class="menu-card-icon">📊</div>
+                    <div class="menu-card-title">Статистика</div>
+                    <div class="menu-card-description">Анализ конверсии лидов по стадиям и источникам.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Контент вкладок -->
-        <div class="tab-content">
-            <!-- ВКЛАДКА "КАССА" -->
-            <div id="tab-cashbox" class="tab-pane active">
-                <!-- Здесь будет форма для внесения расходов -->
-                <h2 style="text-align: center; margin-top: 20px;">Скоро здесь появится форма для учета расходов</h2>
+        <!-- ЭКРАН: КАССА -->
+        <div id="cashbox-screen" class="app-screen">
+            <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
+            <div class="ui-form-title">
+                <div class="ui-form-title-text">Касса</div>
             </div>
-
-            <!-- ВКЛАДКА "СТАТИСТИКА" -->
-            <div id="tab-statistics" class="tab-pane">
-                <div class="ui-form-title">
-                    <div class="ui-form-title-text">Статистика по лидам</div>
-                </div>
-                <!-- Блок фильтров -->
-                <div class="filter-container">
-                    <div class="filter-item">
-                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата">
-                        </div>
-                    </div>
-                    <div class="filter-item">
-                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата">
-                        </div>
-                    </div>
-                    <div class="filter-item">
-                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                            <select id="sourceFilter" class="ui-ctl-element">
-                                <option value="">Все источники</option>
-                            </select>
-                        </div>
-                    </div>
-                     <div class="filter-item">
-                        <button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button>
-                    </div>
-                </div>
-                <!-- Дашборд для статистики -->
-                <div id="dashboard-container" class="dashboard-container"></div>
-            </div>
+            <!-- Здесь будет форма для внесения расходов -->
+            <h2 style="text-align: center; margin-top: 20px;">Скоро здесь появится форма для учета расходов</h2>
         </div>
+
+        <!-- ЭКРАН: СТАТИСТИКА -->
+        <div id="statistics-screen" class="app-screen">
+            <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
+            <div class="ui-form-title">
+                <div class="ui-form-title-text">Статистика по лидам</div>
+            </div>
+            <div class="filter-container">
+                <div class="filter-item"><input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата"></div>
+                <div class="filter-item"><input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата"></div>
+                <div class="filter-item">
+                    <select id="sourceFilter" class="ui-ctl-element">
+                        <option value="">Все источники</option>
+                    </select>
+                </div>
+                <div class="filter-item"><button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button></div>
+            </div>
+            <div id="dashboard-container" class="dashboard-container"></div>
+        </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <!-- Используем относительный путь к нашему файлу -->
     <script src="static/statistics_app.js"></script>
 </body>
 </html>

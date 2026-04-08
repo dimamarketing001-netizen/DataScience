@@ -1,22 +1,27 @@
 BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
-    // --- ЛОГИКА ВКЛАДОК ---
-    const tabs = document.querySelectorAll('.ui-tabs-item');
-    const tabPanes = document.querySelectorAll('.tab-pane');
+    // --- ЛОГИКА НАВИГАЦИИ МЕЖДУ ЭКРАНАМИ ---
+    const screens = document.querySelectorAll('.app-screen');
+    const mainMenu = document.getElementById('main-menu');
+    const cashboxScreen = document.getElementById('cashbox-screen');
+    const statisticsScreen = document.getElementById('statistics-screen');
+    
+    const gotoCashboxBtn = document.getElementById('goto-cashbox');
+    const gotoStatisticsBtn = document.getElementById('goto-statistics');
+    const backButtons = document.querySelectorAll('.back-button');
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('ui-tabs-item-active'));
-            tabPanes.forEach(p => p.classList.remove('active'));
-
-            tab.classList.add('ui-tabs-item-active');
-            const targetPaneId = tab.dataset.tabId;
-            const targetPane = document.getElementById(targetPaneId);
-            if (targetPane) {
-                targetPane.classList.add('active');
-            }
+    const showScreen = (screenToShow) => {
+        screens.forEach(screen => {
+            screen.classList.remove('active');
         });
+        screenToShow.classList.add('active');
+    };
+
+    gotoCashboxBtn.addEventListener('click', () => showScreen(cashboxScreen));
+    gotoStatisticsBtn.addEventListener('click', () => showScreen(statisticsScreen));
+    backButtons.forEach(button => {
+        button.addEventListener('click', () => showScreen(mainMenu));
     });
 
     // --- ОБЩИЕ ЭЛЕМЕНТЫ И ФУНКЦИИ ---
@@ -24,7 +29,7 @@ BX24.ready(() => {
     const showLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'flex'; };
     const hideLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'none'; };
 
-    // --- ЛОГИКА СТАТИСТИКИ ---
+    // --- ЛОГИКА СТАТИСТИКИ (остается без изменений) ---
     const dashboardContainer = document.getElementById('dashboard-container');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
@@ -32,14 +37,22 @@ BX24.ready(() => {
     const applyFilterBtn = document.getElementById('apply-filter-btn');
     
     let sortedStatuses = [];
+    let statisticsInitialized = false; // Флаг, чтобы инициализировать статистику только один раз
 
-    // Проверяем, есть ли на странице элементы для статистики, и если да - запускаем логику
-    if (dashboardContainer && startDateInput && endDateInput && sourceFilter && applyFilterBtn) {
-        initializeStatistics();
-    }
+    // Запускаем логику статистики, только когда пользователь переходит на этот экран
+    gotoStatisticsBtn.addEventListener('click', () => {
+        if (!statisticsInitialized) {
+            initializeStatistics();
+            statisticsInitialized = true;
+        }
+    });
     
     function initializeStatistics() {
-        console.log("Initializing Statistics Tab...");
+        console.log("Initializing Statistics Screen...");
+        if (!dashboardContainer || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
+            console.error("Ошибка инициализации: один из элементов экрана статистики не найден.");
+            return;
+        }
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
