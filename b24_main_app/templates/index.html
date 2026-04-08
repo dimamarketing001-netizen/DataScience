@@ -8,66 +8,26 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="static/custom_styles.css">
     <style>
-        /* Стили для главного меню и карточек */
-        .main-menu {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 30px;
-            padding: 40px 20px;
-        }
-        .menu-card {
-            width: 250px;
-            padding: 20px;
-            border: 1px solid #eef2f4;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            background-color: #fff;
-        }
-        .menu-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-        .menu-card-icon {
-            font-size: 48px;
-            color: #2fc6f6;
-            margin-bottom: 15px;
-        }
-        .menu-card-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        .menu-card-description {
-            font-size: 14px;
-            color: #828b95;
-        }
-        /* Стили для экранов и кнопки "Назад" */
-        .app-screen {
-            display: none; /* Все экраны по умолчанию скрыты */
-        }
-        .app-screen.active {
-            display: block; /* Активный экран показывается */
-        }
-        .back-button {
-            margin-bottom: 20px;
-        }
+        .main-menu { display: flex; justify-content: center; align-items: center; gap: 30px; padding: 40px 20px; }
+        .menu-card { width: 250px; padding: 20px; border: 1px solid #eef2f4; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s ease-in-out; background-color: #fff; }
+        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); }
+        .menu-card-icon { font-size: 48px; color: #2fc6f6; margin-bottom: 15px; }
+        .menu-card-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        .menu-card-description { font-size: 14px; color: #828b95; }
+        .app-screen { display: none; }
+        .app-screen.active { display: block; }
+        .back-button { margin-bottom: 20px; }
+        /* Стили для динамических полей в форме */
+        .dynamic-field { display: none; }
     </style>
 </head>
 <body>
-    <div id="loader-overlay" class="loader-overlay" style="display: none;">
-        <div class="loader"></div>
-    </div>
+    <div id="loader-overlay" class="loader-overlay" style="display: none;"><div class="loader"></div></div>
 
     <div class="workarea-content-paddings">
-
         <!-- ЭКРАН: ГЛАВНОЕ МЕНЮ -->
         <div id="main-menu" class="app-screen active">
-            <div class="ui-form-title">
-                <div class="ui-form-title-text">Выберите раздел</div>
-            </div>
+            <div class="ui-form-title"><div class="ui-form-title-text">Выберите раздел</div></div>
             <div class="main-menu">
                 <div id="goto-cashbox" class="menu-card">
                     <div class="menu-card-icon">💰</div>
@@ -85,32 +45,87 @@
         <!-- ЭКРАН: КАССА -->
         <div id="cashbox-screen" class="app-screen">
             <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
-            <div class="ui-form-title">
-                <div class="ui-form-title-text">Касса</div>
-            </div>
-            <!-- Здесь будет форма для внесения расходов -->
-            <h2 style="text-align: center; margin-top: 20px;">Скоро здесь появится форма для учета расходов</h2>
+            <div class="ui-form-title"><div class="ui-form-title-text">Добавить расход</div></div>
+
+            <form id="expense-form" class="ui-form">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="expense-date" class="ui-ctl-element" required></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="expense-amount" class="ui-ctl-element" required></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Категория</div></div>
+                    <div class="ui-form-content">
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="expense-category" class="ui-ctl-element">
+                                <option value="">Выберите категорию...</option>
+                                <option value="office">Офис и Операционные расходы</option>
+                                <option value="employees">Сотрудники</option>
+                                <option value="marketing">Маркетинг и Лиды</option>
+                                <option value="clients">Расходы по Клиентам</option>
+                                <option value="taxes">Налоги и Банк</option>
+                                <option value="it">IT и Оборудование</option>
+                                <option value="transfers">Внутренние переводы</option>
+                                <option value="other">Прочее</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Динамические поля -->
+                <div id="employee-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="expense-employee" class="ui-ctl-element"></select></div></div>
+                    </div>
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Тип выплаты</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="expense-payment-type" class="ui-ctl-element"><option value="fix">Фикса/ЗП</option><option value="motivation">Мотивация/Премия</option></select></div></div>
+                    </div>
+                </div>
+
+                <div id="marketing-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="expense-contractor" class="ui-ctl-element"></select></div></div>
+                    </div>
+                </div>
+
+                <div id="client-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска..."></div></div>
+                    </div>
+                </div>
+
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="expense-comment" class="ui-ctl-element"></textarea></div></div>
+                </div>
+
+                <div class="ui-form-row">
+                    <div class="ui-form-label"></div>
+                    <div class="ui-form-content"><button type="submit" class="ui-btn ui-btn-primary">Сохранить расход</button></div>
+                </div>
+            </form>
         </div>
 
         <!-- ЭКРАН: СТАТИСТИКА -->
         <div id="statistics-screen" class="app-screen">
             <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
-            <div class="ui-form-title">
-                <div class="ui-form-title-text">Статистика по лидам</div>
-            </div>
+            <div class="ui-form-title"><div class="ui-form-title-text">Статистика по лидам</div></div>
             <div class="filter-container">
                 <div class="filter-item"><input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата"></div>
                 <div class="filter-item"><input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата"></div>
-                <div class="filter-item">
-                    <select id="sourceFilter" class="ui-ctl-element">
-                        <option value="">Все источники</option>
-                    </select>
-                </div>
+                <div class="filter-item"><select id="sourceFilter" class="ui-ctl-element"><option value="">Все источники</option></select></div>
                 <div class="filter-item"><button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button></div>
             </div>
             <div id="dashboard-container" class="dashboard-container"></div>
         </div>
-
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
