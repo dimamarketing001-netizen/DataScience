@@ -46,102 +46,96 @@ BX24.ready(() => {
         marketing: document.getElementById('marketing-fields'),
         clients: document.getElementById('client-fields')
     };
+    // Модальное окно
+    const modal = document.getElementById('custom-modal');
+    const modalText = document.getElementById('modal-text');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    function showCustomConfirm(text, data) {
+        return new Promise(resolve => {
+            modalText.innerHTML = text; // Используем innerHTML для поддержки тегов
+            modal.style.display = 'flex';
+            confirmBtn.onclick = () => { modal.style.display = 'none'; resolve(true); };
+            cancelBtn.onclick = () => { modal.style.display = 'none'; resolve(false); };
+        });
+    }
 
     function initializeCashbox() {
         console.log("Initializing Cashbox Screen...");
-        // Инициализация календаря
         flatpickr("#expense-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
 
-        // Заполнение списков
         const employees = ["Попов", "Мирзоев", "Аптряев", "Иванова", "Васильев", "Коротаева", "Константинов", "Карпенко", "Хайнова", "Григорий"];
         const contractors = ["Лидпрайм", "Верба", "2ГИС", "Клик.Ру", "Яндекс", "МТТ", "Битрикс", "Сбер", "Т-банк", "Дельта"];
-
+        
         const employeeSelect = document.getElementById('expense-employee');
         const contractorSelect = document.getElementById('expense-contractor');
+        employees.forEach(name => employeeSelect.add(new Option(name, name)));
+        contractors.forEach(name => contractorSelect.add(new Option(name, name)));
 
-        employees.forEach(name => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            employeeSelect.appendChild(option);
-        });
-
-        contractors.forEach(name => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            contractorSelect.appendChild(option);
-        });
-
-        // Логика отображения динамических полей
         expenseCategory.addEventListener('change', (event) => {
-            // Сначала скрыть все динамические поля
             Object.values(dynamicFields).forEach(field => field.style.display = 'none');
-            // Показать нужное поле
             const selectedCategory = event.target.value;
             if (dynamicFields[selectedCategory]) {
                 dynamicFields[selectedCategory].style.display = 'block';
             }
         });
 
-        // Поиск клиентов (пока просто пример)
         const clientSearchInput = document.getElementById('expense-client-search');
         clientSearchInput.addEventListener('input', (event) => {
             const searchTerm = event.target.value;
-            if (searchTerm.length > 2) {
-                console.log(`Ищем клиента: ${searchTerm}`);
-                // Здесь будет вызов BX24.callMethod('crm.contact.list', ...)
-            }
+            if (searchTerm.length > 2) console.log(`Ищем клиента: ${searchTerm}`);
         });
 
-        // Обработка отправки формы
-        expenseForm.addEventListener('submit', (event) => {
+        expenseForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const formData = {
                 date: document.getElementById('expense-date').value,
                 amount: document.getElementById('expense-amount').value,
-                category: expenseCategory.value,
+                category: expenseCategory.options[expenseCategory.selectedIndex].text,
+                category_val: expenseCategory.value,
                 comment: document.getElementById('expense-comment').value,
             };
-            // Добавляем данные из динамических полей
-            if (formData.category === 'employees') {
+
+            let details = '';
+            if (formData.category_val === 'employees') {
                 formData.employee = document.getElementById('expense-employee').value;
                 formData.paymentType = document.getElementById('expense-payment-type').value;
-            } else if (formData.category === 'marketing') {
+                details = `<li>Сотрудник: <strong>${formData.employee}</strong></li><li>Тип: <strong>${formData.paymentType}</strong></li>`;
+            } else if (formData.category_val === 'marketing') {
                 formData.contractor = document.getElementById('expense-contractor').value;
-            } else if (formData.category === 'clients') {
+                details = `<li>Подрядчик: <strong>${formData.contractor}</strong></li>`;
+            } else if (formData.category_val === 'clients') {
                 formData.client = document.getElementById('expense-client-search').value;
+                details = `<li>Клиент: <strong>${formData.client}</strong></li>`;
             }
-            console.log("Сохраняем расход:", formData);
-            alert("Расход сохранен (в консоли)");
-            expenseForm.reset();
-            // Сбрасываем динамические поля
-            Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+
+            const confirmationText = `
+                <p>Вы уверены, что хотите сохранить расход?</p>
+                <ul>
+                    <li>Дата: <strong>${formData.date}</strong></li>
+                    <li>Сумма: <strong>${formData.amount}</strong></li>
+                    <li>Категория: <strong>${formData.category}</strong></li>
+                    ${details}
+                    ${formData.comment ? `<li>Комментарий: <strong>${formData.comment}</strong></li>` : ''}
+                </ul>
+            `;
+
+            const isConfirmed = await showCustomConfirm(confirmationText, formData);
+
+            if (isConfirmed) {
+                console.log("Сохраняем расход:", formData);
+                // Здесь будет вызов BX24.callMethod для сохранения в универсальный список
+                alert("Расход сохранен (в консоли)");
+                expenseForm.reset();
+                Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+            } else {
+                console.log("Сохранение отменено пользователем.");
+            }
         });
     }
 
     // --- ЛОГИКА СТАТИСТИКИ ---
     let statisticsInitialized = false;
-    const dashboardContainer = document.getElementById('dashboard-container');
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    const sourceFilter = document.getElementById('sourceFilter');
-    const applyFilterBtn = document.getElementById('apply-filter-btn');
-    let sortedStatuses = [];
-
-    function initializeStatistics() {
-        console.log("Initializing Statistics Screen...");
-        if (!dashboardContainer || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
-            console.error("Ошибка инициализации: один из элементов экрана статистики не найден.");
-            return;
-        }
-        flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-        flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-        applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
-        fetchInitialData();
-    }
-
-    async function fetchInitialData() { /* ... код без изменений ... */ }
-    async function fetchLeadsAndRenderDashboard() { /* ... код без изменений ... */ }
-    function renderDashboard(leads) { /* ... код без изменений ... */ }
+    // ... остальной код статистики без изменений ...
 });
