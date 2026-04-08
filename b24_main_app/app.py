@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import requests
 import logging
 import json
-import time # Added import for time
+import time  # Added import for time
 
 # --- Конфигурация ---
 B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/"  # <--- ВАШ ВЕБХУК ЗДЕСЬ
@@ -82,29 +82,23 @@ def get_leads():
 # --- НОВЫЕ МАРШРУТЫ ДЛЯ КАССЫ ---
 @app.route('/api/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
-    """Загружает списки сотрудников и подрядчиков для формы Кассы, а также все доступные списки для отладки."""
+    """Загружает списки сотрудников и подрядчиков для формы Кассы."""
     batch_payload = {
         'halt': 0,
         'cmd': {
             'users': 'user.get?filter[ACTIVE]=Y&admin=false',
             'sources': 'crm.status.list?filter[ENTITY_ID]=SOURCE',
-            'all_lists': 'lists.get?IBLOCK_TYPE_ID=lists' # Added to fetch all lists
         }
     }
     response = b24_call_method('batch', batch_payload)
     if response and response.get('result', {}).get('result'):
         result = response['result']['result']
-        users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in result.get('users', [])]
+        users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in
+                 result.get('users', [])]
         sources = [{'ID': source['STATUS_ID'], 'NAME': source['NAME']} for source in result.get('sources', [])]
-        all_lists = result.get('all_lists', []) # Get all lists
-        
+
         # Возвращаем пустой массив категорий, т.к. автоопределение не работает
-        return jsonify({
-            'users': users, 
-            'sources': sources, 
-            'categories': [],
-            'debug_all_lists': all_lists # Include all lists for debugging
-        })
+        return jsonify({'users': users, 'sources': sources, 'categories': []})
 
     return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
 
@@ -144,8 +138,8 @@ def add_expense():
 
     # Собираем все поля для отправки
     fields = {
-        'NAME': data.get('name', f"Расход {element_code}"), # Standard NAME field, with a fallback
-        'UF_RPA_2_NAME': data.get('name'), # Custom field for name, if it's also needed
+        'NAME': data.get('name', f"Расход {element_code}"),  # Standard NAME field, with a fallback
+        'UF_RPA_2_NAME': data.get('name'),  # Custom field for name, if it's also needed
         'UF_RPA_2_1775648993353': data.get('date'),
         'UF_RPA_2_1775649025545': data.get('amount'),
         'UF_RPA_2_1775649163870': data.get('comment'),
@@ -154,17 +148,19 @@ def add_expense():
     }
 
     if data.get('employee_id'):
-        fields['UF_RPA_2_1775649074479'] = int(data['employee_id'])
+        # Format as U_ID for user link field (even if defined as generic string)
+        fields['UF_RPA_2_1775649074479'] = f"U_{data['employee_id']}"
     if data.get('contractor_id'):
         fields['UF_RPA_2_1775649104323'] = data['contractor_id']
     if data.get('client_id'):
-        fields['UF_RPA_2_1775649130020'] = int(data['client_id'])
+        # Format as C_ID for contact link field (even if defined as generic string)
+        fields['UF_RPA_2_1775649130020'] = f"C_{data['client_id']}"
 
     try:
         params = {
             'IBLOCK_TYPE_ID': IBLOCK_TYPE_ID,
             'IBLOCK_ID': LIST_ID,
-            'ELEMENT_CODE': element_code, # Add ELEMENT_CODE as required by the API
+            'ELEMENT_CODE': element_code,  # Add ELEMENT_CODE as required by the API
             'FIELDS': fields
         }
         response = b24_call_method('lists.element.add', params)
@@ -174,7 +170,8 @@ def add_expense():
             app.logger.info(f"Элемент списка успешно добавлен, ID: {item_id}")
             return jsonify({'success': True, 'id': item_id})
         else:
-            error_from_b24 = response.get('error_description', response.get('error', 'Неизвестная ошибка Битрикс24 API'))
+            error_from_b24 = response.get('error_description',
+                                          response.get('error', 'Неизвестная ошибка Битрикс24 API'))
             app.logger.error(f"Битрикс24 API вернул ошибку при добавлении элемента списка: {error_from_b24}")
             return jsonify({'success': False, 'error': error_from_b24}), 500
     except Exception as e:
