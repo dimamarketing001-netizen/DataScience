@@ -1,7 +1,27 @@
 BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
-    // --- Элементы DOM ---
+    // --- ЛОГИКА ВКЛАДОК ---
+    const tabs = document.querySelectorAll('.ui-tabs-item');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Убираем активность со всех вкладок и панелей
+            tabs.forEach(t => t.classList.remove('ui-tabs-item-active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+
+            // Добавляем активность нужной вкладке
+            tab.classList.add('ui-tabs-item-active');
+            const targetPaneId = tab.dataset.tabId;
+            const targetPane = document.getElementById(targetPaneId);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+        });
+    });
+
+    // --- ЛОГИКА СТАТИСТИКИ (остается без изменений) ---
     const dashboardContainer = document.getElementById('dashboard-container');
     const loaderOverlay = document.getElementById('loader-overlay');
     const startDateInput = document.getElementById('startDate');
@@ -9,33 +29,28 @@ BX24.ready(() => {
     const sourceFilter = document.getElementById('sourceFilter');
     const applyFilterBtn = document.getElementById('apply-filter-btn');
 
-    // --- Главная проверка ---
     if (!dashboardContainer || !loaderOverlay || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
-        console.error("Критическая ошибка: Один или несколько ключевых элементов DOM не найдены. Работа скрипта прекращена.");
-        return;
+        console.error("Критическая ошибка: Один или несколько ключевых элементов для вкладки 'Статистика' не найдены.");
+        // Не прерываем весь скрипт, чтобы вкладка "Касса" могла работать
+    } else {
+        initializeStatistics();
     }
-    console.log("Success: All required DOM elements are found. Starting statistics app...");
-
-    // --- Глобальные переменные ---
+    
     let sortedStatuses = [];
-
-    // --- Вспомогательные функции ---
     const showLoader = () => loaderOverlay.style.display = 'flex';
     const hideLoader = () => loaderOverlay.style.display = 'none';
 
-    // --- Инициализация ---
-    function initialize() {
+    function initializeStatistics() {
+        console.log("Initializing Statistics Tab...");
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
         fetchInitialData();
     }
 
-    // --- Загрузка данных ---
     async function fetchInitialData() {
         showLoader();
         try {
-            // Используем относительный путь для API
             const response = await fetch('api/initial_data');
             if (!response.ok) throw new Error('Failed to load initial data');
             const data = await response.json();
@@ -54,7 +69,6 @@ BX24.ready(() => {
             }
 
             await fetchLeadsAndRenderDashboard();
-
         } catch (error) {
             console.error("Error fetching initial data:", error);
             dashboardContainer.innerHTML = `<p>Ошибка загрузки данных для фильтров.</p>`;
@@ -72,7 +86,6 @@ BX24.ready(() => {
         });
 
         try {
-            // Используем относительный путь для API
             const response = await fetch(`api/leads?${queryParams}`);
             if (!response.ok) throw new Error('Failed to load leads');
             const leads = await response.json();
@@ -85,7 +98,6 @@ BX24.ready(() => {
         }
     }
 
-    // --- Отрисовка дашборда ---
     function renderDashboard(leads) {
         dashboardContainer.innerHTML = '';
         const totalLeads = leads.length;
@@ -127,7 +139,4 @@ BX24.ready(() => {
             }
         });
     }
-
-    // --- Запуск приложения ---
-    initialize();
 });

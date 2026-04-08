@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Статистика по лидам</title>
+    <title>Финансы и Статистика</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <!-- Используем относительный путь -->
@@ -15,45 +15,64 @@
     </div>
 
     <div class="workarea-content-paddings">
-        <div class="ui-form-title">
-            <div class="ui-form-title-text">Статистика по лидам</div>
-        </div>
-
-        <!-- Блок фильтров -->
-        <div class="filter-container">
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                    <input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата">
+        <!-- Блок с вкладками -->
+        <div class="ui-tabs">
+            <div class="ui-tabs-nav">
+                <div class="ui-tabs-item ui-tabs-item-active" data-tab-id="tab-cashbox">
+                    <div class="ui-tabs-title">Касса</div>
                 </div>
-            </div>
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                    <input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата">
+                <div class="ui-tabs-item" data-tab-id="tab-statistics">
+                    <div class="ui-tabs-title">Статистика</div>
                 </div>
-            </div>
-            <div class="filter-item">
-                <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                     <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                    <select id="sourceFilter" class="ui-ctl-element">
-                        <option value="">Все источники</option>
-                        <!-- Источники будут загружены сюда -->
-                    </select>
-                </div>
-            </div>
-             <div class="filter-item">
-                <button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button>
             </div>
         </div>
 
-        <!-- Дашборд для статистики -->
-        <div id="dashboard-container" class="dashboard-container">
-            <!-- Карточки со статистикой будут здесь -->
+        <!-- Контент вкладок -->
+        <div class="tab-content">
+            <!-- ВКЛАДКА "КАССА" -->
+            <div id="tab-cashbox" class="tab-pane active">
+                <!-- Здесь будет форма для внесения расходов -->
+                <h2 style="text-align: center; margin-top: 20px;">Скоро здесь появится форма для учета расходов</h2>
+            </div>
+
+            <!-- ВКЛАДКА "СТАТИСТИКА" -->
+            <div id="tab-statistics" class="tab-pane">
+                <div class="ui-form-title">
+                    <div class="ui-form-title-text">Статистика по лидам</div>
+                </div>
+                <!-- Блок фильтров -->
+                <div class="filter-container">
+                    <div class="filter-item">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="sourceFilter" class="ui-ctl-element">
+                                <option value="">Все источники</option>
+                            </select>
+                        </div>
+                    </div>
+                     <div class="filter-item">
+                        <button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button>
+                    </div>
+                </div>
+                <!-- Дашборд для статистики -->
+                <div id="dashboard-container" class="dashboard-container"></div>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <!-- Используем относительный путь к нашему новому файлу -->
+    <!-- Используем относительный путь к нашему файлу -->
     <script src="static/statistics_app.js"></script>
 </body>
 </html>
