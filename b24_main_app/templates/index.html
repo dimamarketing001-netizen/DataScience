@@ -12,7 +12,7 @@
         <!-- Сюда будет вставлен текст "Привет" -->
     </div>
 
-    <!-- Ссылаемся на совершенно новый файл, чтобы обойти кэш -->
-    <script src="{{ url_for('static', filename='statistics_app.js') }}"></script>
+    <!-- ИСПРАВЛЕНО: Используем относительный путь без url_for, чтобы он работал из подпапки -->
+    <script src="static/statistics_app.js"></script>
 </body>
 </html>
