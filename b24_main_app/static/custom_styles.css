@@ -55,6 +55,7 @@ body {
     padding: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
+    position: relative; /* Для позиционирования стрелки */
 }
 
 .status-card:hover {
@@ -81,9 +82,15 @@ body {
     color: #0b66c3;
 }
 
-.status-card .conversion {
+/* --- Новый стиль для стрелки конверсии --- */
+.conversion-arrow {
+    position: absolute;
+    top: -25px; /* Позиционируем над карточкой */
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
     font-weight: bold;
-    color: #333;
+    color: #535c69;
 }
 
 

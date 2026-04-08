@@ -1,7 +1,7 @@
 BX24.ready(function() {
     console.log("BX24 is ready. Lead statistics app starts.");
 
-    // --- Элементы управления ---
+    // --- Элементы DOM ---
     const loaderOverlay = document.getElementById('loader-overlay');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
@@ -9,34 +9,38 @@ BX24.ready(function() {
     const applyFilterBtn = document.getElementById('apply-filter-btn');
     const dashboardContainer = document.getElementById('dashboard-container');
 
-    // --- Критическая проверка перед запуском ---
-    if (!applyFilterBtn) {
-        console.error("Critical Error: Button with ID 'apply-filter-btn' not found in the DOM. Please check if the correct HTML file is loaded.");
-        alert("Критическая ошибка: не найден ключевой элемент управления. Проверьте консоль.");
-        return; // Прекращаем выполнение, если кнопка не найдена
-    }
-
-    // --- Глобальные переменные ---
-    let statuses = []; // Сохраняем статусы для использования при отрисовке
+    // --- Глобальные переменные для хранения данных ---
+    let sortedStatuses = []; // Статусы, отсортированные как в CRM
 
     // --- Вспомогательные функции ---
-    const showLoader = () => loaderOverlay.style.display = 'flex';
-    const hideLoader = () => loaderOverlay.style.display = 'none';
+    const showLoader = () => {
+        if (loaderOverlay) loaderOverlay.style.display = 'flex';
+    };
+    const hideLoader = () => {
+        if (loaderOverlay) loaderOverlay.style.display = 'none';
+    };
 
-    // --- Инициализация ---
+    // --- Инициализация приложения ---
     function initialize() {
+        // Проверяем наличие ключевых элементов
+        if (!applyFilterBtn || !dashboardContainer) {
+            console.error("Critical Error: Key UI elements not found. Check HTML structure.");
+            alert("Критическая ошибка: отсутствует интерфейс. Проверьте HTML.");
+            return;
+        }
+
         // Инициализация календарей
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
 
-        // Добавление обработчика событий (теперь безопасно)
+        // Навешиваем обработчик на кнопку
         applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
 
-        // Загрузка данных для фильтров и первая отрисовка
+        // Загружаем первоначальные данные (статусы, источники) и запускаем первый поиск
         fetchInitialData();
     }
 
-    // --- Загрузка данных ---
+    // --- Загрузка данных для фильтров ---
     async function fetchInitialData() {
         showLoader();
         try {
@@ -45,6 +49,7 @@ BX24.ready(function() {
             
             const data = await response.json();
             
+            // Заполняем фильтр по источникам
             if (data.sources) {
                 data.sources.forEach(source => {
                     const option = document.createElement('option');
@@ -54,20 +59,23 @@ BX24.ready(function() {
                 });
             }
 
+            // Сохраняем и сортируем статусы по полю SORT, как в CRM
             if (data.statuses) {
-                statuses = data.statuses;
+                sortedStatuses = data.statuses.sort((a, b) => parseInt(a.SORT) - parseInt(b.SORT));
             }
 
-            fetchLeadsAndRenderDashboard();
+            // После успешной загрузки данных, запускаем первый поиск лидов
+            await fetchLeadsAndRenderDashboard();
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
-            dashboardContainer.innerHTML = `<p>Ошибка загрузки начальных данных. Попробуйте обновить страницу.</p>`;
+            dashboardContainer.innerHTML = `<p>Ошибка загрузки данных для фильтров. Попробуйте обновить страницу.</p>`;
         } finally {
             hideLoader();
         }
     }
 
+    // --- Основная функция: получение лидов и отрисовка дашборда ---
     async function fetchLeadsAndRenderDashboard() {
         showLoader();
         const queryParams = new URLSearchParams({
@@ -91,9 +99,9 @@ BX24.ready(function() {
         }
     }
 
-    // --- Отрисовка дашборда ---
+    // --- Отрисовка дашборда с новой логикой конверсии ---
     function renderDashboard(leads) {
-        dashboardContainer.innerHTML = '';
+        dashboardContainer.innerHTML = ''; // Очищаем контейнер
         const totalLeads = leads.length;
 
         if (totalLeads === 0) {
@@ -101,23 +109,42 @@ BX24.ready(function() {
             return;
         }
 
+        // Считаем количество лидов в каждом статусе
         const statusCounts = leads.reduce((acc, lead) => {
             acc[lead.STATUS_ID] = (acc[lead.STATUS_ID] || 0) + 1;
             return acc;
         }, {});
 
-        statuses.forEach(status => {
+        let previousStatusCount = totalLeads; // Для первого статуса конверсия считается от общего числа
+
+        // Создаем карточки для каждого статуса в отсортированном порядке
+        sortedStatuses.forEach(status => {
             const count = statusCounts[status.STATUS_ID] || 0;
-            const conversion = totalLeads > 0 ? ((count / totalLeads) * 100).toFixed(2) : 0;
+
+            // Считаем конверсию из предыдущего статуса
+            let conversionRate = 0;
+            if (previousStatusCount > 0) {
+                conversionRate = ((count / previousStatusCount) * 100).toFixed(1);
+            }
 
             const card = document.createElement('div');
             card.className = 'status-card';
-            card.innerHTML = `
+
+            // Добавляем стрелку конверсии, если это не первая карточка
+            if (previousStatusCount !== totalLeads) {
+                card.innerHTML += `<div class="conversion-arrow">↓ ${conversionRate}%</div>`;
+            }
+
+            card.innerHTML += `
                 <h3>${status.NAME}</h3>
-                <p>Количество: <span class="count">${count}</span></p>
-                <p>Конверсия: <span class="conversion">${conversion}%</span></p>
+                <p>Количество лидов: <span class="count">${count}</span></p>
             `;
             dashboardContainer.appendChild(card);
+
+            // Обновляем счетчик для следующего шага воронки, только если на текущем шаге были лиды
+            if (count > 0) {
+                previousStatusCount = count;
+            }
         });
     }
 
