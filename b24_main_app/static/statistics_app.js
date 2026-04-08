@@ -79,6 +79,10 @@ BX24.ready(() => {
             if (!response.ok) throw new Error('Failed to load cashbox initial data');
             const data = await response.json();
 
+            // --- ОТЛАДКА ---
+            console.log("Полные данные, полученные от /api/cashbox_initial_data:", data);
+            // --- КОНЕЦ ОТЛАДКИ ---
+
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
             availableCategories = data.categories || []; // <--- Сохраняем полученные категории
@@ -227,14 +231,26 @@ BX24.ready(() => {
             if (isConfirmed) {
                 showLoader();
                 try {
-                    // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+                    // --- ОТЛАДКА ---
+                    console.log(`[ОТЛАДКА] Ищем ID для категории: "${formData.category}"`);
+                    console.log("[ОТЛАДКА] Поиск будет производиться в этом массиве:", availableCategories);
+                    // --- КОНЕЦ ОТЛАДКИ ---
+
                     // Находим ID категории по ее текстовому названию
                     const selectedCategoryObject = availableCategories.find(cat => cat.value === formData.category);
+
+                    // --- ОТЛАДКА ---
+                    console.log("[ОТЛАДКА] Результат поиска (найденный объект):", selectedCategoryObject);
+                    // --- КОНЕЦ ОТЛАДКИ ---
+
                     const categoryId = selectedCategoryObject ? selectedCategoryObject.id : null;
 
                     // Проверка, что ID найден, если категория была выбрана
                     if (!categoryId && formData.category_val) {
-                        throw new Error(`Не удалось найти ID для категории "${formData.category}". Проверьте, что название в HTML-коде совпадает с названием в Битрикс24.`);
+                         // Проверяем, что категория не пустая, чтобы не ругаться на "Выберите категорию"
+                        if (formData.category && formData.category !== 'Выберите категорию...') {
+                            throw new Error(`Не удалось найти ID для категории "${formData.category}". Проверьте, что название в HTML-коде совпадает с названием в Битрикс24.`);
+                        }
                     }
 
                     const saveResponse = await fetch('api/add_expense', {
