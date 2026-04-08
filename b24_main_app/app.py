@@ -5,7 +5,11 @@ import json
 
 # --- Конфигурация ---
 B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/"  # <--- ВАШ ВЕБХУК ЗДЕСЬ
-RPA_LIST_ID = 2 # ID вашего универсального списка (смарт-процесса)
+# ID универсального списка. Также используется как IBLOCK_ID
+LIST_ID = 2
+# Тип инфоблока для универсальных списков. Обычно 'lists' или 'lists_socnet'
+IBLOCK_TYPE_ID = 'lists'
+
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -86,7 +90,8 @@ def get_cashbox_initial_data():
         'cmd': {
             'users': 'user.get?filter[ACTIVE]=Y&admin=false',
             'sources': 'crm.status.list?filter[ENTITY_ID]=SOURCE',
-            'rpa_type': f'rpa.type.get?entityTypeId={RPA_LIST_ID}'
+            # ИЗМЕНЕНО: Используем lists.field.get для получения полей универсального списка
+            'list_fields': f'lists.field.get?IBLOCK_TYPE_ID={IBLOCK_TYPE_ID}&IBLOCK_ID={LIST_ID}'
         }
     }
     response = b24_call_method('batch', batch_payload)
@@ -95,19 +100,25 @@ def get_cashbox_initial_data():
         users = [{'ID': user['ID'], 'NAME': f"{user.get('LAST_NAME', '')} {user.get('NAME', '')}".strip()} for user in result.get('users', [])]
         sources = [{'ID': source['STATUS_ID'], 'NAME': source['NAME']} for source in result.get('sources', [])]
 
-        # Извлекаем варианты для поля "Категория"
+        # ИЗМЕНЕНО: Парсим ответ от lists.field.get
         categories = []
-        rpa_type_data = result.get('rpa_type', {})
-        if rpa_type_data and 'fields' in rpa_type_data:
-            for field_name, field_info in rpa_type_data['fields'].items():
-                # Ищем наше поле по названию. Это не очень надежно, лучше по ID, если он известен.
-                # UF_RPA_2_1775649039905 - ID поля "Категория"
-                if field_name == 'UF_RPA_2_1775649039905' and field_info.get('type') == 'list' and 'items' in field_info:
-                    categories = field_info['items'] # items уже содержит {'id': ..., 'value': ...}
+        list_fields_data = result.get('list_fields', {})
+        if list_fields_data and 'UF_RPA_2_1775649039905' in list_fields_data:
+            category_field = list_fields_data['UF_RPA_2_1775649039905']
+            # Для полей типа 'enumeration' (список) значения находятся в ключе 'LIST'
+            if category_field.get('USER_TYPE_ID') == 'enumeration' and 'LIST' in category_field:
+                # Преобразуем в формат, который ожидает фронтенд: {'id': ..., 'value': ...}
+                categories = [{'id': item['ID'], 'value': item['VALUE']} for item in category_field['LIST']]
 
         return jsonify({'users': users, 'sources': sources, 'categories': categories})
 
-    return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
+    # Обработка ошибок, если batch не удался
+    error_details = "Неизвестная ошибка"
+    if response and response.get('result', {}).get('result_error'):
+        error_details = response['result']['result_error']
+        app.logger.error(f"Ошибки в пакетном запросе: {error_details}")
+
+    return jsonify({'error': 'Не удалось загрузить начальные данные для кассы', 'details': error_details}), 500
 
 
 @app.route('/api/search_contacts', methods=['GET'])
@@ -140,7 +151,6 @@ def add_expense():
     if not data:
         return jsonify({'error': 'Нет данных для сохранения'}), 400
 
-    # Маппинг полей из документации
     fields = {
         'UF_RPA_2_NAME': data.get('name'),
         'UF_RPA_2_1775648993353': data.get('date'),
@@ -160,12 +170,15 @@ def add_expense():
         fields['UF_RPA_2_1775649130020'] = int(data['client_id'])
 
     try:
+        # При добавлении элемента можно использовать rpa.item.add, он более универсален
+        # Если он тоже будет давать сбой, его нужно будет заменить на lists.element.add
         response = b24_call_method('rpa.item.add', {
-            'entityTypeId': RPA_LIST_ID,
+            'entityTypeId': LIST_ID,
             'fields': fields
         })
 
-        if response and response.get('item'): # Метод rpa.item.add возвращает {item: {...}}
+        # Успешный ответ от rpa.item.add содержит 'item'
+        if response and response.get('item'):
             item_id = response['item']['id']
             app.logger.info(f"RPA элемент успешно добавлен, ID: {item_id}")
             return jsonify({'success': True, 'id': item_id})
