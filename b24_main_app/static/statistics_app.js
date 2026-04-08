@@ -59,6 +59,7 @@ BX24.ready(() => {
 
     let availableEmployees = [];
     let availableContractors = [];
+    let availableCategories = []; // <--- Сохраняем категории здесь
 
     function showCustomConfirm(text) {
         return new Promise(resolve => {
@@ -73,13 +74,14 @@ BX24.ready(() => {
         console.log("Initializing Cashbox Screen...");
         showLoader();
         try {
-            // Загрузка начальных данных для кассы (сотрудники, подрядчики)
+            // Загрузка начальных данных для кассы (сотрудники, подрядчики, КАТЕГОРИИ)
             const response = await fetch('api/cashbox_initial_data');
             if (!response.ok) throw new Error('Failed to load cashbox initial data');
             const data = await response.json();
 
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
+            availableCategories = data.categories || []; // <--- Сохраняем полученные категории
 
             const employeeSelect = document.getElementById('expense-employee');
             const contractorSelect = document.getElementById('expense-contractor');
@@ -97,7 +99,7 @@ BX24.ready(() => {
 
         } catch (error) {
             console.error("Error fetching cashbox initial data:", error);
-            // Можно вывести сообщение об ошибке пользователю
+            alert(`Критическая ошибка: не удалось загрузить данные для кассы. ${error.message}`);
         } finally {
             hideLoader();
         }
@@ -174,9 +176,9 @@ BX24.ready(() => {
             event.preventDefault();
             const formData = {
                 date: document.getElementById('expense-date').value,
-                amount: parseFloat(document.getElementById('expense-amount').value), // Преобразуем в число
-                category: expenseCategory.options[expenseCategory.selectedIndex].text,
-                category_val: expenseCategory.value,
+                amount: parseFloat(document.getElementById('expense-amount').value),
+                category: expenseCategory.options[expenseCategory.selectedIndex].text, // Текст, напр. "Сотрудники"
+                category_val: expenseCategory.value, // Значение, напр. "employees"
                 comment: document.getElementById('expense-comment').value,
                 name: '' // Будет сгенерировано
             };
@@ -201,7 +203,12 @@ BX24.ready(() => {
                 details = `<li>Клиент: <strong>${formData.client_name}</strong></li>`;
                 formData.name = `Расход по клиенту: ${formData.client_name}`;
             } else {
-                formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`; // Генерируем название из категории и комментария
+                // Для прочих категорий, у которых нет доп. полей
+                if (formData.category) {
+                     formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`;
+                } else {
+                    formData.name = `Расход: ${formData.comment.substring(0, 50)}`;
+                }
             }
 
             const confirmationText = `
@@ -220,6 +227,16 @@ BX24.ready(() => {
             if (isConfirmed) {
                 showLoader();
                 try {
+                    // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+                    // Находим ID категории по ее текстовому названию
+                    const selectedCategoryObject = availableCategories.find(cat => cat.value === formData.category);
+                    const categoryId = selectedCategoryObject ? selectedCategoryObject.id : null;
+
+                    // Проверка, что ID найден, если категория была выбрана
+                    if (!categoryId && formData.category_val) {
+                        throw new Error(`Не удалось найти ID для категории "${formData.category}". Проверьте, что название в HTML-коде совпадает с названием в Битрикс24.`);
+                    }
+
                     const saveResponse = await fetch('api/add_expense', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -227,12 +244,12 @@ BX24.ready(() => {
                             name: formData.name,
                             date: formData.date,
                             amount: formData.amount,
-                            category_text: formData.category,
+                            category_id: categoryId, // <--- Отправляем ID категории
                             comment: formData.comment,
                             employee_id: formData.employee_id || null,
                             contractor_id: formData.contractor_id || null,
                             client_id: formData.client_id || null,
-                            payment_type: formData.paymentType || null // Если нужно сохранять тип выплаты
+                            payment_type: formData.paymentType || null
                         }),
                     });
 
@@ -245,10 +262,14 @@ BX24.ready(() => {
                     console.log("Расход успешно сохранен:", result);
                     alert("Расход успешно сохранен!");
                     expenseForm.reset();
+                    // Сбрасываем все динамические поля и результаты поиска
                     Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+                    clientSearchInput.value = '';
                     clientSearchResults.innerHTML = '';
                     clientSearchResults.style.display = 'none';
                     selectedClientIdInput.value = '';
+                    expenseCategory.value = '';
+
                 } catch (error) {
                     console.error("Ошибка сохранения расхода:", error);
                     alert(`Ошибка при сохранении расхода: ${error.message}`);
