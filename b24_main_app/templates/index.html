@@ -7,64 +7,7 @@
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="static/custom_styles.css">
-    <style>
-        .main-menu { display: flex; justify-content: center; align-items: center; gap: 30px; padding: 40px 20px; }
-        .menu-card { width: 250px; padding: 20px; border: 1px solid #eef2f4; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s ease-in-out; background-color: #fff; }
-        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); }
-        .menu-card-icon { font-size: 48px; color: #2fc6f6; margin-bottom: 15px; }
-        .menu-card-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-        .menu-card-description { font-size: 14px; color: #828b95; }
-        .app-screen { display: none; }
-        .app-screen.active { display: block; }
-        .back-button { margin-bottom: 20px; }
-        .dynamic-field { display: none; }
-        /* Стили для модального окна */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 400px; text-align: center; }
-        .modal-text { margin-bottom: 20px; text-align: left; }
-        .modal-buttons { display: flex; justify-content: center; gap: 10px; }
-        .btn-fixed-width { width: 100px; }
-
-        /* Стили для поиска клиентов */
-        .client-search-results {
-            border: 1px solid #eef2f4;
-            max-height: 150px;
-            overflow-y: auto;
-            background-color: #fff;
-            position: absolute; /* Для позиционирования под полем ввода */
-            width: calc(100% - 2px); /* Ширина как у поля ввода */
-            z-index: 100;
-            display: none; /* Скрыто по умолчанию */
-        }
-        .client-search-results-item {
-            padding: 8px 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .client-search-results-item:hover {
-            background-color: #f5f5f5;
-        }
-        .client-search-wrapper {
-            position: relative; /* Для позиционирования результатов */
-        }
-
-        /* Стили для таблицы расходов */
-        .expenses-table-container { margin-top: 30px; }
-        .expenses-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .expenses-table th, .expenses-table td { border: 1px solid #eef2f4; padding: 8px; text-align: left; font-size: 13px; }
-        .expenses-table th { background-color: #f8f9fa; font-weight: bold; }
-        .expenses-table tr:nth-child(even) { background-color: #fdfdfd; }
-        .expenses-table tr:hover { background-color: #f0f0f0; }
-        .expenses-table .actions-column { width: 80px; text-align: center; }
-        .expenses-table .action-icon { cursor: pointer; margin: 0 5px; color: #2fc6f6; }
-        .expenses-table .action-icon:hover { color: #007bff; }
-        .filter-form { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 15px; border: 1px solid #eef2f4; border-radius: 8px; background-color: #f8f9fa; }
-        .filter-form .ui-form-row { flex: 1 1 calc(33% - 20px); min-width: 200px; margin-bottom: 0; }
-        .filter-form .ui-form-content { width: 100%; }
-        .filter-form .ui-btn { flex-shrink: 0; align-self: flex-end; }
-        .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; }
-        .pagination-controls button { padding: 5px 10px; }
-    </style>
+    <!-- Стили перенесены в custom_styles.css -->
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay" style="display: none;"><div class="loader"></div></div>
@@ -165,11 +108,21 @@
 
             <!-- Блок фильтров для таблицы расходов -->
             <div class="ui-form-title" style="margin-top: 40px;"><div class="ui-form-title-text">Фильтр расходов</div></div>
-            <form id="expenses-filter-form" class="filter-form">
+            <form id="expenses-filter-form" class="ui-form">
+                <!-- Дата от, Дата до (в одной строке) -->
                 <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Название</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-name" class="ui-ctl-element"></div></div>
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
+                    <div class="ui-form-content date-filter-group">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w50">
+                            <input type="text" id="filter-start-date" class="ui-ctl-element" placeholder="Дата от">
+                        </div>
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w50">
+                            <input type="text" id="filter-end-date" class="ui-ctl-element" placeholder="Дата до">
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Категория (с новой строки) -->
                 <div class="ui-form-row">
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Категория</div></div>
                     <div class="ui-form-content">
@@ -189,44 +142,20 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Сотрудник (с новой строки) -->
                 <div class="ui-form-row">
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
                     <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="filter-employee" class="ui-ctl-element"></select></div></div>
                 </div>
+
+                <!-- Подрядчик (с новой строки) -->
                 <div class="ui-form-row">
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
                     <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="filter-contractor" class="ui-ctl-element"></select></div></div>
                 </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
-                    <div class="ui-form-content client-search-wrapper">
-                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="filter-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
-                        </div>
-                        <div id="filter-client-search-results" class="client-search-results"></div>
-                        <input type="hidden" id="filter-selected-client-id">
-                    </div>
-                </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата от</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-start-date" class="ui-ctl-element"></div></div>
-                </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата до</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-end-date" class="ui-ctl-element"></div></div>
-                </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма от</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="filter-min-amount" class="ui-ctl-element"></div></div>
-                </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма до</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="filter-max-amount" class="ui-ctl-element"></div></div>
-                </div>
-                <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-comment" class="ui-ctl-element"></div></div>
-                </div>
+
+                <!-- Кнопки (с новой строки) -->
                 <div class="ui-form-row">
                     <div class="ui-form-label"></div>
                     <div class="ui-form-content">
@@ -367,7 +296,7 @@
     <div id="delete-confirm-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <div class="ui-form-title"><div class="ui-form-title-text">Подтвердите удаление</div></div>
-            <div class="modal-text">Вы уверены, что хотите безвозвратно удалить эту запись?</div>
+            <div class="modal-text" id="custom-modal-text">Вы уверены, что хотите безвозвратно удалить эту запись?</div>
             <div class="modal-buttons">
                 <button id="confirm-delete-btn" class="ui-btn ui-btn-danger btn-fixed-width">Удалить</button>
                 <button id="cancel-delete-btn" class="ui-btn ui-btn-light-border btn-fixed-width">Отмена</button>

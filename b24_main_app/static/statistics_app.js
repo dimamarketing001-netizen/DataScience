@@ -54,10 +54,10 @@ BX24.ready(() => {
         clients: document.getElementById('client-fields')
     };
     // Модальное окно подтверждения (для добавления)
-    const customModal = document.getElementById('custom-modal');
-    const customModalText = document.getElementById('modal-text');
-    const customModalConfirmBtn = document.getElementById('modal-confirm-btn');
-    const customModalCancelBtn = document.getElementById('modal-cancel-btn');
+    const customModal = document.getElementById('delete-confirm-modal'); // Corrected ID
+    const customModalText = document.getElementById('custom-modal-text'); // Corrected ID
+    const customModalConfirmBtn = document.getElementById('confirm-delete-btn'); // Corrected ID
+    const customModalCancelBtn = document.getElementById('cancel-delete-btn'); // Corrected ID
 
     // Элементы для поиска клиентов (для добавления)
     const clientSearchInput = document.getElementById('expense-client-search');
@@ -333,70 +333,17 @@ BX24.ready(() => {
         });
 
         // Логика поиска клиентов для фильтра
-        const filterClientSearchInput = document.getElementById('filter-client-search');
-        const filterClientSearchResults = document.getElementById('filter-client-search-results');
-        const filterSelectedClientIdInput = document.getElementById('filter-selected-client-id');
-
-        let filterSearchTimeout;
-        filterClientSearchInput.addEventListener('input', (event) => {
-            clearTimeout(filterSearchTimeout);
-            const searchTerm = event.target.value;
-
-            if (searchTerm.length > 2) {
-                filterSearchTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`api/search_contacts?query=${encodeURIComponent(searchTerm)}`);
-                        if (!response.ok) throw new Error('Failed to search contacts');
-                        const contacts = await response.json();
-                        filterClientSearchResults.innerHTML = '';
-                        if (contacts.length > 0) {
-                            contacts.forEach(contact => {
-                                const item = document.createElement('div');
-                                item.className = 'client-search-results-item';
-                                item.textContent = contact.NAME;
-                                item.dataset.id = contact.ID;
-                                item.addEventListener('click', () => {
-                                    filterClientSearchInput.value = contact.NAME;
-                                    filterSelectedClientIdInput.value = contact.ID;
-                                    filterClientSearchResults.style.display = 'none';
-                                });
-                                filterClientSearchResults.appendChild(item);
-                            });
-                            filterClientSearchResults.style.display = 'block';
-                        } else {
-                            filterClientSearchResults.style.display = 'none';
-                        }
-                    } catch (error) {
-                        console.error("Error searching contacts for filter:", error);
-                        filterClientSearchResults.style.display = 'none';
-                    }
-                }, 300);
-            } else {
-                filterClientSearchResults.innerHTML = '';
-                filterClientSearchResults.style.display = 'none';
-                filterSelectedClientIdInput.value = '';
-            }
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!filterClientSearchInput.contains(event.target) && !filterClientSearchResults.contains(event.target)) {
-                filterClientSearchResults.style.display = 'none';
-            }
-        });
+        // Removed filter-name, filter-min-amount, filter-max-amount, filter-comment, filter-client-search, filter-client-search-results, filter-selected-client-id
+        // as per the user's request to remove them from filters.
     }
 
     function applyFilters() {
         currentFilters = {
-            name: document.getElementById('filter-name').value,
             category: document.getElementById('filter-category').value,
             employee_id: document.getElementById('filter-employee').value,
             source_id: document.getElementById('filter-contractor').value,
-            contact_id: document.getElementById('filter-selected-client-id').value,
             start_date: document.getElementById('filter-start-date').value,
             end_date: document.getElementById('filter-end-date').value,
-            min_amount: document.getElementById('filter-min-amount').value,
-            max_amount: document.getElementById('filter-max-amount').value,
-            comment: document.getElementById('filter-comment').value
         };
         // Удаляем пустые значения из фильтров
         for (const key in currentFilters) {
@@ -409,7 +356,7 @@ BX24.ready(() => {
 
     function resetFilters() {
         filterForm.reset();
-        document.getElementById('filter-selected-client-id').value = ''; // Сброс скрытого поля клиента
+        // Removed filter-selected-client-id reset as per the user's request.
         currentFilters = {};
         currentPage = 1;
         loadExpensesTable();
