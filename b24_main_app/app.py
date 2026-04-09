@@ -166,5 +166,5 @@ def index():
 
 if __name__ == '__main__':
     with app.app_context():
-        init_db() # Create the table on startup
+        # init_db() # Create the table on startup
     app.run(debug=True, port=5002)
