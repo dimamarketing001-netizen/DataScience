@@ -10,9 +10,10 @@ B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/"
 
 # --- MySQL Database Configuration ---
 DB_CONFIG = {
-    'host': '192.168.136.106', # Your WSL IP Address
+    'host': '5.141.91.138', # Your WSL IP Address
+    'port': 3001,
     'user': 'dima',
-    'password': 'vRZVgh6c@@',
+    'password': 'vRZVgh6c@@.',
     'database': 'b24_data' # The database you created
 }
 
