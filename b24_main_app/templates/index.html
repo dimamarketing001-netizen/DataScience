@@ -47,6 +47,23 @@
         .client-search-wrapper {
             position: relative; /* Для позиционирования результатов */
         }
+
+        /* Стили для таблицы расходов */
+        .expenses-table-container { margin-top: 30px; }
+        .expenses-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .expenses-table th, .expenses-table td { border: 1px solid #eef2f4; padding: 8px; text-align: left; font-size: 13px; }
+        .expenses-table th { background-color: #f8f9fa; font-weight: bold; }
+        .expenses-table tr:nth-child(even) { background-color: #fdfdfd; }
+        .expenses-table tr:hover { background-color: #f0f0f0; }
+        .expenses-table .actions-column { width: 80px; text-align: center; }
+        .expenses-table .action-icon { cursor: pointer; margin: 0 5px; color: #2fc6f6; }
+        .expenses-table .action-icon:hover { color: #007bff; }
+        .filter-form { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 15px; border: 1px solid #eef2f4; border-radius: 8px; background-color: #f8f9fa; }
+        .filter-form .ui-form-row { flex: 1 1 calc(33% - 20px); min-width: 200px; margin-bottom: 0; }
+        .filter-form .ui-form-content { width: 100%; }
+        .filter-form .ui-btn { flex-shrink: 0; align-self: flex-end; }
+        .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; }
+        .pagination-controls button { padding: 5px 10px; }
     </style>
 </head>
 <body>
@@ -145,6 +162,109 @@
                     <div class="ui-form-content"><button type="submit" class="ui-btn ui-btn-primary">Сохранить расход</button></div>
                 </div>
             </form>
+
+            <!-- Блок фильтров для таблицы расходов -->
+            <div class="ui-form-title" style="margin-top: 40px;"><div class="ui-form-title-text">Фильтр расходов</div></div>
+            <form id="expenses-filter-form" class="filter-form">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Название</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-name" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Категория</div></div>
+                    <div class="ui-form-content">
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="filter-category" class="ui-ctl-element">
+                                <option value="">Все категории...</option>
+                                <option value="office">Офис и Операционные расходы</option>
+                                <option value="employees">Сотрудники</option>
+                                <option value="marketing">Маркетинг и Лиды</option>
+                                <option value="clients">Расходы по Клиентам</option>
+                                <option value="taxes">Налоги и Банк</option>
+                                <option value="it">IT и Оборудование</option>
+                                <option value="transfers">Внутренние переводы</option>
+                                <option value="other">Прочее</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="filter-employee" class="ui-ctl-element"></select></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="filter-contractor" class="ui-ctl-element"></select></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
+                    <div class="ui-form-content client-search-wrapper">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="text" id="filter-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
+                        </div>
+                        <div id="filter-client-search-results" class="client-search-results"></div>
+                        <input type="hidden" id="filter-selected-client-id">
+                    </div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата от</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-start-date" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата до</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-end-date" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма от</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="filter-min-amount" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма до</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="filter-max-amount" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="filter-comment" class="ui-ctl-element"></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"></div>
+                    <div class="ui-form-content">
+                        <button type="submit" class="ui-btn ui-btn-primary">Применить фильтр</button>
+                        <button type="button" id="reset-filter-btn" class="ui-btn ui-btn-light-border">Сбросить</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Таблица расходов -->
+            <div class="ui-form-title" style="margin-top: 40px;"><div class="ui-form-title-text">Список расходов</div></div>
+            <div class="expenses-table-container">
+                <table class="expenses-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Название</th>
+                            <th>Дата</th>
+                            <th>Сумма</th>
+                            <th>Категория</th>
+                            <th>Сотрудник</th>
+                            <th>Подрядчик</th>
+                            <th>Клиент</th>
+                            <th>Комментарий</th>
+                            <th>Добавил</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenses-table-body">
+                        <!-- Здесь будут загружаться расходы -->
+                    </tbody>
+                </table>
+                <div class="pagination-controls">
+                    <button id="prev-page-btn" class="ui-btn ui-btn-light-border" disabled>Предыдущая</button>
+                    <span id="page-info">Страница 1</span>
+                    <button id="next-page-btn" class="ui-btn ui-btn-light-border">Следующая</button>
+                </div>
+            </div>
         </div>
 
         <!-- ЭКРАН: СТАТИСТИКА -->
@@ -161,13 +281,96 @@
         </div>
     </div>
 
-    <!-- Кастомное модальное окно -->
-    <div id="custom-modal" class="modal-overlay" style="display: none;">
+    <!-- Модальное окно редактирования расхода -->
+    <div id="edit-expense-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="width: 500px;">
+            <div class="ui-form-title"><div class="ui-form-title-text">Редактировать расход</div></div>
+            <form id="edit-expense-form" class="ui-form">
+                <input type="hidden" id="edit-expense-id">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Название</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="edit-expense-name" class="ui-ctl-element" required></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="edit-expense-date" class="ui-ctl-element" required></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="edit-expense-amount" class="ui-ctl-element" required></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Категория</div></div>
+                    <div class="ui-form-content">
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="edit-expense-category" class="ui-ctl-element">
+                                <option value="">Выберите категорию...</option>
+                                <option value="office">Офис и Операционные расходы</option>
+                                <option value="employees">Сотрудники</option>
+                                <option value="marketing">Маркетинг и Лиды</option>
+                                <option value="clients">Расходы по Клиентам</option>
+                                <option value="taxes">Налоги и Банк</option>
+                                <option value="it">IT и Оборудование</option>
+                                <option value="transfers">Внутренние переводы</option>
+                                <option value="other">Прочее</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Динамические поля для редактирования -->
+                <div id="edit-employee-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-employee" class="ui-ctl-element"></select></div></div>
+                    </div>
+                </div>
+
+                <div id="edit-marketing-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-contractor" class="ui-ctl-element"></select></div></div>
+                    </div>
+                </div>
+
+                <div id="edit-client-fields" class="dynamic-field">
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
+                        <div class="ui-form-content client-search-wrapper">
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                <input type="text" id="edit-expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
+                            </div>
+                            <div id="edit-client-search-results" class="client-search-results"></div>
+                            <input type="hidden" id="edit-selected-client-id">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="edit-expense-comment" class="ui-ctl-element"></textarea></div></div>
+                </div>
+
+                <div class="ui-form-row">
+                    <div class="ui-form-label"></div>
+                    <div class="ui-form-content">
+                        <button type="submit" class="ui-btn ui-btn-primary">Сохранить изменения</button>
+                        <button type="button" id="cancel-edit-btn" class="ui-btn ui-btn-light-border">Отмена</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения удаления -->
+    <div id="delete-confirm-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <div id="modal-text" class="modal-text"></div>
+            <div class="ui-form-title"><div class="ui-form-title-text">Подтвердите удаление</div></div>
+            <div class="modal-text">Вы уверены, что хотите безвозвратно удалить эту запись?</div>
             <div class="modal-buttons">
-                <button id="modal-confirm-btn" class="ui-btn ui-btn-primary btn-fixed-width">Да</button>
-                <button id="modal-cancel-btn" class="ui-btn ui-btn-light-border btn-fixed-width">Нет</button>
+                <button id="confirm-delete-btn" class="ui-btn ui-btn-danger btn-fixed-width">Удалить</button>
+                <button id="cancel-delete-btn" class="ui-btn ui-btn-light-border btn-fixed-width">Отмена</button>
             </div>
         </div>
     </div>
