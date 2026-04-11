@@ -25,6 +25,22 @@ App.initializeCashbox = async function() {
     const prevPageBtn = document.getElementById('prev-page-btn');
     const nextPageBtn = document.getElementById('next-page-btn');
 
+    // --- Вспомогательная функция для уведомлений ---
+    function showNotification(message, type = 'success') {
+        if (typeof BX !== 'undefined' && BX.UI && BX.UI.Notification && BX.UI.Notification.Center) {
+            BX.UI.Notification.Center.notify({
+                content: message,
+                position: 'top-right',
+                autoHideDelay: 3000,
+                closeButton: true,
+                category: 'cashbox_notification',
+                type: type === 'success' ? 'success' : 'error'
+            });
+        } else {
+            alert(message); // Fallback to alert if BX.UI.Notification is not available
+        }
+    }
+
     // --- Инициализация ---
     App.showLoader();
     try {
@@ -40,7 +56,7 @@ App.initializeCashbox = async function() {
         
         await loadExpensesTable();
     } catch (error) {
-        alert(`Критическая ошибка инициализации кассы: ${error.message}`);
+        showNotification(`Критическая ошибка инициализации кассы: ${error.message}`, 'error');
     } finally {
         App.hideLoader();
     }
@@ -79,7 +95,7 @@ App.initializeCashbox = async function() {
             App.cashbox.ui.renderExpensesTable(data.expenses, openEditModal, openDeleteConfirmModal);
             currentPage = App.cashbox.ui.updatePaginationControls(data.total_records, data.limit, data.offset);
         } catch (error) {
-            alert(`Ошибка загрузки расходов: ${error.message}`);
+            showNotification(`Ошибка загрузки расходов: ${error.message}`, 'error');
             App.cashbox.ui.elements.expensesTableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки расходов.</td></tr>`;
         } finally {
             App.hideLoader();
@@ -90,12 +106,10 @@ App.initializeCashbox = async function() {
         currentFilters = {
             start_date: document.getElementById('filter-start-date').value,
             end_date: document.getElementById('filter-end-date').value,
-            // Удалены поля name, min_amount, max_amount
             category_val: document.getElementById('filter-category').value,
             employee_id: document.getElementById('filter-employee').value,
             source_id: document.getElementById('filter-contractor').value,
         };
-        // Удаляем пустые значения из фильтров
         Object.keys(currentFilters).forEach(key => { if (!currentFilters[key]) delete currentFilters[key]; });
         loadExpensesTable(1);
     }
@@ -103,7 +117,6 @@ App.initializeCashbox = async function() {
     function resetFilters() {
         filterForm.reset();
         currentFilters = {};
-        // Дополнительно вызываем toggleFilterDynamicFields для скрытия полей при сбросе
         App.cashbox.ui.toggleFilterDynamicFields('');
         loadExpensesTable(1);
     }
@@ -128,12 +141,12 @@ App.initializeCashbox = async function() {
             App.showLoader();
             try {
                 await App.cashbox.api.addExpense({ ...formData, added_by_user_id: App.currentUser.ID });
-                alert("Расход успешно сохранен!");
+                showNotification("Расход успешно сохранен!");
                 expenseForm.reset();
                 App.cashbox.ui.toggleDynamicFields('');
                 loadExpensesTable(1);
             } catch (error) {
-                alert(`Ошибка сохранения: ${error.message}`);
+                showNotification(`Ошибка сохранения: ${error.message}`, 'error');
             } finally {
                 App.hideLoader();
             }
@@ -146,7 +159,7 @@ App.initializeCashbox = async function() {
             const expense = await App.cashbox.api.getSingleExpense(expenseId);
             App.cashbox.ui.openEditModal(expense);
         } catch (error) {
-            alert(`Ошибка загрузки данных для редактирования: ${error.message}`);
+            showNotification(`Ошибка загрузки данных для редактирования: ${error.message}`, 'error');
         } finally {
             App.hideLoader();
         }
@@ -166,11 +179,11 @@ App.initializeCashbox = async function() {
         App.showLoader();
         try {
             await App.cashbox.api.updateExpense(formData);
-            alert('Расход успешно обновлен!');
+            showNotification('Расход успешно обновлен!');
             App.cashbox.ui.closeEditModal();
             loadExpensesTable(currentPage);
         } catch (error) {
-            alert(`Ошибка обновления: ${error.message}`);
+            showNotification(`Ошибка обновления: ${error.message}`, 'error');
         } finally {
             App.hideLoader();
         }
@@ -186,12 +199,12 @@ App.initializeCashbox = async function() {
         App.showLoader();
         try {
             await App.cashbox.api.deleteExpense(expenseToDeleteId);
-            alert('Расход удален.');
+            showNotification('Расход удален.');
             App.cashbox.ui.closeDeleteConfirmModal();
             expenseToDeleteId = null;
             loadExpensesTable(currentPage);
         } catch (error) {
-            alert(`Ошибка удаления: ${error.message}`);
+            showNotification(`Ошибка удаления: ${error.message}`, 'error');
         } finally {
             App.hideLoader();
         }
