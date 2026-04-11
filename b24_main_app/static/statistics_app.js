@@ -2,12 +2,13 @@ BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
     // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-    const memberId = "{{ member_id }}";
+    const memberId = window.APP_CONFIG.memberId;
     let currentPage = 1;
     let expensesPerPage = 25;
     let currentFilters = {};
     let availableEmployees = [];
     let availableContractors = [];
+    let userCache = {}; // Кэш для имен пользователей
     let cashboxInitialized = false;
     let statisticsInitialized = false;
 
@@ -63,10 +64,7 @@ BX24.ready(() => {
             confirmationModalTitle.textContent = title;
             confirmationModalText.innerHTML = text;
             confirmActionBtn.textContent = confirmButtonText;
-
-            // Управление классами кнопки
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
-
             confirmationModal.style.display = 'flex';
 
             confirmActionBtn.onclick = () => {
@@ -102,6 +100,10 @@ BX24.ready(() => {
     async function initializeCashbox() {
         console.log("Initializing Cashbox Screen...");
         showLoader();
+
+        // Bug #4: Скрываем все динамические поля при инициализации
+        Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+
         try {
             const response = await fetch('api/cashbox_initial_data');
             if (!response.ok) throw new Error('Failed to load cashbox initial data');
@@ -110,9 +112,14 @@ BX24.ready(() => {
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
 
-            // Первоначальное заполнение фильтров
+            // Bug #5: Кэшируем пользователей
+            userCache = (data.users || []).reduce((acc, user) => {
+                acc[user.ID] = user.NAME;
+                return acc;
+            }, {});
+            console.log("User cache initialized:", userCache); // Выводим кэш в консоль
+
             setupFilterForm();
-            // Первоначальная загрузка таблицы
             loadExpensesTable();
 
         } catch (error) {
@@ -132,21 +139,18 @@ BX24.ready(() => {
                 dynamicFields[selectedCategory].style.display = 'block';
             }
 
-            // Динамическое заполнение селектов
             if (selectedCategory === 'employees') {
                 populateSelect(document.getElementById('expense-employee'), availableEmployees, 'Выберите сотрудника...');
             } else if (selectedCategory === 'marketing') {
                 populateSelect(document.getElementById('expense-contractor'), availableContractors, 'Выберите подрядчика...');
             }
 
-            // Сброс полей при смене категории
             clientSearchInput.value = '';
             selectedClientIdInput.value = '';
             clientSearchResults.innerHTML = '';
             clientSearchResults.style.display = 'none';
         });
 
-        // Логика поиска клиентов
         let searchTimeout;
         clientSearchInput.addEventListener('input', (event) => {
             clearTimeout(searchTimeout);
@@ -391,7 +395,10 @@ BX24.ready(() => {
             row.insertCell().textContent = expense.source_name || '';
             row.insertCell().textContent = expense.contact_name || '';
             row.insertCell().textContent = expense.comment || '';
-            row.insertCell().textContent = expense.added_by_user_name || '';
+            
+            // Bug #5: Используем кэш для отображения имени создателя
+            const addedByCell = row.insertCell();
+            addedByCell.textContent = userCache[expense.added_by_user_id] || 'Неизвестно';
 
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
@@ -452,7 +459,6 @@ BX24.ready(() => {
 
             Object.values(editDynamicFields).forEach(field => field.style.display = 'none');
             
-            // Заполняем и настраиваем динамические поля
             if (expense.category_val === 'employees') {
                 editDynamicFields.employees.style.display = 'block';
                 const editEmployeeSelect = document.getElementById('edit-expense-employee');
@@ -604,7 +610,7 @@ BX24.ready(() => {
     async function fetchInitialData() {
         showLoader();
         try {
-            const response = await fetch('api/initial_data'); // This seems to be for a different part of the app.
+            const response = await fetch('api/initial_data');
             if (!response.ok) throw new Error('Failed to load initial data for statistics');
             const data = await response.json();
 

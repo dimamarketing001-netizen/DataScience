@@ -7,7 +7,6 @@
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="static/custom_styles.css">
-    <!-- Стили перенесены в custom_styles.css -->
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay" style="display: none;"><div class="loader"></div></div>
@@ -306,6 +305,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+
+    <!-- Передача данных из Flask в JavaScript -->
+    <script>
+        window.APP_CONFIG = {
+            memberId: '{{ member_id|default("", true) }}'
+        };
+    </script>
+
     <script src="static/statistics_app.js"></script>
 </body>
 </html>
