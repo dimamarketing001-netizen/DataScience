@@ -2,7 +2,7 @@ BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
     // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-    const APP_BASE_PATH = "/page2";
+    const APP_BASE_PATH = "";
     let currentUser = null;
     let userPermissions = null;
     let currentPage = 1;
