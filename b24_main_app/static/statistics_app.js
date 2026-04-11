@@ -116,12 +116,18 @@ BX24.ready(() => {
             console.log("Current user data received:", currentUser);
 
             try {
-                const permRes = await fetch(`/?action=my_permissions&user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
+                // Безопасная передача department_id
+                const departmentId = (currentUser.UF_DEPARTMENT && currentUser.UF_DEPARTMENT.length > 0) ? currentUser.UF_DEPARTMENT[0] : '';
+                const permRes = await fetch(`/?action=my_permissions&user_id=${currentUser.ID}&department_id=${departmentId}`);
+                
+                const rawText = await permRes.text();
+                console.log("Raw response from server:", rawText);
+
                 if (!permRes.ok) {
-                    const errorText = await permRes.text();
-                    throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
+                    throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${rawText}`);
                 }
-                userPermissions = await permRes.json();
+
+                userPermissions = JSON.parse(rawText);
                 console.log("User permissions received:", userPermissions);
 
                 if (applyPermissions(userPermissions)) {
