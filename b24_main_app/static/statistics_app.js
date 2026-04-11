@@ -117,7 +117,10 @@ BX24.ready(() => {
 
             try {
                 const permRes = await fetch(`/?action=my_permissions&user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
-                if (!permRes.ok) throw new Error('Failed to fetch permissions');
+                if (!permRes.ok) {
+                    const errorText = await permRes.text();
+                    throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
+                }
                 userPermissions = await permRes.json();
                 console.log("User permissions received:", userPermissions);
 
