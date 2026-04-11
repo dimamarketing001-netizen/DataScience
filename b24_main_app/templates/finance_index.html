@@ -67,7 +67,7 @@
                         <div class="ui-form-content">
                             <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="expense-category" class="ui-ctl-element">
+                                <select id="expense-category" class="ui-ctl-element" required>
                                     <option value="">Выберите категорию...</option>
                                     <option value="office">Офис и Операционные расходы</option>
                                     <option value="employees">Сотрудники</option>
@@ -113,7 +113,7 @@
                         <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
                         <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="expense-comment" class="ui-ctl-element"></textarea></div></div>
                     </div>
-                    <div class="ui-form-row">
+                    <div class="ui-form-row ui-form-row-actions">
                         <div class="ui-form-label"></div>
                         <div class="ui-form-content"><button type="submit" class="ui-btn ui-btn-primary" data-action="save">Сохранить расход</button></div>
                     </div>
@@ -160,7 +160,7 @@
                     <table class="expenses-table">
                         <thead>
                             <tr>
-                                <th>ID</th><th>Название</th><th>Дата</th><th>Сумма</th><th>Категория</th><th>Сотрудник</th><th>Подрядчик</th><th>Клиент</th><th>Комментарий</th><th>Добавил</th><th>Действия</th>
+                                <th>ID</th><th>Дата</th><th>Сумма</th><th>Категория</th><th>Сотрудник</th><th>Подрядчик</th><th>Клиент</th><th>Комментарий</th><th>Добавил</th><th>Действия</th>
                             </tr>
                         </thead>
                         <tbody id="expenses-table-body"></tbody>
@@ -211,10 +211,6 @@
             <form id="edit-expense-form" class="ui-form">
                 <input type="hidden" id="edit-expense-id">
                 <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Название</div></div>
-                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="edit-expense-name" class="ui-ctl-element" required></div></div>
-                </div>
-                <div class="ui-form-row">
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
                     <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="edit-expense-date" class="ui-ctl-element" required></div></div>
                 </div>
@@ -227,7 +223,7 @@
                     <div class="ui-form-content">
                         <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                            <select id="edit-expense-category" class="ui-ctl-element">
+                            <select id="edit-expense-category" class="ui-ctl-element" required>
                                 <option value="">Выберите категорию...</option>
                                 <option value="office">Офис и Операционные расходы</option>
                                 <option value="employees">Сотрудники</option>
@@ -245,6 +241,10 @@
                     <div class="ui-form-row">
                         <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
                         <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-employee" class="ui-ctl-element"></select></div></div>
+                    </div>
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Тип выплаты</div></div>
+                        <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-payment-type" class="ui-ctl-element"><option value="fix">Фикса/ЗП</option><option value="motivation">Мотивация/Премия</option></select></div></div>
                     </div>
                 </div>
                 <div id="edit-marketing-fields" class="dynamic-field" style="display: none;">
@@ -269,7 +269,7 @@
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
                     <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="edit-expense-comment" class="ui-ctl-element"></textarea></div></div>
                 </div>
-                <div class="ui-form-row">
+                <div class="ui-form-row ui-form-row-actions">
                     <div class="ui-form-label"></div>
                     <div class="ui-form-content">
                         <button type="submit" class="ui-btn ui-btn-primary" data-action="save">Сохранить изменения</button>

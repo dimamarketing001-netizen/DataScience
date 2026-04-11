@@ -125,20 +125,61 @@ App.initializeCashbox = async function() {
 
     async function handleAddExpense(event) {
         event.preventDefault();
+
+        // Собираем данные из формы
         const formData = {
             date: document.getElementById('expense-date').value,
             amount: parseFloat(document.getElementById('expense-amount').value),
             category_text: expenseCategory.options[expenseCategory.selectedIndex].text,
             category_val: expenseCategory.value,
             comment: document.getElementById('expense-comment').value,
-            name: '',
+            name: '', // Будет сформировано на сервере или оставлено пустым
             employee_id: document.getElementById('expense-employee').value,
             source_id: document.getElementById('expense-contractor').value,
             contact_id: document.getElementById('selected-client-id').value,
         };
-        // ... логика формирования имени ...
 
-        const isConfirmed = await App.showCustomConfirm({ title: 'Сохранение расхода', text: 'Вы уверены?', confirmButtonText: 'Сохранить' });
+        // Формируем данные для отображения в попапе подтверждения
+        const formDataForDisplay = {
+            'Дата': formData.date,
+            'Сумма': formData.amount,
+            'Категория': formData.category_text,
+        };
+
+        if (formData.comment) {
+            formDataForDisplay['Комментарий'] = formData.comment;
+        }
+
+        // Добавляем динамические поля, если они выбраны
+        const selectedCategory = formData.category_val;
+        if (selectedCategory === 'employees') {
+            const employeeSelect = document.getElementById('expense-employee');
+            if (employeeSelect.value) {
+                formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
+            }
+            const paymentTypeSelect = document.getElementById('expense-payment-type');
+            if (paymentTypeSelect.value) {
+                formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
+            }
+        } else if (selectedCategory === 'marketing') {
+            const contractorSelect = document.getElementById('expense-contractor');
+            if (contractorSelect.value) {
+                formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
+            }
+        } else if (selectedCategory === 'clients') {
+            const clientSearchInput = document.getElementById('expense-client-search');
+            if (clientSearchInput.value) {
+                formDataForDisplay['Клиент'] = clientSearchInput.value;
+            }
+        }
+
+        const isConfirmed = await App.showCustomConfirm({
+            title: 'Подтвердите сохранение расхода',
+            text: 'Вы уверены, что хотите сохранить следующий расход?',
+            data: formDataForDisplay,
+            confirmButtonText: 'Сохранить'
+        });
+
         if (isConfirmed) {
             App.showLoader();
             try {

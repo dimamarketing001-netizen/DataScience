@@ -49,10 +49,22 @@ BX24.ready(() => {
         });
     };
 
-    App.showCustomConfirm = ({ title = 'Подтвердите действие', text = 'Вы уверены?', confirmButtonText = 'Подтвердить', confirmButtonClass = 'ui-btn-primary' }) => {
+    App.showCustomConfirm = ({ title = 'Подтвердите действие', text = 'Вы уверены?', data = null, confirmButtonText = 'Подтвердить', confirmButtonClass = 'ui-btn-primary' }) => {
         return new Promise(resolve => {
             confirmationModalTitle.textContent = title;
-            confirmationModalText.innerHTML = text;
+            
+            let contentHtml = `<p>${text}</p>`;
+            if (data) {
+                contentHtml += '<ul style="list-style: none; padding: 0; text-align: left;">';
+                for (const key in data) {
+                    if (data.hasOwnProperty(key)) {
+                        contentHtml += `<li><strong>${key}:</strong> ${data[key]}</li>`;
+                    }
+                }
+                contentHtml += '</ul>';
+            }
+            confirmationModalText.innerHTML = contentHtml;
+
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
             confirmationModal.style.display = 'flex';

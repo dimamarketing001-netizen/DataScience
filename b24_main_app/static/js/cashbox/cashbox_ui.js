@@ -32,13 +32,13 @@ App.cashbox.ui = {
         const { expensesTableBody } = this.elements;
         expensesTableBody.innerHTML = '';
         if (!expenses || expenses.length === 0) {
-            expensesTableBody.innerHTML = `<tr><td colspan="11">Нет записей о расходах по заданным фильтрам.</td></tr>`;
+            expensesTableBody.innerHTML = `<tr><td colspan="10">Нет записей о расходах по заданным фильтрам.</td></tr>`;
             return;
         }
         expenses.forEach(expense => {
             const row = expensesTableBody.insertRow();
             row.insertCell().textContent = expense.id;
-            row.insertCell().textContent = expense.name;
+            // Удален столбец "Название"
             row.insertCell().textContent = expense.expense_date;
             row.insertCell().textContent = parseFloat(expense.amount).toFixed(2);
             row.insertCell().textContent = expense.category;
