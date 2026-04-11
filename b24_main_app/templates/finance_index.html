@@ -6,7 +6,7 @@
     <title>Финансы и Статистика</title>
     <script src="//api.bitrix24.com/api/v1/"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="static/custom_styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='custom_styles.css') }}">
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay"><div class="loader"></div></div>
@@ -282,12 +282,21 @@
         </div>
     </div>
 
+    <!-- Подключение скриптов -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
-    <script src="static/js/api.js"></script>
-    <script src="static/js/app.js"></script>
-    <script src="static/js/access.js"></script>
-    <script src="static/js/cashbox.js"></script>
-    <script src="static/js/statistics.js"></script>
+
+    <!-- Основные скрипты приложения -->
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- Скрипты модулей -->
+    <script src="{{ url_for('static', filename='js/access.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/statistics.js') }}"></script>
+
+    <!-- Скрипты модуля "Касса" (в правильном порядке) -->
+    <script src="{{ url_for('static', filename='js/cashbox/cashbox_main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cashbox/cashbox_api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cashbox/cashbox_ui.js') }}"></script>
 </body>
 </html>
