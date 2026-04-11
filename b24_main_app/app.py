@@ -323,7 +323,7 @@ def get_expenses():
 def router():
     # Если это POST-запрос без action, это стандартный вход из Битрикс24
     if request.method == 'POST' and 'action' not in request.args:
-        return render_template('index.html')
+        return render_template('finance_index.html')
 
     action = request.args.get('action')
     app.logger.info(f"Incoming request: method={request.method}, action={action}, args={request.args}")
@@ -346,7 +346,7 @@ def router():
         return jsonify({'error': f'Action "{action}" not found'}), 404
     
     # Если action не указан и это GET-запрос, отдаем главную страницу
-    return render_template('index.html')
+    return render_template('finance_index.html')
 
 
 if __name__ == '__main__':
