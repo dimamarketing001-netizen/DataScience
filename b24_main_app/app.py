@@ -127,9 +127,8 @@ def _get_b24_entity_name(entity_type, entity_id):
     return name
 
 
-# --- API для Управления Доступами ---
+# --- API Функции (внутренние) ---
 
-@app.route('/api/initial_data_for_access', methods=['GET'])
 def get_initial_data_for_access():
     batch_payload = {
         'halt': 0,
@@ -144,7 +143,6 @@ def get_initial_data_for_access():
     return jsonify({'error': 'Не удалось загрузить начальные данные для доступов'}), 500
 
 
-@app.route('/api/access_rights', methods=['GET', 'POST'])
 def handle_access_rights():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
@@ -182,7 +180,6 @@ def handle_access_rights():
             conn.close()
 
 
-@app.route('/api/my_permissions', methods=['GET'])
 def get_my_permissions():
     user_id = request.args.get('user_id')
     department_id = request.args.get('department_id')
@@ -219,9 +216,6 @@ def get_my_permissions():
         conn.close()
 
 
-# --- API для Кассы и Расходов ---
-
-@app.route('/api/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
     batch_payload = {
         'halt': 0,
@@ -236,7 +230,6 @@ def get_cashbox_initial_data():
     return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
 
 
-@app.route('/api/search_contacts', methods=['GET'])
 def search_contacts():
     query = request.args.get('query', '')
     if not query: return jsonify([])
@@ -247,7 +240,6 @@ def search_contacts():
     return jsonify([])
 
 
-@app.route('/api/add_expense', methods=['POST'])
 def add_expense():
     data = request.get_json()
     app.logger.info(f"Попытка сохранения расхода... ID юзера: {data.get('added_by_user_id')}, Данные: {json.dumps(data, ensure_ascii=False)}")
@@ -272,7 +264,6 @@ def add_expense():
         conn.close()
 
 
-@app.route('/api/expenses', methods=['GET'])
 def get_expenses():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'Не удалось подключиться к базе данных'}), 500
@@ -313,76 +304,33 @@ def get_expenses():
         conn.close()
 
 
-@app.route('/api/expenses/<int:expense_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_single_expense(expense_id):
-    conn = get_db_connection()
-    if not conn: return jsonify({'error': 'DB connection failed'}), 500
-    
-    if request.method == 'GET':
-        cursor = conn.cursor(dictionary=True)
-        try:
-            cursor.execute("SELECT * FROM expenses WHERE id = %s", (expense_id,))
-            expense = cursor.fetchone()
-            if not expense: return jsonify({'error': 'Запись не найдена'}), 404
-            expense['expense_date'] = expense['expense_date'].isoformat() if expense['expense_date'] else None
-            expense['created_at'] = expense['created_at'].isoformat() if expense['created_at'] else None
-            return jsonify(expense)
-        except mysql.connector.Error as err:
-            return jsonify({'error': str(err)}), 500
-        finally:
-            cursor.close()
-            conn.close()
-
-    if request.method == 'PUT':
-        data = request.get_json()
-        if not data: return jsonify({'error': 'Нет данных для обновления'}), 400
-        
-        cursor = conn.cursor()
-        try:
-            set_clauses, update_params = [], {}
-            field_mapping = {
-                'name': 'name', 'date': 'expense_date', 'amount': 'amount', 'category_text': 'category', 'category_val': 'category_val',
-                'employee_id': 'employee_id', 'contractor_id': 'source_id', 'client_id': 'contact_id', 'comment': 'comment'
-            }
-            for key, db_column in field_mapping.items():
-                if key in data:
-                    set_clauses.append(f"`{db_column}` = %({db_column})s")
-                    update_params[db_column] = data[key]
-
-            if not set_clauses: return jsonify({'error': 'Нет полей для обновления'}), 400
-
-            query = f"UPDATE expenses SET {', '.join(set_clauses)} WHERE id = %(id)s"
-            update_params['id'] = expense_id
-            cursor.execute(query, update_params)
-            conn.commit()
-
-            if cursor.rowcount == 0: return jsonify({'error': 'Запись не найдена или данные не изменились'}), 404
-            return jsonify({'success': True, 'id': expense_id})
-        except mysql.connector.Error as err:
-            conn.rollback()
-            return jsonify({'error': str(err)}), 500
-        finally:
-            cursor.close()
-            conn.close()
-
-    if request.method == 'DELETE':
-        cursor = conn.cursor()
-        try:
-            cursor.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
-            conn.commit()
-            if cursor.rowcount == 0: return jsonify({'error': 'Запись не найдена'}), 404
-            return jsonify({'success': True})
-        except mysql.connector.Error as err:
-            conn.rollback()
-            return jsonify({'error': str(err)}), 500
-        finally:
-            cursor.close()
-            conn.close()
-
-
-# --- Главный маршрут ---
+# --- Главный маршрутизатор ---
 @app.route('/', methods=['GET', 'POST'])
-def index():
+def router():
+    # Если это POST-запрос без action, это стандартный вход из Битрикс24
+    if request.method == 'POST' and 'action' not in request.args:
+        return render_template('index.html')
+
+    action = request.args.get('action')
+    
+    api_actions = {
+        'my_permissions': get_my_permissions,
+        'initial_data_for_access': get_initial_data_for_access,
+        'access_rights': handle_access_rights,
+        'cashbox_initial_data': get_cashbox_initial_data,
+        'search_contacts': search_contacts,
+        'add_expense': add_expense,
+        'expenses': get_expenses,
+    }
+
+    if action in api_actions:
+        return api_actions[action]()
+    
+    # Если action не найден, но это API-запрос, возвращаем ошибку
+    if action:
+        return jsonify({'error': f'Action "{action}" not found'}), 404
+    
+    # Если action не указан и это GET-запрос, отдаем главную страницу
     return render_template('index.html')
 
 
