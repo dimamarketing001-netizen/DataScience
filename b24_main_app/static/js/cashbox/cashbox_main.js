@@ -90,13 +90,12 @@ App.initializeCashbox = async function() {
         currentFilters = {
             start_date: document.getElementById('filter-start-date').value,
             end_date: document.getElementById('filter-end-date').value,
-            name: document.getElementById('filter-name').value,
-            min_amount: document.getElementById('filter-min-amount').value,
-            max_amount: document.getElementById('filter-max-amount').value,
+            // Удалены поля name, min_amount, max_amount
             category_val: document.getElementById('filter-category').value,
             employee_id: document.getElementById('filter-employee').value,
             source_id: document.getElementById('filter-contractor').value,
         };
+        // Удаляем пустые значения из фильтров
         Object.keys(currentFilters).forEach(key => { if (!currentFilters[key]) delete currentFilters[key]; });
         loadExpensesTable(1);
     }
@@ -104,6 +103,8 @@ App.initializeCashbox = async function() {
     function resetFilters() {
         filterForm.reset();
         currentFilters = {};
+        // Дополнительно вызываем toggleFilterDynamicFields для скрытия полей при сбросе
+        App.cashbox.ui.toggleFilterDynamicFields('');
         loadExpensesTable(1);
     }
 
