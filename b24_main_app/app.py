@@ -193,7 +193,7 @@ def _get_b24_entity_name(entity_type, entity_id):
 
 # --- API для Управления Доступами ---
 
-@app.route('/api/initial_data_for_access', methods=['GET'])
+@app.route('/initial_data_for_access', methods=['GET'])
 def get_initial_data_for_access():
     batch_payload = {
         'halt': 0,
@@ -212,7 +212,7 @@ def get_initial_data_for_access():
     return jsonify({'error': 'Не удалось загрузить начальные данные для доступов'}), 500
 
 
-@app.route('/api/access_rights', methods=['GET', 'POST'])
+@app.route('/access_rights', methods=['GET', 'POST'])
 def handle_access_rights():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
@@ -257,7 +257,7 @@ def handle_access_rights():
             conn.close()
 
 
-@app.route('/api/my_permissions', methods=['GET'])
+@app.route('/my_permissions', methods=['GET'])
 def get_my_permissions():
     user_id = request.args.get('user_id')
     department_id = request.args.get('department_id')
@@ -299,7 +299,7 @@ def get_my_permissions():
 
 # --- API для Кассы и Расходов ---
 
-@app.route('/api/cashbox_initial_data', methods=['GET'])
+@app.route('/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
     batch_payload = {
         'halt': 0,
@@ -318,7 +318,7 @@ def get_cashbox_initial_data():
     return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
 
 
-@app.route('/api/search_contacts', methods=['GET'])
+@app.route('/search_contacts', methods=['GET'])
 def search_contacts():
     query = request.args.get('query', '')
     if not query: return jsonify([])
@@ -332,7 +332,7 @@ def search_contacts():
     return jsonify([])
 
 
-@app.route('/api/add_expense', methods=['POST'])
+@app.route('/add_expense', methods=['POST'])
 def add_expense():
     data = request.get_json()
     app.logger.info(
@@ -363,7 +363,7 @@ def add_expense():
         conn.close()
 
 
-@app.route('/api/expenses', methods=['GET'])
+@app.route('/expenses', methods=['GET'])
 def get_expenses():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'Не удалось подключиться к базе данных'}), 500
@@ -415,7 +415,7 @@ def get_expenses():
         conn.close()
 
 
-@app.route('/api/expenses/<int:expense_id>', methods=['GET', 'PUT', 'DELETE'])
+@app.route('/expenses/<int:expense_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_single_expense(expense_id):
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
