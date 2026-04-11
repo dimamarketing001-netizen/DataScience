@@ -2,71 +2,74 @@ BX24.ready(() => {
     console.log("BX24 is ready. Application logic starts.");
 
     // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-    const memberId = window.APP_CONFIG.memberId;
+    let currentUser = null;
+    let userPermissions = null;
     let currentPage = 1;
     let expensesPerPage = 25;
     let currentFilters = {};
     let availableEmployees = [];
     let availableContractors = [];
-    let userCache = {}; // Кэш для имен пользователей
+    let userCache = {};
     let cashboxInitialized = false;
     let statisticsInitialized = false;
+    let accessInitialized = false;
+    let sortedStatuses = [];
 
-    // --- ЛОГИКА НАВИГАЦИИ МЕЖДУ ЭКРАНАМИ ---
+    // --- ЭЛЕМЕНТЫ UI ---
+    const loaderOverlay = document.getElementById('loader-overlay');
+    const appContainer = document.getElementById('app-container');
     const screens = document.querySelectorAll('.app-screen');
     const mainMenu = document.getElementById('main-menu');
-    const cashboxScreen = document.getElementById('cashbox-screen');
-    const statisticsScreen = document.getElementById('statistics-screen');
-    const gotoCashboxBtn = document.getElementById('goto-cashbox');
-    const gotoStatisticsBtn = document.getElementById('goto-statistics');
+    const menuCards = document.querySelectorAll('.menu-card');
     const backButtons = document.querySelectorAll('.back-button');
-
-    const showScreen = (screenToShow) => {
-        screens.forEach(screen => screen.classList.remove('active'));
-        screenToShow.classList.add('active');
-    };
-
-    gotoCashboxBtn.addEventListener('click', () => {
-        if (!cashboxInitialized) {
-            initializeCashbox();
-            cashboxInitialized = true;
-        }
-        showScreen(cashboxScreen);
-    });
-    gotoStatisticsBtn.addEventListener('click', () => {
-        if (!statisticsInitialized) {
-            initializeStatistics();
-            statisticsInitialized = true;
-        }
-        showScreen(statisticsScreen);
-    });
-    backButtons.forEach(button => button.addEventListener('click', () => showScreen(mainMenu)));
-
-    // --- ОБЩИЕ ЭЛЕМЕНТЫ И ФУНКЦИИ ---
-    const loaderOverlay = document.getElementById('loader-overlay');
-    const showLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'flex'; };
-    const hideLoader = () => { if (loaderOverlay) loaderOverlay.style.display = 'none'; };
-
-    // --- УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО ---
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmationModalTitle = document.getElementById('confirmation-modal-title');
     const confirmationModalText = document.getElementById('confirmation-modal-text');
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const cancelActionBtn = document.getElementById('cancel-action-btn');
+    const expenseForm = document.getElementById('expense-form');
+    const expenseCategory = document.getElementById('expense-category');
+    const dynamicFields = {
+        employees: document.getElementById('employee-fields'),
+        marketing: document.getElementById('marketing-fields'),
+        clients: document.getElementById('client-fields')
+    };
+    const clientSearchInput = document.getElementById('expense-client-search');
+    const clientSearchResults = document.getElementById('client-search-results');
+    const selectedClientIdInput = document.getElementById('selected-client-id');
+    const expensesTableBody = document.getElementById('expenses-table-body');
+    const pageInfoSpan = document.getElementById('page-info');
+    const prevPageBtn = document.getElementById('prev-page-btn');
+    const nextPageBtn = document.getElementById('next-page-btn');
+    const dashboardContainer = document.getElementById('dashboard-container');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const sourceFilter = document.getElementById('sourceFilter');
+    const applyFilterBtn = document.getElementById('apply-filter-btn');
 
-    function showCustomConfirm({
-        title = 'Подтвердите действие',
-        text = 'Вы уверены?',
-        confirmButtonText = 'Подтвердить',
-        confirmButtonClass = 'ui-btn-primary'
-    }) {
+    // --- ОБЩИЕ ФУНКЦИИ ---
+    const showLoader = () => loaderOverlay.style.display = 'flex';
+    const hideLoader = () => loaderOverlay.style.display = 'none';
+
+    const showScreen = (screenToShow) => {
+        screens.forEach(screen => screen.classList.remove('active'));
+        if (screenToShow) screenToShow.classList.add('active');
+    };
+
+    const populateSelect = (selectElement, data, placeholder) => {
+        selectElement.innerHTML = `<option value="">${placeholder}</option>`;
+        data.forEach(item => {
+            selectElement.add(new Option(item.name, item.id));
+        });
+    };
+
+    function showCustomConfirm({ title = 'Подтвердите действие', text = 'Вы уверены?', confirmButtonText = 'Подтвердить', confirmButtonClass = 'ui-btn-primary' }) {
         return new Promise(resolve => {
             confirmationModalTitle.textContent = title;
             confirmationModalText.innerHTML = text;
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
             confirmationModal.style.display = 'flex';
-
             confirmActionBtn.onclick = () => {
                 confirmationModal.style.display = 'none';
                 resolve(true);
@@ -78,30 +81,175 @@ BX24.ready(() => {
         });
     }
 
-    // --- ЛОГИКА КАССЫ ---
-    const expenseForm = document.getElementById('expense-form');
-    const expenseCategory = document.getElementById('expense-category');
-    const dynamicFields = {
-        employees: document.getElementById('employee-fields'),
-        marketing: document.getElementById('marketing-fields'),
-        clients: document.getElementById('client-fields')
-    };
-    const clientSearchInput = document.getElementById('expense-client-search');
-    const clientSearchResults = document.getElementById('client-search-results');
-    const selectedClientIdInput = document.getElementById('selected-client-id');
+    // --- ЛОГИКА ДОСТУПОВ И АВТОРИЗАЦИИ ---
+    function applyPermissions(permissions) {
+        if (!permissions || !permissions.can_access_app) {
+            showScreen(document.getElementById('no-access-screen'));
+            appContainer.style.display = 'block';
+            hideLoader();
+            return false;
+        }
 
-    const populateSelect = (selectElement, data, placeholder) => {
-        selectElement.innerHTML = `<option value="">${placeholder}</option>`;
-        data.forEach(item => {
-            selectElement.add(new Option(item.NAME, item.ID));
+        menuCards.forEach(card => {
+            const tabName = card.dataset.tab;
+            card.style.display = permissions.tabs[tabName] ? 'block' : 'none';
         });
-    };
 
+        document.querySelectorAll('[data-action="save"]').forEach(btn => {
+            btn.disabled = !permissions.actions.can_save;
+            btn.style.cursor = permissions.actions.can_save ? 'pointer' : 'not-allowed';
+        });
+
+        return true;
+    }
+
+    // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
+    function initializeApp() {
+        showLoader();
+        BX24.callMethod('user.current', {}, async (res) => {
+            if (res.error()) {
+                console.error("Failed to get current user:", res.error());
+                applyPermissions(null);
+                return;
+            }
+            currentUser = res.data();
+            console.log("Current user data received:", currentUser);
+
+            try {
+                const permRes = await fetch(`/api/my_permissions?user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
+                if (!permRes.ok) throw new Error('Failed to fetch permissions');
+                userPermissions = await permRes.json();
+                console.log("User permissions received:", userPermissions);
+
+                if (applyPermissions(userPermissions)) {
+                    appContainer.style.display = 'block';
+                    showScreen(mainMenu);
+                }
+            } catch (e) {
+                console.error("Error during permission check:", e);
+                applyPermissions(null);
+            } finally {
+                hideLoader();
+            }
+        });
+    }
+
+    // --- НАВИГАЦИЯ ---
+    menuCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const tab = card.dataset.tab;
+            const screen = document.getElementById(`${tab}-screen`);
+            if (screen) {
+                if (tab === 'cashbox' && !cashboxInitialized) { initializeCashbox(); cashboxInitialized = true; }
+                if (tab === 'statistics' && !statisticsInitialized) { initializeStatistics(); statisticsInitialized = true; }
+                if (tab === 'access' && !accessInitialized) { initializeAccessTab(); accessInitialized = true; }
+                showScreen(screen);
+            }
+        });
+    });
+    backButtons.forEach(button => button.addEventListener('click', () => showScreen(mainMenu)));
+
+    // --- ЛОГИКА ВКЛАДКИ "ДОСТУПЫ" ---
+    async function initializeAccessTab() {
+        const selectEl = document.getElementById('access-entity-select');
+        const rulesContainer = document.getElementById('access-rules-container');
+        let availableEntities = [];
+
+        showLoader();
+        try {
+            const res = await fetch('/api/initial_data_for_access');
+            const data = await res.json();
+            availableEntities = [...data.users, ...data.departments];
+            populateSelect(selectEl, availableEntities, "Выберите сотрудника или отдел...");
+            await loadAccessRules();
+        } catch (e) {
+            console.error("Failed to load entities for access tab", e);
+            alert('Не удалось загрузить данные для настройки доступов.');
+        } finally {
+            hideLoader();
+        }
+
+        document.getElementById('add-access-rule-btn').addEventListener('click', () => {
+            const selectedId = selectEl.value;
+            if (!selectedId || document.querySelector(`.access-rule-card[data-entity-id="${selectedId}"]`)) return;
+
+            const entity = availableEntities.find(e => e.id === selectedId);
+            if (entity) {
+                renderAccessRuleCard(entity.id, entity.name, {
+                    can_access_app: true,
+                    tabs: { cashbox: false, statistics: false, access: false },
+                    actions: { can_save: false, can_delete: false }
+                });
+            }
+        });
+
+        async function loadAccessRules() {
+            const res = await fetch('/api/access_rights');
+            const rules = await res.json();
+            rulesContainer.innerHTML = '';
+            rules.forEach(rule => {
+                renderAccessRuleCard(rule.entity_id, rule.entity_name, rule.permissions);
+            });
+        }
+
+        function renderAccessRuleCard(entityId, entityName, permissions) {
+            const card = document.createElement('div');
+            card.className = 'access-rule-card';
+            card.dataset.entityId = entityId;
+
+            card.innerHTML = `
+                <h4>${entityName}</h4>
+                <div class="access-grid">
+                    <label><input type="checkbox" data-perm="can_access_app" ${permissions.can_access_app ? 'checked' : ''}> Доступ к приложению</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox" ${permissions.tabs.cashbox ? 'checked' : ''}> Вкладка "Касса"</label>
+                    <label><input type="checkbox" data-perm="tabs.statistics" ${permissions.tabs.statistics ? 'checked' : ''}> Вкладка "Статистика"</label>
+                    <label><input type="checkbox" data-perm="tabs.access" ${permissions.tabs.access ? 'checked' : ''}> Вкладка "Доступы"</label>
+                    <label><input type="checkbox" data-perm="actions.can_save" ${permissions.actions.can_save ? 'checked' : ''}> Право на сохр./ред.</label>
+                    <label><input type="checkbox" data-perm="actions.can_delete" ${permissions.actions.can_delete ? 'checked' : ''}> Право на удаление</label>
+                </div>
+                <button class="ui-btn ui-btn-primary save-rule-btn" data-action="save">Сохранить</button>
+            `;
+            rulesContainer.appendChild(card);
+
+            card.querySelector('.save-rule-btn').addEventListener('click', async () => {
+                const newPermissions = {
+                    can_access_app: card.querySelector('[data-perm="can_access_app"]').checked,
+                    tabs: {
+                        cashbox: card.querySelector('[data-perm="tabs.cashbox"]').checked,
+                        statistics: card.querySelector('[data-perm="tabs.statistics"]').checked,
+                        access: card.querySelector('[data-perm="tabs.access"]').checked,
+                    },
+                    actions: {
+                        can_save: card.querySelector('[data-perm="actions.can_save"]').checked,
+                        can_delete: card.querySelector('[data-perm="actions.can_delete"]').checked,
+                    }
+                };
+
+                showLoader();
+                try {
+                    await fetch('/api/access_rights', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            entity_id: entityId,
+                            entity_name: entityName,
+                            permissions: newPermissions
+                        })
+                    });
+                    alert('Права сохранены!');
+                } catch (e) {
+                    alert('Ошибка сохранения прав.');
+                } finally {
+                    hideLoader();
+                }
+            });
+        }
+    }
+
+    // --- ЛОГИКА КАССЫ ---
     async function initializeCashbox() {
         console.log("Initializing Cashbox Screen...");
         showLoader();
-
-        // Bug #4: Скрываем все динамические поля при инициализации
         Object.values(dynamicFields).forEach(field => field.style.display = 'none');
 
         try {
@@ -112,16 +260,13 @@ BX24.ready(() => {
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
 
-            // Bug #5: Кэшируем пользователей
             userCache = (data.users || []).reduce((acc, user) => {
                 acc[user.ID] = user.NAME;
                 return acc;
             }, {});
-            console.log("User cache initialized:", userCache); // Выводим кэш в консоль
+            console.log("User cache for Cashbox initialized:", userCache);
 
-            setupFilterForm();
             loadExpensesTable();
-
         } catch (error) {
             console.error("Error fetching cashbox initial data:", error);
             alert(`Критическая ошибка: не удалось загрузить данные для кассы. ${error.message}`);
@@ -134,241 +279,96 @@ BX24.ready(() => {
         expenseCategory.addEventListener('change', (event) => {
             Object.values(dynamicFields).forEach(field => field.style.display = 'none');
             const selectedCategory = event.target.value;
-
             if (dynamicFields[selectedCategory]) {
                 dynamicFields[selectedCategory].style.display = 'block';
             }
-
             if (selectedCategory === 'employees') {
-                populateSelect(document.getElementById('expense-employee'), availableEmployees, 'Выберите сотрудника...');
+                populateSelect(document.getElementById('expense-employee'), availableEmployees.map(u => ({id: u.ID, name: u.NAME})), 'Выберите сотрудника...');
             } else if (selectedCategory === 'marketing') {
-                populateSelect(document.getElementById('expense-contractor'), availableContractors, 'Выберите подрядчика...');
-            }
-
-            clientSearchInput.value = '';
-            selectedClientIdInput.value = '';
-            clientSearchResults.innerHTML = '';
-            clientSearchResults.style.display = 'none';
-        });
-
-        let searchTimeout;
-        clientSearchInput.addEventListener('input', (event) => {
-            clearTimeout(searchTimeout);
-            const searchTerm = event.target.value;
-
-            if (searchTerm.length > 2) {
-                searchTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`api/search_contacts?query=${encodeURIComponent(searchTerm)}`);
-                        if (!response.ok) throw new Error('Failed to search contacts');
-                        const contacts = await response.json();
-                        clientSearchResults.innerHTML = '';
-                        if (contacts.length > 0) {
-                            contacts.forEach(contact => {
-                                const item = document.createElement('div');
-                                item.className = 'client-search-results-item';
-                                item.textContent = contact.NAME;
-                                item.dataset.id = contact.ID;
-                                item.addEventListener('click', () => {
-                                    clientSearchInput.value = contact.NAME;
-                                    selectedClientIdInput.value = contact.ID;
-                                    clientSearchResults.style.display = 'none';
-                                });
-                                clientSearchResults.appendChild(item);
-                            });
-                            clientSearchResults.style.display = 'block';
-                        } else {
-                            clientSearchResults.style.display = 'none';
-                        }
-                    } catch (error) {
-                        console.error("Error searching contacts:", error);
-                        clientSearchResults.style.display = 'none';
-                    }
-                }, 300);
-            } else {
-                clientSearchResults.innerHTML = '';
-                clientSearchResults.style.display = 'none';
-                selectedClientIdInput.value = '';
-            }
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!clientSearchInput.contains(event.target) && !clientSearchResults.contains(event.target)) {
-                clientSearchResults.style.display = 'none';
-            }
-        });
-
-        expenseForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const formData = {
-                date: document.getElementById('expense-date').value,
-                amount: parseFloat(document.getElementById('expense-amount').value),
-                category: expenseCategory.options[expenseCategory.selectedIndex].text,
-                category_val: expenseCategory.value,
-                comment: document.getElementById('expense-comment').value,
-                name: ''
-            };
-
-            let details = '';
-            if (formData.category_val === 'employees') {
-                const employeeSelect = document.getElementById('expense-employee');
-                formData.employee_id = employeeSelect.value;
-                formData.employee_name = employeeSelect.options[employeeSelect.selectedIndex].text;
-                formData.paymentType = document.getElementById('expense-payment-type').value;
-                details = `<li>Сотрудник: <strong>${formData.employee_name}</strong></li><li>Тип: <strong>${formData.paymentType}</strong></li>`;
-                formData.name = `ЗП/Мотивация: ${formData.employee_name}`;
-            } else if (formData.category_val === 'marketing') {
-                const contractorSelect = document.getElementById('expense-contractor');
-                formData.contractor_id = contractorSelect.value;
-                formData.contractor_name = contractorSelect.options[contractorSelect.selectedIndex].text;
-                details = `<li>Подрядчик: <strong>${formData.contractor_name}</strong></li>`;
-                formData.name = `Маркетинг: ${formData.contractor_name}`;
-            } else if (formData.category_val === 'clients') {
-                formData.client_id = selectedClientIdInput.value;
-                formData.client_name = clientSearchInput.value;
-                details = `<li>Клиент: <strong>${formData.client_name}</strong></li>`;
-                formData.name = `Расход по клиенту: ${formData.client_name}`;
-            } else {
-                formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`;
-            }
-
-            const isConfirmed = await showCustomConfirm({
-                title: 'Сохранение расхода',
-                text: `
-                    <p>Вы уверены, что хотите сохранить расход?</p>
-                    <ul>
-                        <li>Дата: <strong>${formData.date}</strong></li>
-                        <li>Сумма: <strong>${formData.amount}</strong></li>
-                        <li>Категория: <strong>${formData.category}</strong></li>
-                        ${details}
-                        ${formData.comment ? `<li>Комментарий: <strong>${formData.comment}</strong></li>` : ''}
-                    </ul>
-                `,
-                confirmButtonText: 'Сохранить',
-                confirmButtonClass: 'ui-btn-primary'
-            });
-
-            if (isConfirmed) {
-                showLoader();
-                try {
-                    const saveResponse = await fetch('api/add_expense', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            name: formData.name,
-                            date: formData.date,
-                            amount: formData.amount,
-                            category_text: formData.category,
-                            comment: formData.comment,
-                            employee_id: formData.employee_id || null,
-                            contractor_id: formData.contractor_id || null,
-                            client_id: formData.client_id || null,
-                            payment_type: formData.paymentType || null,
-                            added_by_user_id: memberId
-                        }),
-                    });
-
-                    if (!saveResponse.ok) {
-                        const errorData = await saveResponse.json();
-                        throw new Error(errorData.error || 'Ошибка при сохранении расхода');
-                    }
-
-                    alert("Расход успешно сохранен!");
-                    expenseForm.reset();
-                    Object.values(dynamicFields).forEach(field => field.style.display = 'none');
-                    clientSearchInput.value = '';
-                    selectedClientIdInput.value = '';
-                    expenseCategory.value = '';
-                    loadExpensesTable();
-
-                } catch (error) {
-                    console.error("Ошибка сохранения расхода:", error);
-                    alert(`Ошибка при сохранении расхода: ${error.message}`);
-                } finally {
-                    hideLoader();
-                }
+                populateSelect(document.getElementById('expense-contractor'), availableContractors.map(c => ({id: c.ID, name: c.NAME})), 'Выберите подрядчика...');
             }
         });
     }
 
-    // --- ЛОГИКА ТАБЛИЦЫ РАСХОДОВ, ФИЛЬТРОВ И ПАГИНАЦИИ ---
-    const expensesTableBody = document.getElementById('expenses-table-body');
-    const filterForm = document.getElementById('expenses-filter-form');
-    const resetFilterBtn = document.getElementById('reset-filter-btn');
-    const prevPageBtn = document.getElementById('prev-page-btn');
-    const nextPageBtn = document.getElementById('next-page-btn');
-    const pageInfoSpan = document.getElementById('page-info');
-
-    function setupFilterForm() {
-        flatpickr("#filter-start-date", { locale: "ru", dateFormat: "Y-m-d" });
-        flatpickr("#filter-end-date", { locale: "ru", dateFormat: "Y-m-d" });
-
-        populateSelect(document.getElementById('filter-employee'), availableEmployees, 'Все сотрудники...');
-        populateSelect(document.getElementById('filter-contractor'), availableContractors, 'Все подрядчики...');
-
-        filterForm.addEventListener('submit', (event) => {
-            event.preventDefault();
-            currentPage = 1;
-            applyFilters();
-        });
-
-        resetFilterBtn.addEventListener('click', resetFilters);
-        prevPageBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                loadExpensesTable();
-            }
-        });
-        nextPageBtn.addEventListener('click', () => {
-            currentPage++;
-            loadExpensesTable();
-        });
-    }
-
-    function applyFilters() {
-        const categorySelect = document.getElementById('filter-category');
-        const selectedCategoryText = categorySelect.value ? categorySelect.options[categorySelect.selectedIndex].text : '';
-
-        currentFilters = {
-            category: selectedCategoryText,
-            employee_id: document.getElementById('filter-employee').value,
-            source_id: document.getElementById('filter-contractor').value,
-            start_date: document.getElementById('filter-start-date').value,
-            end_date: document.getElementById('filter-end-date').value,
+    expenseForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = {
+            date: document.getElementById('expense-date').value,
+            amount: parseFloat(document.getElementById('expense-amount').value),
+            category: expenseCategory.options[expenseCategory.selectedIndex].text,
+            category_val: expenseCategory.value,
+            comment: document.getElementById('expense-comment').value,
+            name: ''
         };
 
-        for (const key in currentFilters) {
-            if (!currentFilters[key]) {
-                delete currentFilters[key];
+        let details = '';
+        if (formData.category_val === 'employees') {
+            const employeeSelect = document.getElementById('expense-employee');
+            formData.employee_id = employeeSelect.value;
+            formData.employee_name = employeeSelect.options[employeeSelect.selectedIndex].text;
+            formData.paymentType = document.getElementById('expense-payment-type').value;
+            details = `<li>Сотрудник: <strong>${formData.employee_name}</strong></li><li>Тип: <strong>${formData.paymentType}</strong></li>`;
+            formData.name = `ЗП/Мотивация: ${formData.employee_name}`;
+        } else if (formData.category_val === 'marketing') {
+            const contractorSelect = document.getElementById('expense-contractor');
+            formData.contractor_id = contractorSelect.value;
+            formData.contractor_name = contractorSelect.options[contractorSelect.selectedIndex].text;
+            details = `<li>Подрядчик: <strong>${formData.contractor_name}</strong></li>`;
+            formData.name = `Маркетинг: ${formData.contractor_name}`;
+        } else if (formData.category_val === 'clients') {
+            formData.client_id = selectedClientIdInput.value;
+            formData.client_name = clientSearchInput.value;
+            details = `<li>Клиент: <strong>${formData.client_name}</strong></li>`;
+            formData.name = `Расход по клиенту: ${formData.client_name}`;
+        } else {
+            formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`;
+        }
+
+        const isConfirmed = await showCustomConfirm({
+            title: 'Сохранение расхода',
+            text: `
+                <p>Вы уверены, что хотите сохранить расход?</p>
+                <ul>
+                    <li>Дата: <strong>${formData.date}</strong></li>
+                    <li>Сумма: <strong>${formData.amount}</strong></li>
+                    <li>Категория: <strong>${formData.category}</strong></li>
+                    ${details}
+                    ${formData.comment ? `<li>Комментарий: <strong>${formData.comment}</strong></li>` : ''}
+                </ul>
+            `,
+            confirmButtonText: 'Сохранить'
+        });
+
+        if (isConfirmed) {
+            console.log(`Попытка сохранения... ID юзера: ${currentUser.ID}, Данные:`, formData);
+            showLoader();
+            try {
+                await fetch('api/add_expense', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...formData, added_by_user_id: currentUser.ID })
+                });
+                alert("Расход успешно сохранен!");
+                expenseForm.reset();
+                Object.values(dynamicFields).forEach(field => field.style.display = 'none');
+                loadExpensesTable();
+            } catch (error) {
+                alert(`Ошибка при сохранении расхода: ${error.message}`);
+            } finally {
+                hideLoader();
             }
         }
-        loadExpensesTable();
-    }
-
-    function resetFilters() {
-        filterForm.reset();
-        currentFilters = {};
-        currentPage = 1;
-        loadExpensesTable();
-    }
+    });
 
     async function loadExpensesTable() {
         showLoader();
         try {
-            const offset = (currentPage - 1) * expensesPerPage;
-            const queryParams = new URLSearchParams({
-                limit: expensesPerPage,
-                offset: offset,
-                ...currentFilters
-            });
-
+            const queryParams = new URLSearchParams({ limit: expensesPerPage, offset: (currentPage - 1) * expensesPerPage, ...currentFilters });
             const response = await fetch(`api/expenses?${queryParams.toString()}`);
             if (!response.ok) throw new Error('Failed to load expenses');
             const data = await response.json();
-
             renderExpensesTable(data.expenses);
             updatePaginationControls(data.total_records, data.limit, data.offset);
-
         } catch (error) {
             console.error("Error loading expenses table:", error);
             expensesTableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки расходов: ${error.message}</td></tr>`;
@@ -383,7 +383,6 @@ BX24.ready(() => {
             expensesTableBody.innerHTML = `<tr><td colspan="11">Нет записей о расходах.</td></tr>`;
             return;
         }
-
         expenses.forEach(expense => {
             const row = expensesTableBody.insertRow();
             row.insertCell().textContent = expense.id;
@@ -395,206 +394,31 @@ BX24.ready(() => {
             row.insertCell().textContent = expense.source_name || '';
             row.insertCell().textContent = expense.contact_name || '';
             row.insertCell().textContent = expense.comment || '';
-            
-            // Bug #5: Используем кэш для отображения имени создателя
-            const addedByCell = row.insertCell();
-            addedByCell.textContent = userCache[expense.added_by_user_id] || 'Неизвестно';
+            row.insertCell().textContent = userCache[expense.added_by_user_id] || expense.added_by_user_name || 'Неизвестно';
 
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
-            actionsCell.innerHTML = `
-                <span class="action-icon edit-icon" data-id="${expense.id}" title="Редактировать">✏️</span>
-                <span class="action-icon delete-icon" data-id="${expense.id}" title="Удалить">🗑️</span>
-            `;
+            if (userPermissions.actions.can_save) {
+                actionsCell.innerHTML += `<span class="action-icon edit-icon" data-id="${expense.id}" title="Редактировать">✏️</span>`;
+            }
+            if (userPermissions.actions.can_delete) {
+                actionsCell.innerHTML += `<span class="action-icon delete-icon" data-id="${expense.id}" title="Удалить" data-action="delete">🗑️</span>`;
+            }
         });
 
-        expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => {
-            icon.addEventListener('click', (event) => openEditModal(event.target.dataset.id));
-        });
-        expensesTableBody.querySelectorAll('.delete-icon').forEach(icon => {
-            icon.addEventListener('click', (event) => openDeleteConfirmModal(event.target.dataset.id));
-        });
+        expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => icon.addEventListener('click', (e) => openEditModal(e.target.dataset.id)));
+        expensesTableBody.querySelectorAll('.delete-icon').forEach(icon => icon.addEventListener('click', (e) => openDeleteConfirmModal(e.target.dataset.id)));
     }
 
     function updatePaginationControls(totalRecords, limit, offset) {
-        const totalPages = Math.ceil(totalRecords / limit);
+        const totalPages = Math.ceil(totalRecords / limit) || 1;
         const currentPageCalculated = Math.floor(offset / limit) + 1;
-
         pageInfoSpan.textContent = `Страница ${currentPageCalculated} из ${totalPages}`;
         prevPageBtn.disabled = currentPageCalculated === 1;
         nextPageBtn.disabled = currentPageCalculated >= totalPages;
     }
 
-    // --- ЛОГИКА РЕДАКТИРОВАНИЯ ---
-    const editExpenseModal = document.getElementById('edit-expense-modal');
-    const editExpenseForm = document.getElementById('edit-expense-form');
-    const cancelEditBtn = document.getElementById('cancel-edit-btn');
-    const editExpenseCategorySelect = document.getElementById('edit-expense-category');
-    const editDynamicFields = {
-        employees: document.getElementById('edit-employee-fields'),
-        marketing: document.getElementById('edit-marketing-fields'),
-        clients: document.getElementById('edit-client-fields')
-    };
-    let editFlatpickrInstance;
-
-    async function openEditModal(expenseId) {
-        showLoader();
-        try {
-            const response = await fetch(`api/expenses/${expenseId}`);
-            if (!response.ok) throw new Error('Failed to load expense for editing');
-            const expense = await response.json();
-
-            document.getElementById('edit-expense-id').value = expense.id;
-            document.getElementById('edit-expense-name').value = expense.name;
-            document.getElementById('edit-expense-amount').value = parseFloat(expense.amount);
-            editExpenseCategorySelect.value = expense.category_val;
-            document.getElementById('edit-expense-comment').value = expense.comment;
-
-            if (editFlatpickrInstance) editFlatpickrInstance.destroy();
-            editFlatpickrInstance = flatpickr("#edit-expense-date", {
-                locale: "ru",
-                dateFormat: "Y-m-d",
-                defaultDate: expense.expense_date
-            });
-
-            Object.values(editDynamicFields).forEach(field => field.style.display = 'none');
-            
-            if (expense.category_val === 'employees') {
-                editDynamicFields.employees.style.display = 'block';
-                const editEmployeeSelect = document.getElementById('edit-expense-employee');
-                populateSelect(editEmployeeSelect, availableEmployees, 'Выберите сотрудника...');
-                editEmployeeSelect.value = expense.employee_id;
-            } else if (expense.category_val === 'marketing') {
-                editDynamicFields.marketing.style.display = 'block';
-                const editContractorSelect = document.getElementById('edit-expense-contractor');
-                populateSelect(editContractorSelect, availableContractors, 'Выберите подрядчика...');
-                editContractorSelect.value = expense.source_id;
-            } else if (expense.category_val === 'clients') {
-                editDynamicFields.clients.style.display = 'block';
-                document.getElementById('edit-expense-client-search').value = expense.contact_name || '';
-                document.getElementById('edit-selected-client-id').value = expense.contact_id || '';
-            }
-
-            editExpenseModal.style.display = 'flex';
-        } catch (error) {
-            console.error("Error opening edit modal:", error);
-            alert(`Ошибка при загрузке данных для редактирования: ${error.message}`);
-        } finally {
-            hideLoader();
-        }
-    }
-
-    editExpenseCategorySelect.addEventListener('change', (event) => {
-        Object.values(editDynamicFields).forEach(field => field.style.display = 'none');
-        const selectedCategory = event.target.value;
-        if (editDynamicFields[selectedCategory]) {
-            editDynamicFields[selectedCategory].style.display = 'block';
-        }
-        if (selectedCategory === 'employees') {
-            populateSelect(document.getElementById('edit-expense-employee'), availableEmployees, 'Выберите сотрудника...');
-        } else if (selectedCategory === 'marketing') {
-            populateSelect(document.getElementById('edit-expense-contractor'), availableContractors, 'Выберите подрядчика...');
-        }
-    });
-
-    editExpenseForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const expenseId = document.getElementById('edit-expense-id').value;
-        const categorySelect = document.getElementById('edit-expense-category');
-        const formData = {
-            name: document.getElementById('edit-expense-name').value,
-            date: document.getElementById('edit-expense-date').value,
-            amount: parseFloat(document.getElementById('edit-expense-amount').value),
-            category_text: categorySelect.options[categorySelect.selectedIndex].text,
-            category_val: categorySelect.value,
-            comment: document.getElementById('edit-expense-comment').value,
-            employee_id: null,
-            contractor_id: null,
-            client_id: null
-        };
-
-        if (formData.category_val === 'employees') {
-            formData.employee_id = document.getElementById('edit-expense-employee').value;
-        } else if (formData.category_val === 'marketing') {
-            formData.contractor_id = document.getElementById('edit-expense-contractor').value;
-        } else if (formData.category_val === 'clients') {
-            formData.client_id = document.getElementById('edit-selected-client-id').value;
-        }
-
-        showLoader();
-        try {
-            const saveResponse = await fetch(`api/expenses/${expenseId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-
-            if (!saveResponse.ok) {
-                const errorData = await saveResponse.json();
-                throw new Error(errorData.error || 'Ошибка при обновлении расхода');
-            }
-
-            alert("Расход успешно обновлен!");
-            closeEditModal();
-            loadExpensesTable();
-        } catch (error) {
-            console.error("Ошибка обновления расхода:", error);
-            alert(`Ошибка при обновлении расхода: ${error.message}`);
-        } finally {
-            hideLoader();
-        }
-    });
-
-    cancelEditBtn.addEventListener('click', closeEditModal);
-
-    function closeEditModal() {
-        editExpenseModal.style.display = 'none';
-        editExpenseForm.reset();
-        if (editFlatpickrInstance) {
-            editFlatpickrInstance.destroy();
-            editFlatpickrInstance = null;
-        }
-    }
-
-    // --- ЛОГИКА УДАЛЕНИЯ ---
-    let expenseToDeleteId = null;
-    async function openDeleteConfirmModal(expenseId) {
-        expenseToDeleteId = expenseId;
-        const isConfirmed = await showCustomConfirm({
-            title: 'Подтвердите удаление',
-            text: 'Вы уверены, что хотите безвозвратно удалить эту запись?',
-            confirmButtonText: 'Удалить',
-            confirmButtonClass: 'ui-btn-danger'
-        });
-
-        if (isConfirmed) {
-            showLoader();
-            try {
-                const response = await fetch(`api/expenses/${expenseToDeleteId}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ошибка при удалении расхода');
-                }
-                alert("Расход успешно удален!");
-                loadExpensesTable();
-            } catch (error) {
-                console.error("Ошибка удаления расхода:", error);
-                alert(`Ошибка при удалении расхода: ${error.message}`);
-            } finally {
-                hideLoader();
-                expenseToDeleteId = null;
-            }
-        }
-    }
-
     // --- ЛОГИКА СТАТИСТИКИ ---
-    const dashboardContainer = document.getElementById('dashboard-container');
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    const sourceFilter = document.getElementById('sourceFilter');
-    const applyFilterBtn = document.getElementById('apply-filter-btn');
-    let sortedStatuses = [];
-
     function initializeStatistics() {
         console.log("Initializing Statistics Screen...");
         if (!dashboardContainer || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
@@ -604,18 +428,24 @@ BX24.ready(() => {
         flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
         applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
-        fetchInitialData();
+        fetchInitialDataForStatistics();
     }
 
-    async function fetchInitialData() {
+    async function fetchInitialDataForStatistics() {
         showLoader();
         try {
-            const response = await fetch('api/initial_data');
+            const response = await fetch('api/initial_data'); // Предполагается, что этот эндпоинт существует
             if (!response.ok) throw new Error('Failed to load initial data for statistics');
             const data = await response.json();
 
             if (data.sources) {
-                populateSelect(sourceFilter, data.sources, 'Все источники');
+                sourceFilter.innerHTML = '<option value="">Все источники</option>';
+                data.sources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.STATUS_ID;
+                    option.textContent = source.NAME;
+                    sourceFilter.appendChild(option);
+                });
             }
             if (data.statuses) {
                 sortedStatuses = data.statuses.sort((a, b) => parseInt(a.SORT) - parseInt(b.SORT));
@@ -683,4 +513,7 @@ BX24.ready(() => {
             }
         });
     }
-});
+
+    // --- ЗАПУСК ПРИЛОЖЕНИЯ ---
+    initializeApp();
+});<ctrl46>}
