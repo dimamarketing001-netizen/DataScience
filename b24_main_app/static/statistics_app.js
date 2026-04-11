@@ -116,7 +116,7 @@ BX24.ready(() => {
             console.log("Current user data received:", currentUser);
 
             try {
-                const permRes = await fetch(`/?action=my_permissions&user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
+                const permRes = await fetch(`/api?action=my_permissions&user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
                 if (!permRes.ok) {
                     const errorText = await permRes.text();
                     throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
@@ -160,7 +160,7 @@ BX24.ready(() => {
 
         showLoader();
         try {
-            const res = await fetch(`/?action=initial_data_for_access`);
+            const res = await fetch(`/api?action=initial_data_for_access`);
             const data = await res.json();
             availableEntities = [...data.users, ...data.departments];
             populateSelect(selectEl, availableEntities, "Выберите сотрудника или отдел...");
@@ -187,7 +187,7 @@ BX24.ready(() => {
         });
 
         async function loadAccessRules() {
-            const res = await fetch(`/?action=access_rights`);
+            const res = await fetch(`/api?action=access_rights`);
             const rules = await res.json();
             rulesContainer.innerHTML = '';
             rules.forEach(rule => {
@@ -230,7 +230,7 @@ BX24.ready(() => {
                 
                 showLoader();
                 try {
-                    await fetch(`/?action=access_rights`, {
+                    await fetch(`/api?action=access_rights`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

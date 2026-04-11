@@ -303,18 +303,9 @@ def get_expenses():
         cursor.close()
         conn.close()
 
-
-def handle_single_expense(expense_id):
-    # Эта функция больше не используется напрямую, но оставлена для полноты
-    pass
-
 # --- Главный маршрутизатор ---
-@app.route('/', methods=['GET', 'POST'])
-def router():
-    # Если это POST-запрос без action, это стандартный вход из Битрикс24
-    if request.method == 'POST' and 'action' not in request.args:
-        return render_template('index.html')
-
+@app.route('/api', methods=['GET', 'POST'])
+def api_router():
     action = request.args.get('action')
     
     api_actions = {
@@ -328,15 +319,13 @@ def router():
     }
 
     if action in api_actions:
-        # Для /expenses/1 и т.д. нужна была бы более сложная логика,
-        # но так как мы ее не используем, этого достаточно.
         return api_actions[action]()
     
-    # Если action не найден, но это API-запрос, возвращаем ошибку
-    if action:
-        return jsonify({'error': f'Action "{action}" not found'}), 404
-    
-    # Если action не указан и это GET-запрос, отдаем главную страницу
+    return jsonify({'error': f'Action "{action}" not found'}), 404
+
+# --- Главный маршрут для отображения страницы ---
+@app.route('/', methods=['GET', 'POST'])
+def index():
     return render_template('index.html')
 
 
