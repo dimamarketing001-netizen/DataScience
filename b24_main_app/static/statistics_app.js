@@ -116,7 +116,7 @@ BX24.ready(() => {
             console.log("Current user data received:", currentUser);
 
             try {
-                const permRes = await fetch(`/api?action=my_permissions&user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
+                const permRes = await fetch(`/api/my_permissions?user_id=${currentUser.ID}&department_id=${currentUser.UF_DEPARTMENT[0]}`);
                 if (!permRes.ok) {
                     const errorText = await permRes.text();
                     throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
@@ -160,7 +160,7 @@ BX24.ready(() => {
 
         showLoader();
         try {
-            const res = await fetch(`/api?action=initial_data_for_access`);
+            const res = await fetch(`/api/initial_data_for_access`);
             const data = await res.json();
             availableEntities = [...data.users, ...data.departments];
             populateSelect(selectEl, availableEntities, "Выберите сотрудника или отдел...");
@@ -187,7 +187,7 @@ BX24.ready(() => {
         });
 
         async function loadAccessRules() {
-            const res = await fetch(`/api?action=access_rights`);
+            const res = await fetch(`/api/access_rights`);
             const rules = await res.json();
             rulesContainer.innerHTML = '';
             rules.forEach(rule => {
@@ -230,7 +230,7 @@ BX24.ready(() => {
                 
                 showLoader();
                 try {
-                    await fetch(`/api?action=access_rights`, {
+                    await fetch(`/api/access_rights`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -256,7 +256,7 @@ BX24.ready(() => {
         Object.values(dynamicFields).forEach(field => field.style.display = 'none');
 
         try {
-            const response = await fetch(`/api?action=cashbox_initial_data`);
+            const response = await fetch(`/api/cashbox_initial_data`);
             if (!response.ok) throw new Error('Failed to load cashbox initial data');
             const data = await response.json();
 
@@ -346,7 +346,7 @@ BX24.ready(() => {
             console.log(`Попытка сохранения... ID юзера: ${currentUser.ID}, Данные:`, formData);
             showLoader();
             try {
-                await fetch(`/api?action=add_expense`, {
+                await fetch(`/api/add_expense`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...formData, added_by_user_id: currentUser.ID })
@@ -366,8 +366,8 @@ BX24.ready(() => {
     async function loadExpensesTable() {
         showLoader();
         try {
-            const queryParams = new URLSearchParams({ action: 'expenses', limit: expensesPerPage, offset: (currentPage - 1) * expensesPerPage, ...currentFilters });
-            const response = await fetch(`/api?${queryParams.toString()}`);
+            const queryParams = new URLSearchParams({ ...currentFilters, limit: expensesPerPage, offset: (currentPage - 1) * expensesPerPage });
+            const response = await fetch(`/api/expenses?${queryParams.toString()}`);
             if (!response.ok) throw new Error('Failed to load expenses');
             const data = await response.json();
             renderExpensesTable(data.expenses);
@@ -437,7 +437,7 @@ BX24.ready(() => {
     async function fetchInitialDataForStatistics() {
         showLoader();
         try {
-            const response = await fetch(`/api?action=cashbox_initial_data`); // Re-using cashbox data
+            const response = await fetch(`/api/cashbox_initial_data`); // Re-using cashbox data
             if (!response.ok) throw new Error('Failed to load initial data for statistics');
             const data = await response.json();
 
@@ -466,14 +466,13 @@ BX24.ready(() => {
     async function fetchLeadsAndRenderDashboard() {
         showLoader();
         const queryParams = new URLSearchParams({
-            action: 'leads',
             startDate: startDateInput.value,
             endDate: endDateInput.value,
             source: sourceFilter.value
         });
 
         try {
-            const response = await fetch(`/api?${queryParams}`);
+            const response = await fetch(`/api/leads?${queryParams.toString()}`);
             if (!response.ok) throw new Error('Failed to load leads');
             const leads = await response.json();
             renderDashboard(leads);
