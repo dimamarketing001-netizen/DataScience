@@ -55,7 +55,7 @@ BX24.ready(() => {
         screens.forEach(screen => screen.classList.remove('active'));
         if (screenToShow) screenToShow.classList.add('active');
     };
-
+    
     const populateSelect = (selectElement, data, placeholder) => {
         selectElement.innerHTML = `<option value="">${placeholder}</option>`;
         data.forEach(item => {
@@ -99,7 +99,7 @@ BX24.ready(() => {
             btn.disabled = !permissions.actions.can_save;
             btn.style.cursor = permissions.actions.can_save ? 'pointer' : 'not-allowed';
         });
-
+        
         return true;
     }
 
@@ -162,7 +162,7 @@ BX24.ready(() => {
             availableEntities = [...data.users, ...data.departments];
             populateSelect(selectEl, availableEntities, "Выберите сотрудника или отдел...");
             await loadAccessRules();
-        } catch (e) {
+        } catch (e) { 
             console.error("Failed to load entities for access tab", e);
             alert('Не удалось загрузить данные для настройки доступов.');
         } finally {
@@ -172,7 +172,7 @@ BX24.ready(() => {
         document.getElementById('add-access-rule-btn').addEventListener('click', () => {
             const selectedId = selectEl.value;
             if (!selectedId || document.querySelector(`.access-rule-card[data-entity-id="${selectedId}"]`)) return;
-
+            
             const entity = availableEntities.find(e => e.id === selectedId);
             if (entity) {
                 renderAccessRuleCard(entity.id, entity.name, {
@@ -224,7 +224,7 @@ BX24.ready(() => {
                         can_delete: card.querySelector('[data-perm="actions.can_delete"]').checked,
                     }
                 };
-
+                
                 showLoader();
                 try {
                     await fetch('/api/access_rights', {
@@ -245,7 +245,7 @@ BX24.ready(() => {
             });
         }
     }
-
+    
     // --- ЛОГИКА КАССЫ ---
     async function initializeCashbox() {
         console.log("Initializing Cashbox Screen...");
@@ -259,7 +259,7 @@ BX24.ready(() => {
 
             availableEmployees = data.users || [];
             availableContractors = data.sources || [];
-
+            
             userCache = (data.users || []).reduce((acc, user) => {
                 acc[user.ID] = user.NAME;
                 return acc;
@@ -323,9 +323,9 @@ BX24.ready(() => {
         } else {
             formData.name = `${formData.category}: ${formData.comment.substring(0, 50)}`;
         }
-
-        const isConfirmed = await showCustomConfirm({
-            title: 'Сохранение расхода',
+        
+        const isConfirmed = await showCustomConfirm({ 
+            title: 'Сохранение расхода', 
             text: `
                 <p>Вы уверены, что хотите сохранить расход?</p>
                 <ul>
@@ -335,8 +335,8 @@ BX24.ready(() => {
                     ${details}
                     ${formData.comment ? `<li>Комментарий: <strong>${formData.comment}</strong></li>` : ''}
                 </ul>
-            `,
-            confirmButtonText: 'Сохранить'
+            `, 
+            confirmButtonText: 'Сохранить' 
         });
 
         if (isConfirmed) {
@@ -395,7 +395,7 @@ BX24.ready(() => {
             row.insertCell().textContent = expense.contact_name || '';
             row.insertCell().textContent = expense.comment || '';
             row.insertCell().textContent = userCache[expense.added_by_user_id] || expense.added_by_user_name || 'Неизвестно';
-
+            
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
             if (userPermissions.actions.can_save) {
@@ -417,7 +417,7 @@ BX24.ready(() => {
         prevPageBtn.disabled = currentPageCalculated === 1;
         nextPageBtn.disabled = currentPageCalculated >= totalPages;
     }
-
+    
     // --- ЛОГИКА СТАТИСТИКИ ---
     function initializeStatistics() {
         console.log("Initializing Statistics Screen...");
@@ -516,4 +516,4 @@ BX24.ready(() => {
 
     // --- ЗАПУСК ПРИЛОЖЕНИЯ ---
     initializeApp();
-});<ctrl46>}
+});
