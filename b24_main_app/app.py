@@ -380,12 +380,9 @@ def handle_single_expense(expense_id):
             cursor.close()
             conn.close()
 
-
 # --- Главный маршрут ---
-@app.route('/')
-@app.route(f'{APP_BASE_PATH}')
-@app.route(f'{APP_BASE_PATH}/<path:path>')
-def index(path=None):
+@app.route('/', methods=['GET', 'POST'])
+def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
