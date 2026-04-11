@@ -18,7 +18,12 @@ App.cashbox.ui = {
             employees: document.getElementById('edit-employee-fields'),
             marketing: document.getElementById('edit-marketing-fields'),
             clients: document.getElementById('edit-client-fields')
-        }
+        },
+        // Элементы для фильтра
+        filterCategory: document.getElementById('filter-category'),
+        filterEmployeeWrapper: document.getElementById('filter-employee-wrapper'),
+        filterContractorWrapper: document.getElementById('filter-contractor-wrapper'),
+        resetFilterBtn: document.getElementById('reset-filter-btn')
     },
 
     // --- Функции рендеринга и управления UI ---
@@ -71,12 +76,29 @@ App.cashbox.ui = {
     },
 
     setupFilterForm: function(categories, employees, contractors) {
+        const { filterCategory, filterEmployeeWrapper, filterContractorWrapper, resetFilterBtn } = this.elements;
+
         flatpickr("#filter-start-date", { locale: "ru", dateFormat: "Y-m-d" });
         flatpickr("#filter-end-date", { locale: "ru", dateFormat: "Y-m-d" });
 
-        App.populateSelect(document.getElementById('filter-category'), categories, "Все категории");
+        App.populateSelect(filterCategory, categories, "Все категории");
         App.populateSelect(document.getElementById('filter-employee'), employees, "Все сотрудники");
         App.populateSelect(document.getElementById('filter-contractor'), contractors, "Все подрядчики");
+
+        // Инициализация видимости полей фильтра
+        this.toggleFilterDynamicFields(filterCategory.value);
+
+        // Обработчик изменения категории фильтра
+        filterCategory.addEventListener('change', (event) => {
+            this.toggleFilterDynamicFields(event.target.value);
+        });
+
+        // Обработчик сброса фильтра
+        resetFilterBtn.addEventListener('click', () => {
+            // Дополнительно скрываем поля при сбросе
+            filterCategory.value = ''; // Сбрасываем категорию
+            this.toggleFilterDynamicFields('');
+        });
     },
     
     toggleDynamicFields: function(categoryValue, formType = 'add') {
@@ -84,6 +106,19 @@ App.cashbox.ui = {
         Object.values(fields).forEach(field => field.style.display = 'none');
         if (fields[categoryValue]) {
             fields[categoryValue].style.display = 'block';
+        }
+    },
+
+    toggleFilterDynamicFields: function(categoryValue) {
+        const { filterEmployeeWrapper, filterContractorWrapper } = this.elements;
+        
+        filterEmployeeWrapper.style.display = 'none';
+        filterContractorWrapper.style.display = 'none';
+
+        if (categoryValue === 'employees') {
+            filterEmployeeWrapper.style.display = 'block';
+        } else if (categoryValue === 'marketing') {
+            filterContractorWrapper.style.display = 'block';
         }
     },
 
