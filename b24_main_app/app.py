@@ -303,6 +303,7 @@ def get_expenses():
         cursor.close()
         conn.close()
 
+
 # --- Главный маршрутизатор ---
 @app.route('/api', methods=['GET', 'POST'])
 def api_router():
