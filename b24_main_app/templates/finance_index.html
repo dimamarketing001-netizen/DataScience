@@ -286,15 +286,15 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
 
-    <!-- Основные скрипты приложения -->
-    <script src="static/js/api.js"></script>
+    <!-- Основные скрипты приложения (app.js должен быть первым) -->
     <script src="static/js/app.js"></script>
+    <script src="static/js/api.js"></script>
 
     <!-- Скрипты модулей -->
     <script src="static/js/access.js"></script>
     <script src="static/js/statistics.js"></script>
 
-    <!-- Скрипты модуля "Касса" (в правильном порядке) -->
+    <!-- Скрипты модуля "Касса" (main должен быть первым) -->
     <script src="static/js/cashbox/cashbox_main.js"></script>
     <script src="static/js/cashbox/cashbox_api.js"></script>
     <script src="static/js/cashbox/cashbox_ui.js"></script>
