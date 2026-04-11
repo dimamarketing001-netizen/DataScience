@@ -8,7 +8,7 @@ from functools import wraps
 
 # --- Конфигурация ---
 B24_WEBHOOK_URL = "https://b24-p41gmg.bitrix24.ru/rest/30/6k67fjhrmukh7ql7/"
-APP_BASE_PATH = "/page2"  # Префикс пути для всех маршрутов
+APP_BASE_PATH = "/page2"  # Префикс пути для всех маршрутов (оставлен пустым)
 
 # --- MySQL Database Configuration ---
 DB_CONFIG = {
@@ -382,9 +382,10 @@ def handle_single_expense(expense_id):
 
 
 # --- Главный маршрут ---
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def index(path):
+@app.route('/')
+@app.route(f'{APP_BASE_PATH}')
+@app.route(f'{APP_BASE_PATH}/<path:path>')
+def index(path=None):
     return render_template('index.html')
 
 if __name__ == '__main__':
