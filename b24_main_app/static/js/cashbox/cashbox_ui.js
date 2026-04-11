@@ -23,7 +23,15 @@ App.cashbox.ui = {
         filterCategory: document.getElementById('filter-category'),
         filterEmployeeWrapper: document.getElementById('filter-employee-wrapper'),
         filterContractorWrapper: document.getElementById('filter-contractor-wrapper'),
-        resetFilterBtn: document.getElementById('reset-filter-btn')
+        resetFilterBtn: document.getElementById('reset-filter-btn'),
+
+        // Элементы для формы редактирования (добавлены/обновлены)
+        editExpenseCategory: document.getElementById('edit-expense-category'),
+        editExpenseEmployee: document.getElementById('edit-expense-employee'),
+        editExpensePaymentType: document.getElementById('edit-expense-payment-type'),
+        editExpenseContractor: document.getElementById('edit-expense-contractor'),
+        editExpenseClientSearch: document.getElementById('edit-expense-client-search'),
+        editSelectedClientId: document.getElementById('edit-selected-client-id'),
     },
 
     // --- Функции рендеринга и управления UI ---
@@ -38,7 +46,6 @@ App.cashbox.ui = {
         expenses.forEach(expense => {
             const row = expensesTableBody.insertRow();
             row.insertCell().textContent = expense.id;
-            // Удален столбец "Название"
             row.insertCell().textContent = expense.expense_date;
             row.insertCell().textContent = parseFloat(expense.amount).toFixed(2);
             row.insertCell().textContent = expense.category;
@@ -95,7 +102,6 @@ App.cashbox.ui = {
 
         // Обработчик сброса фильтра
         resetFilterBtn.addEventListener('click', () => {
-            // Дополнительно скрываем поля при сбросе
             filterCategory.value = ''; // Сбрасываем категорию
             this.toggleFilterDynamicFields('');
         });
@@ -122,20 +128,51 @@ App.cashbox.ui = {
         }
     },
 
-    openEditModal: function(expense) {
-        const { editExpenseForm, editExpenseModal } = this.elements;
+    openEditModal: function(expense, availableEmployees, availableContractors) {
+        const { editExpenseForm, editExpenseModal, editExpenseCategory, editExpenseEmployee, editExpensePaymentType, editExpenseContractor, editExpenseClientSearch, editSelectedClientId } = this.elements;
         editExpenseForm.reset();
 
         document.getElementById('edit-expense-id').value = expense.id;
-        document.getElementById('edit-expense-name').value = expense.name;
+        // Поле "Название" удалено, поэтому не заполняем
         document.getElementById('edit-expense-amount').value = expense.amount;
         document.getElementById('edit-expense-comment').value = expense.comment;
         
         flatpickr("#edit-expense-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: expense.expense_date });
-        document.getElementById('edit-expense-category').value = expense.category_val;
+        editExpenseCategory.value = expense.category_val;
         
+        // Показываем/скрываем динамические поля
         this.toggleDynamicFields(expense.category_val, 'edit');
-        // Здесь может быть логика заполнения селектов в модальном окне, если нужно
+
+        // Заполняем динамические поля данными
+        if (expense.category_val === 'employees') {
+            App.populateSelect(editExpenseEmployee, availableEmployees.map(u => ({id: u.ID, name: u.NAME})), 'Выберите сотрудника...', expense.employee_id);
+            if (expense.payment_type) {
+                editExpensePaymentType.value = expense.payment_type;
+            }
+        } else if (expense.category_val === 'marketing') {
+            App.populateSelect(editExpenseContractor, availableContractors.map(c => ({id: c.ID, name: c.NAME})), 'Выберите подрядчика...', expense.source_id);
+        } else if (expense.category_val === 'clients') {
+            editExpenseClientSearch.value = expense.contact_name || ''; // Отображаем имя клиента
+            editSelectedClientId.value = expense.contact_id || ''; // Сохраняем ID клиента
+        }
+
+        // Обработчик изменения категории в форме редактирования
+        editExpenseCategory.onchange = (event) => {
+            const selectedCategory = event.target.value;
+            this.toggleDynamicFields(selectedCategory, 'edit');
+            // При изменении категории, перенаселяем соответствующие селекты
+            if (selectedCategory === 'employees') {
+                App.populateSelect(editExpenseEmployee, availableEmployees.map(u => ({id: u.ID, name: u.NAME})), 'Выберите сотрудника...');
+            } else if (selectedCategory === 'marketing') {
+                App.populateSelect(editExpenseContractor, availableContractors.map(c => ({id: c.ID, name: c.NAME})), 'Выберите подрядчика...');
+            }
+            // Сбрасываем значения динамических полей при смене категории
+            if (editExpenseEmployee) editExpenseEmployee.value = '';
+            if (editExpensePaymentType) editExpensePaymentType.value = 'fix'; // или другое значение по умолчанию
+            if (editExpenseContractor) editExpenseContractor.value = '';
+            if (editExpenseClientSearch) editExpenseClientSearch.value = '';
+            if (editSelectedClientId) editSelectedClientId.value = '';
+        };
         
         editExpenseModal.style.display = 'flex';
     },
@@ -143,6 +180,8 @@ App.cashbox.ui = {
     closeEditModal: function() {
         this.elements.editExpenseModal.style.display = 'none';
         this.elements.editExpenseForm.reset();
+        // Скрываем все динамические поля при закрытии модального окна
+        this.toggleDynamicFields('', 'edit');
     },
 
     openDeleteConfirmModal: function() {
