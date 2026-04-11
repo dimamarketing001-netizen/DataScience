@@ -127,9 +127,8 @@ def _get_b24_entity_name(entity_type, entity_id):
     return name
 
 
-# --- API для Управления Доступами ---
+# --- API Функции (внутренние) ---
 
-@app.route('/initial_data_for_access', methods=['GET'])
 def get_initial_data_for_access():
     batch_payload = {
         'halt': 0,
@@ -144,7 +143,6 @@ def get_initial_data_for_access():
     return jsonify({'error': 'Не удалось загрузить начальные данные для доступов'}), 500
 
 
-@app.route('/access_rights', methods=['GET', 'POST'])
 def handle_access_rights():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
@@ -182,7 +180,6 @@ def handle_access_rights():
             conn.close()
 
 
-@app.route('/my_permissions', methods=['GET'])
 def get_my_permissions():
     user_id = request.args.get('user_id')
     department_id = request.args.get('department_id')
@@ -219,9 +216,6 @@ def get_my_permissions():
         conn.close()
 
 
-# --- API для Кассы и Расходов ---
-
-@app.route('/cashbox_initial_data', methods=['GET'])
 def get_cashbox_initial_data():
     batch_payload = {
         'halt': 0,
@@ -236,7 +230,6 @@ def get_cashbox_initial_data():
     return jsonify({'error': 'Не удалось загрузить начальные данные для кассы'}), 500
 
 
-@app.route('/search_contacts', methods=['GET'])
 def search_contacts():
     query = request.args.get('query', '')
     if not query: return jsonify([])
@@ -247,7 +240,6 @@ def search_contacts():
     return jsonify([])
 
 
-@app.route('/add_expense', methods=['POST'])
 def add_expense():
     data = request.get_json()
     app.logger.info(f"Попытка сохранения расхода... ID юзера: {data.get('added_by_user_id')}, Данные: {json.dumps(data, ensure_ascii=False)}")
@@ -272,7 +264,6 @@ def add_expense():
         conn.close()
 
 
-@app.route('/expenses', methods=['GET'])
 def get_expenses():
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'Не удалось подключиться к базе данных'}), 500
@@ -313,7 +304,6 @@ def get_expenses():
         conn.close()
 
 
-@app.route('/expenses/<int:expense_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_single_expense(expense_id):
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
@@ -380,10 +370,32 @@ def handle_single_expense(expense_id):
             conn.close()
 
 
-# --- Главный маршрут ---
+# --- Главный маршрутизатор ---
 @app.route('/', methods=['GET', 'POST'])
-def index():
+def router():
+    action = request.args.get('action')
+    if request.method == 'POST' and not action:
+        return render_template('index.html')
+
+    # Словарь для сопоставления 'action' с функцией
+    api_actions = {
+        'my_permissions': get_my_permissions,
+        'initial_data_for_access': get_initial_data_for_access,
+        'access_rights': handle_access_rights,
+        'cashbox_initial_data': get_cashbox_initial_data,
+        'search_contacts': search_contacts,
+        'add_expense': add_expense,
+        'expenses': get_expenses,
+        # Для эндпоинтов с параметрами в пути, обработка будет сложнее,
+        # но для текущих задач этого достаточно.
+    }
+
+    if action in api_actions:
+        return api_actions[action]()
+    
+    # Если action не найден или это GET-запрос на главную страницу
     return render_template('index.html')
+
 
 if __name__ == '__main__':
     with app.app_context():
