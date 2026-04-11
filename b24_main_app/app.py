@@ -185,7 +185,6 @@ def get_my_permissions():
         user_id = request.args.get('user_id')
         department_id = request.args.get('department_id')
 
-        # Безопасная проверка department_id
         if not user_id:
             return jsonify({'error': 'user_id is required'}), 400
         if department_id == 'undefined' or department_id is None:
@@ -283,23 +282,28 @@ def get_expenses():
     if not conn: return jsonify({'error': 'Не удалось подключиться к базе данных'}), 500
     cursor = conn.cursor(dictionary=True)
 
-    where_clauses, query_params = [], {}
-    if request.args.get('category'): where_clauses.append("`category` = %(category)s"); query_params['category'] = request.args.get('category')
-    if request.args.get('employee_id'): where_clauses.append("`employee_id` = %(employee_id)s"); query_params['employee_id'] = request.args.get('employee_id')
-    if request.args.get('source_id'): where_clauses.append("`source_id` = %(source_id)s"); query_params['source_id'] = request.args.get('source_id')
-    if request.args.get('start_date'): where_clauses.append("`expense_date` >= %(start_date)s"); query_params['start_date'] = request.args.get('start_date')
-    if request.args.get('end_date'): where_clauses.append("`expense_date` <= %(end_date)s"); query_params['end_date'] = request.args.get('end_date')
+    where_clauses, query_params = [], []
+    
+    if request.args.get('name'): where_clauses.append("`name` LIKE %s"); query_params.append(f"%{request.args.get('name')}%")
+    if request.args.get('category_val'): where_clauses.append("`category_val` = %s"); query_params.append(request.args.get('category_val'))
+    if request.args.get('employee_id'): where_clauses.append("`employee_id` = %s"); query_params.append(request.args.get('employee_id'))
+    if request.args.get('source_id'): where_clauses.append("`source_id` = %s"); query_params.append(request.args.get('source_id'))
+    if request.args.get('start_date'): where_clauses.append("`expense_date` >= %s"); query_params.append(request.args.get('start_date'))
+    if request.args.get('end_date'): where_clauses.append("`expense_date` <= %s"); query_params.append(request.args.get('end_date'))
+    if request.args.get('min_amount'): where_clauses.append("`amount` >= %s"); query_params.append(request.args.get('min_amount'))
+    if request.args.get('max_amount'): where_clauses.append("`amount` <= %s"); query_params.append(request.args.get('max_amount'))
 
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     limit = request.args.get('limit', 25, type=int)
     offset = request.args.get('offset', 0, type=int)
 
     try:
-        cursor.execute(f"SELECT COUNT(*) FROM expenses {where_sql}", query_params)
-        total_records = cursor.fetchone()['COUNT(*)']
+        count_query = f"SELECT COUNT(*) as total FROM expenses {where_sql}"
+        cursor.execute(count_query, tuple(query_params))
+        total_records = cursor.fetchone()['total']
         
-        query_params.update({'limit': limit, 'offset': offset})
-        cursor.execute(f"SELECT * FROM expenses {where_sql} ORDER BY created_at DESC LIMIT %(limit)s OFFSET %(offset)s", query_params)
+        data_query = f"SELECT * FROM expenses {where_sql} ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        cursor.execute(data_query, tuple(query_params + [limit, offset]))
         expenses = cursor.fetchall()
 
         for expense in expenses:
@@ -317,12 +321,82 @@ def get_expenses():
         cursor.close()
         conn.close()
 
+def get_single_expense():
+    expense_id = request.args.get('id')
+    if not expense_id: return jsonify({'error': 'Expense ID is required'}), 400
+    
+    conn = get_db_connection()
+    if not conn: return jsonify({'error': 'DB connection failed'}), 500
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("SELECT * FROM expenses WHERE id = %s", (expense_id,))
+        expense = cursor.fetchone()
+        if expense:
+            expense['expense_date'] = expense['expense_date'].isoformat() if expense['expense_date'] else None
+            expense['created_at'] = expense['created_at'].isoformat() if expense['created_at'] else None
+            return jsonify(expense)
+        return jsonify({'error': 'Expense not found'}), 404
+    except mysql.connector.Error as err:
+        return jsonify({'error': str(err)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_expense():
+    data = request.get_json()
+    expense_id = data.get('id')
+    if not expense_id: return jsonify({'error': 'Expense ID is required'}), 400
+
+    conn = get_db_connection()
+    if not conn: return jsonify({'error': 'DB connection failed'}), 500
+    cursor = conn.cursor()
+
+    query = """UPDATE expenses SET 
+               name = %s, expense_date = %s, amount = %s, category = %s, category_val = %s, 
+               employee_id = %s, source_id = %s, contact_id = %s, comment = %s
+               WHERE id = %s"""
+    values = (
+        data.get('name'), data.get('date'), data.get('amount'), data.get('category_text'), data.get('category_val'),
+        data.get('employee_id'), data.get('source_id'), data.get('contact_id'), data.get('comment'), expense_id
+    )
+    
+    try:
+        cursor.execute(query, values)
+        conn.commit()
+        return jsonify({'success': True})
+    except mysql.connector.Error as err:
+        conn.rollback()
+        return jsonify({'error': str(err)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+def delete_expense():
+    expense_id = request.args.get('id')
+    if not expense_id: return jsonify({'error': 'Expense ID is required'}), 400
+
+    conn = get_db_connection()
+    if not conn: return jsonify({'error': 'DB connection failed'}), 500
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return jsonify({'error': 'Expense not found or already deleted'}), 404
+        return jsonify({'success': True})
+    except mysql.connector.Error as err:
+        conn.rollback()
+        return jsonify({'error': str(err)}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 # --- Главный маршрутизатор ---
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def router():
-    # Если это POST-запрос без action, это стандартный вход из Битрикс24
-    if request.method == 'POST' and 'action' not in request.args:
+    if request.method == 'POST' and 'action' not in request.args and not request.is_json:
         return render_template('finance_index.html')
 
     action = request.args.get('action')
@@ -336,16 +410,17 @@ def router():
         'search_contacts': search_contacts,
         'add_expense': add_expense,
         'expenses': get_expenses,
+        'get_single_expense': get_single_expense,
+        'update_expense': update_expense,
+        'delete_expense': delete_expense,
     }
 
     if action in api_actions:
         return api_actions[action]()
     
-    # Если action не найден, но это API-запрос, возвращаем ошибку
     if action:
         return jsonify({'error': f'Action "{action}" not found'}), 404
     
-    # Если action не указан и это GET-запрос, отдаем главную страницу
     return render_template('finance_index.html')
 
 
