@@ -111,22 +111,23 @@ BX24.ready(() => {
             }
             confirmationModalText.innerHTML = contentHtml;
 
-            // Получаем свежие ссылки на кнопки каждый раз при вызове функции
+            // *** ИСПРАВЛЕНИЕ: Получаем кнопки из DOM прямо здесь ***
             let confirmActionBtn = document.getElementById('confirm-action-btn');
             let cancelActionBtn = document.getElementById('cancel-action-btn');
 
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
-
+            
             confirmationModal.style.display = 'flex';
             
-            // Важно клонировать кнопки, чтобы избежать накопления обработчиков
+            // Клонируем узлы, чтобы безопасно удалить и добавить обработчики
             const newConfirmBtn = confirmActionBtn.cloneNode(true);
             confirmActionBtn.parentNode.replaceChild(newConfirmBtn, confirmActionBtn);
 
             const newCancelBtn = cancelActionBtn.cloneNode(true);
             cancelActionBtn.parentNode.replaceChild(newCancelBtn, cancelActionBtn);
 
+            // Навешиваем события на новые (актуальные) кнопки
             newConfirmBtn.onclick = () => {
                 confirmationModal.style.display = 'none';
                 resolve(true);
