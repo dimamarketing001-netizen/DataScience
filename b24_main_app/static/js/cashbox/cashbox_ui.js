@@ -32,6 +32,13 @@ App.cashbox.ui = {
         editExpenseContractor: document.getElementById('edit-expense-contractor'),
         editExpenseClientSearch: document.getElementById('edit-expense-client-search'),
         editSelectedClientId: document.getElementById('edit-selected-client-id'),
+
+        // Новые элементы для лидов (добавление)
+        expensePaidLeads: document.getElementById('expense-paid-leads'),
+        expenseFreeLeads: document.getElementById('expense-free-leads'),
+        // Новые элементы для лидов (редактирование)
+        editExpensePaidLeads: document.getElementById('edit-expense-paid-leads'),
+        editExpenseFreeLeads: document.getElementById('edit-expense-free-leads'),
     },
 
     // --- Функции рендеринга и управления UI ---
@@ -129,7 +136,7 @@ App.cashbox.ui = {
     },
 
     openEditModal: function(expense, availableEmployees, availableContractors) {
-        const { editExpenseForm, editExpenseModal, editExpenseCategory, editExpenseEmployee, editExpensePaymentType, editExpenseContractor, editExpenseClientSearch, editSelectedClientId } = this.elements;
+        const { editExpenseForm, editExpenseModal, editExpenseCategory, editExpenseEmployee, editExpensePaymentType, editExpenseContractor, editExpenseClientSearch, editSelectedClientId, editExpensePaidLeads, editExpenseFreeLeads } = this.elements;
         editExpenseForm.reset();
 
         document.getElementById('edit-expense-id').value = expense.id;
@@ -151,6 +158,8 @@ App.cashbox.ui = {
             }
         } else if (expense.category_val === 'marketing') {
             App.populateSelect(editExpenseContractor, availableContractors.map(c => ({id: c.ID, name: c.NAME})), 'Выберите подрядчика...', expense.source_id);
+            editExpensePaidLeads.value = expense.paid_leads || '';
+            editExpenseFreeLeads.value = expense.free_leads || '';
         } else if (expense.category_val === 'clients') {
             editExpenseClientSearch.value = expense.contact_name || ''; // Отображаем имя клиента
             editSelectedClientId.value = expense.contact_id || ''; // Сохраняем ID клиента
@@ -172,6 +181,9 @@ App.cashbox.ui = {
             if (editExpenseContractor) editExpenseContractor.value = '';
             if (editExpenseClientSearch) editExpenseClientSearch.value = '';
             if (editSelectedClientId) editSelectedClientId.value = '';
+            // Сбрасываем новые поля лидов
+            if (editExpensePaidLeads) editExpensePaidLeads.value = '';
+            if (editExpenseFreeLeads) editExpenseFreeLeads.value = '';
         };
         
         editExpenseModal.style.display = 'flex';
@@ -182,6 +194,9 @@ App.cashbox.ui = {
         this.elements.editExpenseForm.reset();
         // Скрываем все динамические поля при закрытии модального окна
         this.toggleDynamicFields('', 'edit');
+        // Сбрасываем новые поля лидов при закрытии
+        if (this.elements.editExpensePaidLeads) this.elements.editExpensePaidLeads.value = '';
+        if (this.elements.editExpenseFreeLeads) this.elements.editExpenseFreeLeads.value = '';
     },
 
     openDeleteConfirmModal: function() {

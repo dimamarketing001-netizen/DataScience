@@ -96,6 +96,17 @@
                             <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
                             <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="expense-contractor" class="ui-ctl-element"></select></div></div>
                         </div>
+                        <div class="ui-form-row">
+                            <div class="ui-form-label"><div class="ui-ctl-label-text">Количество лидов</div></div>
+                            <div class="ui-form-content" style="display: flex; gap: 10px;">
+                                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                    <input type="number" id="expense-paid-leads" class="ui-ctl-element" placeholder="Платные лиды">
+                                </div>
+                                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                    <input type="number" id="expense-free-leads" class="ui-ctl-element" placeholder="Бесплатные лиды">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div id="client-fields" class="dynamic-field" style="display: none;">
                         <div class="ui-form-row">
@@ -251,6 +262,17 @@
                     <div class="ui-form-row">
                         <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
                         <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-contractor" class="ui-ctl-element"></select></div></div>
+                    </div>
+                    <div class="ui-form-row">
+                        <div class="ui-form-label"><div class="ui-ctl-label-text">Количество лидов</div></div>
+                        <div class="ui-form-content" style="display: flex; gap: 10px;">
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                <input type="number" id="edit-expense-paid-leads" class="ui-ctl-element" placeholder="Платные лиды">
+                            </div>
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                                <input type="number" id="edit-expense-free-leads" class="ui-ctl-element" placeholder="Бесплатные лиды">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="edit-client-fields" class="dynamic-field" style="display: none;">

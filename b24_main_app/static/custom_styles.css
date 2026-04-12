@@ -338,6 +338,12 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
+/* Align labels in modals to the left */
+.modal-content label {
+    text-align: left;
+    display: block; /* Ensure label takes full width to align text */
+}
+
 .modal-text {
     margin-bottom: 20px;
     text-align: left;

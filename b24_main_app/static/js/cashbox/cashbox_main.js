@@ -130,13 +130,21 @@ App.initializeCashbox = async function() {
         const formData = {
             date: document.getElementById('expense-date').value,
             amount: parseFloat(document.getElementById('expense-amount').value),
-            category_text: expenseCategory.options[expenseCategory.selectedIndex].text, // Re-added
+            category_text: expenseCategory.options[expenseCategory.selectedIndex].text,
             category_val: expenseCategory.value,
             comment: document.getElementById('expense-comment').value,
             employee_id: document.getElementById('expense-employee').value,
             source_id: document.getElementById('expense-contractor').value,
             contact_id: document.getElementById('selected-client-id').value,
+            paid_leads: document.getElementById('expense-paid-leads').value, // New field
+            free_leads: document.getElementById('expense-free-leads').value, // New field
         };
+
+        // --- Валидация ---
+        if (formData.category_val === 'employees' && !formData.employee_id) {
+            showCustomNotification("Поле 'Сотрудник' обязательно для категории 'Сотрудники'.", 'error');
+            return;
+        }
 
         // Формируем данные для отображения в попапе подтверждения
         const formDataForDisplay = {
@@ -164,6 +172,12 @@ App.initializeCashbox = async function() {
             const contractorSelect = document.getElementById('expense-contractor');
             if (contractorSelect.value) {
                 formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
+            }
+            if (formData.paid_leads) {
+                formDataForDisplay['Платные лиды'] = formData.paid_leads;
+            }
+            if (formData.free_leads) {
+                formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
             }
         } else if (selectedCategory === 'clients') {
             const clientSearchInput = document.getElementById('expense-client-search');
@@ -218,14 +232,32 @@ App.initializeCashbox = async function() {
             id: document.getElementById('edit-expense-id').value,
             date: document.getElementById('edit-expense-date').value,
             amount: parseFloat(document.getElementById('edit-expense-amount').value),
-            category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text, // Re-added
+            category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
             category_val: selectedCategory,
             comment: document.getElementById('edit-expense-comment').value,
             employee_id: '',
             source_id: '',
             contact_id: '',
             payment_type: '',
+            paid_leads: document.getElementById('edit-expense-paid-leads').value, // New field
+            free_leads: document.getElementById('edit-expense-free-leads').value, // New field
         };
+
+        // Заполняем динамические поля в зависимости от категории
+        if (selectedCategory === 'employees') {
+            formData.employee_id = document.getElementById('edit-expense-employee').value;
+            formData.payment_type = document.getElementById('edit-expense-payment-type').value;
+        } else if (selectedCategory === 'marketing') {
+            formData.source_id = document.getElementById('edit-expense-contractor').value;
+        } else if (selectedCategory === 'clients') {
+            formData.contact_id = document.getElementById('edit-selected-client-id').value;
+        }
+
+        // --- Валидация ---
+        if (selectedCategory === 'employees' && !formData.employee_id) {
+            showCustomNotification("Поле 'Сотрудник' обязательно для категории 'Сотрудники'.", 'error');
+            return;
+        }
 
         // Формируем данные для отображения в попапе подтверждения
         const formDataForDisplay = {
@@ -236,8 +268,6 @@ App.initializeCashbox = async function() {
 
         // Заполняем динамические поля в зависимости от категории
         if (selectedCategory === 'employees') {
-            formData.employee_id = document.getElementById('edit-expense-employee').value;
-            formData.payment_type = document.getElementById('edit-expense-payment-type').value;
             const employeeSelect = document.getElementById('edit-expense-employee');
             if (employeeSelect.value) {
                 formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
@@ -247,13 +277,17 @@ App.initializeCashbox = async function() {
                 formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
             }
         } else if (selectedCategory === 'marketing') {
-            formData.source_id = document.getElementById('edit-expense-contractor').value;
             const contractorSelect = document.getElementById('edit-expense-contractor');
             if (contractorSelect.value) {
                 formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
             }
+            if (formData.paid_leads) {
+                formDataForDisplay['Платные лиды'] = formData.paid_leads;
+            }
+            if (formData.free_leads) {
+                formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
+            }
         } else if (selectedCategory === 'clients') {
-            formData.contact_id = document.getElementById('edit-selected-client-id').value;
             const clientSearchInput = document.getElementById('edit-expense-client-search');
             if (clientSearchInput.value) {
                 formDataForDisplay['Клиент'] = clientSearchInput.value;
@@ -266,7 +300,7 @@ App.initializeCashbox = async function() {
 
         const isConfirmed = await App.showCustomConfirm({
             title: 'Подтвердите обновление расхода',
-            text: 'Вы уверены, что хотите обновить следующий расход?',
+            text: 'Выверены, что хотите обновить следующий расход?',
             data: formDataForDisplay,
             confirmButtonText: 'Обновить'
         });

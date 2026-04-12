@@ -29,10 +29,11 @@ def add_expense_service(data):
     conn = get_db_connection()
     if not conn: raise Exception('Не удалось подключиться к базе данных')
     cursor = conn.cursor()
-    query = "INSERT INTO expenses (expense_date, amount, category, category_val, employee_id, source_id, contact_id, comment, added_by_user_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    query = "INSERT INTO expenses (expense_date, amount, category, category_val, employee_id, source_id, contact_id, comment, added_by_user_id, paid_leads, free_leads) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     values = (
         data.get('date'), data.get('amount'), data.get('category_text'), data.get('category_val'),
-        data.get('employee_id'), data.get('source_id'), data.get('contact_id'), data.get('comment'), data.get('added_by_user_id')
+        data.get('employee_id'), data.get('source_id'), data.get('contact_id'), data.get('comment'), data.get('added_by_user_id'),
+        data.get('paid_leads'), data.get('free_leads')
     )
     try:
         cursor.execute(query, values)
@@ -123,11 +124,13 @@ def update_expense_service(data):
 
     query = """UPDATE expenses SET 
                expense_date = %s, amount = %s, category = %s, category_val = %s, 
-               employee_id = %s, source_id = %s, contact_id = %s, comment = %s
+               employee_id = %s, source_id = %s, contact_id = %s, comment = %s,
+               paid_leads = %s, free_leads = %s
                WHERE id = %s"""
     values = (
         data.get('date'), data.get('amount'), data.get('category_text'), data.get('category_val'),
-        data.get('employee_id'), data.get('source_id'), data.get('contact_id'), data.get('comment'), expense_id
+        data.get('employee_id'), data.get('source_id'), data.get('contact_id'), data.get('comment'),
+        data.get('paid_leads'), data.get('free_leads'), expense_id
     )
     
     try:

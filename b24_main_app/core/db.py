@@ -40,11 +40,30 @@ def init_db():
             else:
                 raise alter_err
 
+        try:
+            cursor.execute("ALTER TABLE `expenses` ADD COLUMN `paid_leads` INT DEFAULT NULL AFTER `comment`")
+            logger.info("Column 'paid_leads' added to 'expenses' table.")
+        except mysql.connector.Error as alter_err:
+            if alter_err.errno == errorcode.ER_DUP_FIELDNAME:
+                logger.info("Column 'paid_leads' already exists in 'expenses' table.")
+            else:
+                raise alter_err
+
+        try:
+            cursor.execute("ALTER TABLE `expenses` ADD COLUMN `free_leads` INT DEFAULT NULL AFTER `paid_leads`")
+            logger.info("Column 'free_leads' added to 'expenses' table.")
+        except mysql.connector.Error as alter_err:
+            if alter_err.errno == errorcode.ER_DUP_FIELDNAME:
+                logger.info("Column 'free_leads' already exists in 'expenses' table.")
+            else:
+                raise alter_err
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `expenses` (
               `id` int(11) NOT NULL AUTO_INCREMENT, `expense_date` date NOT NULL, `amount` decimal(10, 2) NOT NULL,
               `category` varchar(255) DEFAULT NULL, `category_val` varchar(255) DEFAULT NULL, `employee_id` varchar(50) DEFAULT NULL,
               `source_id` varchar(50) DEFAULT NULL, `contact_id` varchar(50) DEFAULT NULL, `comment` text,
+              `paid_leads` INT DEFAULT NULL, `free_leads` INT DEFAULT NULL,
               `added_by_user_id` varchar(50) DEFAULT NULL, `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`)
             ) ENGINE=InnoDB
         """)
