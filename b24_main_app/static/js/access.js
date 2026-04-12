@@ -85,8 +85,8 @@ App.initializeAccessTab = async function() {
 
     // --- Функции модального окна ---
     
-    function showDeleteConfirmation(entityId, rowElement) {
-        ruleToDelete = { entityId, rowElement };
+    function showDeleteConfirmation(entityId, rowElement, entityName) { // Добавлен entityName
+        ruleToDelete = { entityId, rowElement, entityName }; // Сохраняем entityName
         deleteRuleModal.style.display = 'flex';
     }
 
@@ -100,7 +100,7 @@ App.initializeAccessTab = async function() {
     confirmDeleteRuleBtn.addEventListener('click', async () => {
         if (!ruleToDelete) return;
 
-        const { entityId, rowElement } = ruleToDelete;
+        const { entityId, rowElement, entityName } = ruleToDelete; // Получаем entityName
         App.showLoader();
         try {
             const res = await fetch(`?action=access_rights`, {
@@ -108,6 +108,7 @@ App.initializeAccessTab = async function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     entity_id: entityId,
+                    entity_name: entityName, // ИЗМЕНЕНО: Добавляем entity_name в запрос
                     sub_action: 'delete'
                 })
             });
@@ -115,9 +116,9 @@ App.initializeAccessTab = async function() {
             if (!res.ok) throw new Error('Server responded with an error during deletion');
             
             rowElement.remove();
-            alert('Правило удалено.'); // ИЗМЕНЕНО: Заменено на alert
+            alert('Правило удалено.');
         } catch (e) {
-            alert('Ошибка удаления правила.'); // ИЗМЕНЕНО: Заменено на alert
+            alert('Ошибка удаления правила.');
             console.error(e);
         } finally {
             App.hideLoader();
@@ -215,7 +216,7 @@ App.initializeAccessTab = async function() {
         });
 
         deleteBtn.addEventListener('click', () => {
-            showDeleteConfirmation(entityId, row);
+            showDeleteConfirmation(entityId, row, entityName); // ИЗМЕНЕНО: Передаем entityName
         });
     }
 };
