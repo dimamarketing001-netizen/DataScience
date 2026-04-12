@@ -133,7 +133,6 @@ App.initializeCashbox = async function() {
             category_text: expenseCategory.options[expenseCategory.selectedIndex].text,
             category_val: expenseCategory.value,
             comment: document.getElementById('expense-comment').value,
-            name: '', // Будет сформировано на сервере или оставлено пустым
             employee_id: document.getElementById('expense-employee').value,
             source_id: document.getElementById('expense-contractor').value,
             contact_id: document.getElementById('selected-client-id').value,
@@ -222,7 +221,6 @@ App.initializeCashbox = async function() {
             category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
             category_val: selectedCategory,
             comment: document.getElementById('edit-expense-comment').value,
-            name: '', // Поле "Название" удалено
             employee_id: '',
             source_id: '',
             contact_id: '',
