@@ -80,7 +80,7 @@
 
             // Формируем фильтр для поиска по имени, фамилии, телефону и email
             const filter = {
-                "NAME": query, // Убрали %
+                "SEARCH": query // Используем поле SEARCH для общего поиска по всем ключевым полям
             };
 
             console.log(`[ClientSearchHandler] Performing search for query: "${query}", page: ${page}`);
