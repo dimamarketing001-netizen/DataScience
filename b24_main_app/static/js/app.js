@@ -27,7 +27,8 @@ BX24.ready(() => {
     const backButtons = document.querySelectorAll('.back-button');
     
     // Элементы для кастомных уведомлений
-    const toastContainer = document.getElementById('toast-container');
+    const successModal = document.getElementById('success-modal');
+    const successModalText = document.getElementById('success-modal-text');
     const errorModal = document.getElementById('error-modal');
     const errorModalTitle = document.getElementById('error-modal-title');
     const errorModalText = document.getElementById('error-modal-text');
@@ -42,20 +43,11 @@ BX24.ready(() => {
 
     // --- СИСТЕМА УВЕДОМЛЕНИЙ ---
     App.Notify.success = (message) => {
-        const toast = document.createElement('div');
-        toast.className = 'toast show';
-        toast.innerHTML = `
-            <div class="toast-icon success-icon"></div>
-            <div class="toast-message">${message}</div>
-        `;
-        toastContainer.appendChild(toast);
+        successModalText.innerHTML = message;
+        successModal.style.display = 'flex';
 
         setTimeout(() => {
-            toast.classList.remove('show');
-            // Удаляем элемент после завершения анимации
-            setTimeout(() => {
-                toast.remove();
-            }, 500);
+            successModal.style.display = 'none';
         }, 3000);
     };
 
