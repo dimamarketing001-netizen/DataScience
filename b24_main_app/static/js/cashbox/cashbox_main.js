@@ -127,6 +127,9 @@ App.initializeCashbox = async function() {
         event.preventDefault();
 
         // Собираем данные из формы
+        const paidLeadsValue = document.getElementById('expense-paid-leads').value;
+        const freeLeadsValue = document.getElementById('expense-free-leads').value;
+
         const formData = {
             date: document.getElementById('expense-date').value,
             amount: parseFloat(document.getElementById('expense-amount').value),
@@ -136,8 +139,8 @@ App.initializeCashbox = async function() {
             employee_id: document.getElementById('expense-employee').value,
             source_id: document.getElementById('expense-contractor').value,
             contact_id: document.getElementById('selected-client-id').value,
-            paid_leads: document.getElementById('expense-paid-leads').value, // New field
-            free_leads: document.getElementById('expense-free-leads').value, // New field
+            paid_leads: paidLeadsValue === '' ? null : parseInt(paidLeadsValue), // Convert empty string to null
+            free_leads: freeLeadsValue === '' ? null : parseInt(freeLeadsValue), // Convert empty string to null
         };
 
         // --- Валидация ---
@@ -173,10 +176,10 @@ App.initializeCashbox = async function() {
             if (contractorSelect.value) {
                 formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
             }
-            if (formData.paid_leads) {
+            if (formData.paid_leads !== null) {
                 formDataForDisplay['Платные лиды'] = formData.paid_leads;
             }
-            if (formData.free_leads) {
+            if (formData.free_leads !== null) {
                 formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
             }
         } else if (selectedCategory === 'clients') {
@@ -228,6 +231,9 @@ App.initializeCashbox = async function() {
         const editExpenseCategory = document.getElementById('edit-expense-category');
         const selectedCategory = editExpenseCategory.value;
 
+        const editPaidLeadsValue = document.getElementById('edit-expense-paid-leads').value;
+        const editFreeLeadsValue = document.getElementById('edit-expense-free-leads').value;
+
         const formData = {
             id: document.getElementById('edit-expense-id').value,
             date: document.getElementById('edit-expense-date').value,
@@ -239,8 +245,8 @@ App.initializeCashbox = async function() {
             source_id: '',
             contact_id: '',
             payment_type: '',
-            paid_leads: document.getElementById('edit-expense-paid-leads').value, // New field
-            free_leads: document.getElementById('edit-expense-free-leads').value, // New field
+            paid_leads: editPaidLeadsValue === '' ? null : parseInt(editPaidLeadsValue), // Convert empty string to null
+            free_leads: editFreeLeadsValue === '' ? null : parseInt(editFreeLeadsValue), // Convert empty string to null
         };
 
         // Заполняем динамические поля в зависимости от категории
@@ -281,10 +287,10 @@ App.initializeCashbox = async function() {
             if (contractorSelect.value) {
                 formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
             }
-            if (formData.paid_leads) {
+            if (formData.paid_leads !== null) {
                 formDataForDisplay['Платные лиды'] = formData.paid_leads;
             }
-            if (formData.free_leads) {
+            if (formData.free_leads !== null) {
                 formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
             }
         } else if (selectedCategory === 'clients') {
