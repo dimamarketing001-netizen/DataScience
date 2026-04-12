@@ -130,6 +130,7 @@ App.initializeCashbox = async function() {
         const formData = {
             date: document.getElementById('expense-date').value,
             amount: parseFloat(document.getElementById('expense-amount').value),
+            category_text: expenseCategory.options[expenseCategory.selectedIndex].text, // Re-added
             category_val: expenseCategory.value,
             comment: document.getElementById('expense-comment').value,
             employee_id: document.getElementById('expense-employee').value,
@@ -141,7 +142,7 @@ App.initializeCashbox = async function() {
         const formDataForDisplay = {
             'Дата': formData.date,
             'Сумма': formData.amount,
-            'Категория': expenseCategory.options[expenseCategory.selectedIndex].text,
+            'Категория': formData.category_text,
         };
 
         if (formData.comment) {
@@ -217,6 +218,7 @@ App.initializeCashbox = async function() {
             id: document.getElementById('edit-expense-id').value,
             date: document.getElementById('edit-expense-date').value,
             amount: parseFloat(document.getElementById('edit-expense-amount').value),
+            category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text, // Re-added
             category_val: selectedCategory,
             comment: document.getElementById('edit-expense-comment').value,
             employee_id: '',
