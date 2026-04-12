@@ -344,6 +344,11 @@ body {
     display: block; /* Ensure label takes full width to align text */
 }
 
+.modal-content .ui-form-label .ui-ctl-label-text {
+    text-align: left;
+    display: block;
+}
+
 .modal-text {
     margin-bottom: 20px;
     text-align: left;
