@@ -61,7 +61,7 @@ def get_my_permissions():
         return jsonify({'error': str(e)}), 500
 
 def handle_access_rights():
-    """Обрабатывает GET (чтение) и POST (создание/обновление) прав доступа."""
+    """Обрабатывает GET (чтение), POST (создание/обновление) и DELETE (удаление) прав доступа."""
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
     cursor = conn.cursor(dictionary=True)
@@ -77,22 +77,44 @@ def handle_access_rights():
 
         if request.method == 'POST':
             data = request.get_json()
-            entity_id = data['entity_id']
+            entity_id = data.get('entity_id')
+
+            # Проверяем, является ли это запросом на удаление
+            if data.get('sub_action') == 'delete':
+                if not entity_id:
+                    return jsonify({'error': 'entity_id is required for deletion'}), 400
+                
+                query = "DELETE FROM access_rights WHERE entity_id = %s"
+                cursor.execute(query, (entity_id,))
+                conn.commit()
+                
+                if cursor.rowcount > 0:
+                    return jsonify({'success': True, 'message': 'Rule deleted'})
+                else:
+                    # Это не ошибка, просто правило могло быть уже удалено
+                    return jsonify({'success': True, 'message': 'Rule not found or already deleted'})
+
+            # Если не удаление, то это создание/обновление
             entity_type = 'user' if 'user_' in entity_id else 'department'
             query = "INSERT INTO access_rights (entity_id, entity_type, entity_name, permissions) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), entity_name = VALUES(entity_name)"
             params = (entity_id, entity_type, data['entity_name'], json.dumps(data['permissions']))
             cursor.execute(query, params)
             conn.commit()
-            return jsonify({'success': True})
+            return jsonify({'success': True, 'message': 'Rule saved'})
             
     except mysql.connector.Error as err:
+        current_app.logger.error(f"Database error in handle_access_rights: {err}")
         if conn and conn.is_connected():
             conn.rollback()
         return jsonify({'error': str(err)}), 500
+    except Exception as e:
+        current_app.logger.error(f"General error in handle_access_rights: {e}")
+        if conn and conn.is_connected():
+            conn.rollback()
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         if conn and conn.is_connected():
             cursor.close()
             conn.close()
     
-    # На случай, если метод не GET и не POST, хотя Flask-роутер этого не допустит
     return jsonify({'error': 'Invalid request method'}), 405
