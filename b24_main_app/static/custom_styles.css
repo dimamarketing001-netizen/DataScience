@@ -565,10 +565,63 @@ body {
     color: #828b95;
 }
 
+/* --- Стили для вкладки "Доступы" --- */
+.ui-hr {
+    border: none;
+    border-top: 1px solid #eef2f4;
+    margin: 20px 0;
+}
+
+.ui-ctl-radio {
+    margin-right: 20px;
+    cursor: pointer;
+}
+
+.access-rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.access-rules-table th, .access-rules-table td {
+    border: 1px solid #eef2f4;
+    padding: 10px 8px;
+    text-align: left;
+    font-size: 13px;
+    color: #333;
+    vertical-align: middle;
+}
+
+.access-rules-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #535c69;
+}
+
+.access-rules-table tr:nth-child(even) {
+    background-color: #fdfdfd;
+}
+
+.access-grid-cell .access-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.access-grid-cell label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+
 /* --- Адаптивность --- */
 @media (max-width: 768px) {
     .filter-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 2 колонки на средних экранах */
+    }
+    .access-grid-cell .access-grid {
+        grid-template-columns: 1fr;
     }
 }
 
