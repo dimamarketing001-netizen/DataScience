@@ -88,7 +88,7 @@
                 for (const field of searchFields) {
                     const filter = {};
                     // Используем wildcard '*' для частичного совпадения
-                    filter[field] = `*${query}*`;
+                    filter[field] = `${query}`;
 
                     console.log(`[ClientSearchHandler] Sending API call for field "${field}" with filter:`, filter);
 
