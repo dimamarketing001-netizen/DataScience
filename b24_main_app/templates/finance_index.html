@@ -11,10 +11,17 @@
 <body>
     <div id="loader-overlay" class="loader-overlay"><div class="loader"></div></div>
 
-    <!-- Контейнер для toast-уведомлений (успех) -->
-    <div id="toast-container" class="toast-container"></div>
+    <!-- Модальное окно для УСПЕХА -->
+    <div id="success-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-icon success-icon"></div>
+            </div>
+            <div class="modal-text" id="success-modal-text"></div>
+        </div>
+    </div>
 
-    <!-- Модальное окно для ошибок -->
+    <!-- Модальное окно для ОШИБОК -->
     <div id="error-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
