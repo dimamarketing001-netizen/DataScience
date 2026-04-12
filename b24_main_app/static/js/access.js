@@ -6,11 +6,15 @@ App.initializeAccessTab = async function() {
     const departmentSelect = document.getElementById('access-department-select');
     const employeeSelectWrapper = document.getElementById('access-employee-select-wrapper');
     const departmentSelectWrapper = document.getElementById('access-department-select-wrapper');
-    const accessTypeSelect = document.getElementById('access-type-select'); // Новый селект
+    const accessTypeSelect = document.getElementById('access-type-select');
     const rulesTableBody = document.getElementById('access-rules-table-body');
-    
+    const deleteRuleModal = document.getElementById('delete-rule-confirm-modal');
+    const confirmDeleteRuleBtn = document.getElementById('confirm-delete-rule-btn');
+    const cancelDeleteRuleBtn = document.getElementById('cancel-delete-rule-btn');
+
     let availableUsers = [];
     let availableDepartments = [];
+    let ruleToDelete = null;
 
     // --- Инициализация ---
     App.showLoader();
@@ -22,7 +26,6 @@ App.initializeAccessTab = async function() {
         availableUsers = data.users || [];
         availableDepartments = data.departments || [];
 
-        // Заполняем селект для сотрудников
         employeeSelect.innerHTML = '<option value="">Выберите сотрудника...</option>';
         availableUsers.forEach(user => {
             const option = document.createElement('option');
@@ -31,7 +34,6 @@ App.initializeAccessTab = async function() {
             employeeSelect.appendChild(option);
         });
 
-        // Заполняем селект для отделов
         departmentSelect.innerHTML = '<option value="">Выберите отдел...</option>';
         availableDepartments.forEach(dep => {
             const option = document.createElement('option');
@@ -50,7 +52,6 @@ App.initializeAccessTab = async function() {
 
     // --- Обработчики событий ---
 
-    // Переключение между селектами в зависимости от выбора в новом дропдауне
     accessTypeSelect.addEventListener('change', () => {
         if (accessTypeSelect.value === 'employee') {
             employeeSelectWrapper.style.display = '';
@@ -61,7 +62,6 @@ App.initializeAccessTab = async function() {
         }
     });
 
-    // Добавление нового правила в таблицу
     document.getElementById('add-access-rule-btn').addEventListener('click', () => {
         const selectedType = accessTypeSelect.value;
         const selectedId = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
@@ -83,12 +83,52 @@ App.initializeAccessTab = async function() {
         }
     });
 
+    // --- Функции модального окна ---
+    
+    function showDeleteConfirmation(entityId, rowElement) {
+        ruleToDelete = { entityId, rowElement };
+        deleteRuleModal.style.display = 'flex';
+    }
+
+    function hideDeleteConfirmation() {
+        ruleToDelete = null;
+        deleteRuleModal.style.display = 'none';
+    }
+
+    cancelDeleteRuleBtn.addEventListener('click', hideDeleteConfirmation);
+
+    confirmDeleteRuleBtn.addEventListener('click', async () => {
+        if (!ruleToDelete) return;
+
+        const { entityId, rowElement } = ruleToDelete;
+        App.showLoader();
+        try {
+            const res = await fetch(`?action=access_rights`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entity_id: entityId })
+            });
+
+            if (!res.ok) throw new Error('Server responded with an error during deletion');
+            
+            rowElement.remove();
+            alert('Правило удалено.');
+        } catch (e) {
+            alert('Ошибка удаления правила.');
+            console.error(e);
+        } finally {
+            App.hideLoader();
+            hideDeleteConfirmation();
+        }
+    });
+
+
     // --- Функции ---
 
     async function loadAccessRules() {
         const res = await fetch(`?action=access_rights`);
         const rules = await res.json();
-        rulesTableBody.innerHTML = ''; // Очищаем тело таблицы
+        rulesTableBody.innerHTML = '';
         rules.forEach(rule => {
             renderAccessRuleRow(rule.entity_id, rule.entity_name, rule.permissions);
         });
@@ -98,11 +138,9 @@ App.initializeAccessTab = async function() {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
-        // Ячейка с именем
         const nameCell = row.insertCell();
         nameCell.textContent = entityName;
 
-        // Ячейка с правилами
         const permsCell = row.insertCell();
         permsCell.className = 'access-grid-cell';
         permsCell.innerHTML = `
@@ -116,21 +154,28 @@ App.initializeAccessTab = async function() {
             </div>
         `;
 
-        // Ячейка с кнопкой сохранения
         const actionCell = row.insertCell();
         actionCell.className = 'actions-column';
+        
         const saveBtn = document.createElement('button');
         saveBtn.className = 'ui-btn ui-btn-primary save-rule-btn';
         saveBtn.textContent = 'Сохранить';
         actionCell.appendChild(saveBtn);
 
-        // Применяем права к только что созданной кнопке
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'ui-btn ui-btn-danger delete-rule-btn';
+        deleteBtn.textContent = 'Удалить';
+        actionCell.appendChild(deleteBtn);
+
         if (App.userPermissions && !App.userPermissions.actions.can_save) {
             saveBtn.disabled = true;
             saveBtn.style.cursor = 'not-allowed';
         }
+        if (App.userPermissions && !App.userPermissions.actions.can_delete) {
+            deleteBtn.disabled = true;
+            deleteBtn.style.cursor = 'not-allowed';
+        }
 
-        // Обработчик сохранения для конкретной строки
         saveBtn.addEventListener('click', async () => {
             const newPermissions = {
                 can_access_app: row.querySelector('[data-perm="can_access_app"]').checked,
@@ -164,6 +209,10 @@ App.initializeAccessTab = async function() {
             } finally {
                 App.hideLoader();
             }
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            showDeleteConfirmation(entityId, row);
         });
     }
 };
