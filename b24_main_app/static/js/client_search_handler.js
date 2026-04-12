@@ -82,11 +82,11 @@
             const filter = {
                 "0": { // Предложенная вами структура
                     "LOGIC": "OR", // Ищем по любому из полей
-                    "NAME": query,
-                    "LAST_NAME": query,
-                    "SECOND_NAME": query, // Добавляем отчество для полноты поиска
-                    "PHONE": query,
-                    "EMAIL": query
+                    "NAME": `*${query}*`,
+                    "LAST_NAME": `*${query}*`,
+                    "SECOND_NAME": `*${query}*`, // Добавляем отчество для полноты поиска
+                    "PHONE": `*${query}*`,
+                    "EMAIL": `*${query}*`
                 }
             };
 
