@@ -85,8 +85,8 @@ App.initializeAccessTab = async function() {
 
     // --- Функции модального окна ---
     
-    function showDeleteConfirmation(entityId, rowElement, entityName) { // Добавлен entityName
-        ruleToDelete = { entityId, rowElement, entityName }; // Сохраняем entityName
+    function showDeleteConfirmation(entityId, rowElement, entityName) {
+        ruleToDelete = { entityId, rowElement, entityName };
         deleteRuleModal.style.display = 'flex';
     }
 
@@ -100,16 +100,22 @@ App.initializeAccessTab = async function() {
     confirmDeleteRuleBtn.addEventListener('click', async () => {
         if (!ruleToDelete) return;
 
-        const { entityId, rowElement, entityName } = ruleToDelete; // Получаем entityName
+        const { entityId, rowElement, entityName } = ruleToDelete;
         App.showLoader();
         try {
+            // ИЗМЕНЕНО: Структура тела запроса теперь полностью повторяет структуру сохранения
             const res = await fetch(`?action=access_rights`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     entity_id: entityId,
-                    entity_name: entityName, // ИЗМЕНЕНО: Добавляем entity_name в запрос
-                    sub_action: 'delete'
+                    entity_name: entityName,
+                    sub_action: 'delete', // Сигнал для бэкенда на удаление
+                    permissions: { // Добавляем пустой объект permissions, чтобы соответствовать структуре
+                        can_access_app: false,
+                        tabs: { cashbox: false, statistics: false, access: false },
+                        actions: { can_save: false, can_delete: false }
+                    }
                 })
             });
 
@@ -216,7 +222,7 @@ App.initializeAccessTab = async function() {
         });
 
         deleteBtn.addEventListener('click', () => {
-            showDeleteConfirmation(entityId, row, entityName); // ИЗМЕНЕНО: Передаем entityName
+            showDeleteConfirmation(entityId, row, entityName);
         });
     }
 };
