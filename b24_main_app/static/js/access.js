@@ -1,18 +1,30 @@
 // Модуль для управления правами доступа
 App.initializeAccessTab = async function() {
     console.log("Initializing Access Tab...");
-    const selectEl = document.getElementById('access-entity-select');
-    const rulesContainer = document.getElementById('access-rules-container');
-    let availableEntities = [];
 
+    // Новые элементы UI
+    const userSelect = document.getElementById('access-user-select');
+    const departmentSelect = document.getElementById('access-department-select');
+    const userSelectorContainer = document.getElementById('access-user-selector-container');
+    const departmentSelectorContainer = document.getElementById('access-department-selector-container');
+    const entityTypeRadios = document.querySelectorAll('input[name="access_entity_type"]');
+    const rulesTableBody = document.getElementById('access-rules-table-body');
+    
+    let availableUsers = [];
+    let availableDepartments = [];
+
+    // --- Инициализация ---
     App.showLoader();
     try {
         const res = await fetch(`?action=initial_data_for_access`);
         if (!res.ok) throw new Error('Failed to load entities for access tab');
         const data = await res.json();
         
-        availableEntities = [...(data.users || []), ...(data.departments || [])];
-        App.populateSelect(selectEl, availableEntities, "Выберите сотрудника или отдел...");
+        availableUsers = data.users || [];
+        availableDepartments = data.departments || [];
+
+        App.populateSelect(userSelect, availableUsers, "Выберите сотрудника...");
+        App.populateSelect(departmentSelect, availableDepartments, "Выберите отдел...");
         
         await loadAccessRules();
     } catch (e) { 
@@ -22,15 +34,39 @@ App.initializeAccessTab = async function() {
         App.hideLoader();
     }
 
+    // --- Обработчики событий ---
+
+    // Переключение между выбором сотрудника и отдела
+    entityTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (event) => {
+            if (event.target.value === 'user') {
+                userSelectorContainer.style.display = 'block';
+                departmentSelectorContainer.style.display = 'none';
+            } else {
+                userSelectorContainer.style.display = 'none';
+                departmentSelectorContainer.style.display = 'block';
+            }
+        });
+    });
+
+    // Добавление нового правила в таблицу
     document.getElementById('add-access-rule-btn').addEventListener('click', () => {
+        const selectedEntityType = document.querySelector('input[name="access_entity_type"]:checked').value;
+        const selectEl = selectedEntityType === 'user' ? userSelect : departmentSelect;
+        const availableEntities = selectedEntityType === 'user' ? availableUsers : availableDepartments;
+        
         const selectedId = selectEl.value;
-        if (!selectedId || document.querySelector(`.access-rule-card[data-entity-id="${selectedId}"]`)) {
+        
+        // Проверка, что что-то выбрано и что правило для этой сущности еще не добавлено
+        if (!selectedId || document.querySelector(`tr[data-entity-id="${selectedId}"]`)) {
+            alert('Это правило уже добавлено или ничего не выбрано.');
             return;
         }
         
         const entity = availableEntities.find(e => e.id === selectedId);
         if (entity) {
-            renderAccessRuleCard(entity.id, entity.name, {
+            // Добавляем новую строку в таблицу с правами по умолчанию
+            renderAccessRuleRow(entity.id, entity.name, {
                 can_access_app: true,
                 tabs: { cashbox: false, statistics: false, access: false },
                 actions: { can_save: false, can_delete: false }
@@ -38,22 +74,29 @@ App.initializeAccessTab = async function() {
         }
     });
 
+    // --- Функции ---
+
     async function loadAccessRules() {
         const res = await fetch(`?action=access_rights`);
         const rules = await res.json();
-        rulesContainer.innerHTML = '';
+        rulesTableBody.innerHTML = ''; // Очищаем тело таблицы
         rules.forEach(rule => {
-            renderAccessRuleCard(rule.entity_id, rule.entity_name, rule.permissions);
+            renderAccessRuleRow(rule.entity_id, rule.entity_name, rule.permissions);
         });
     }
 
-    function renderAccessRuleCard(entityId, entityName, permissions) {
-        const card = document.createElement('div');
-        card.className = 'access-rule-card';
-        card.dataset.entityId = entityId;
+    function renderAccessRuleRow(entityId, entityName, permissions) {
+        const row = rulesTableBody.insertRow();
+        row.dataset.entityId = entityId;
 
-        card.innerHTML = `
-            <h4>${entityName}</h4>
+        // Ячейка с именем
+        const nameCell = row.insertCell();
+        nameCell.textContent = entityName;
+
+        // Ячейка с правилами
+        const permsCell = row.insertCell();
+        permsCell.className = 'access-grid-cell';
+        permsCell.innerHTML = `
             <div class="access-grid">
                 <label><input type="checkbox" data-perm="can_access_app" ${permissions.can_access_app ? 'checked' : ''}> Доступ к приложению</label>
                 <label><input type="checkbox" data-perm="tabs.cashbox" ${permissions.tabs.cashbox ? 'checked' : ''}> Вкладка "Касса"</label>
@@ -62,28 +105,34 @@ App.initializeAccessTab = async function() {
                 <label><input type="checkbox" data-perm="actions.can_save" ${permissions.actions.can_save ? 'checked' : ''}> Право на сохр./ред.</label>
                 <label><input type="checkbox" data-perm="actions.can_delete" ${permissions.actions.can_delete ? 'checked' : ''}> Право на удаление</label>
             </div>
-            <button class="ui-btn ui-btn-primary save-rule-btn" data-action="save">Сохранить</button>
         `;
-        rulesContainer.appendChild(card);
+
+        // Ячейка с кнопкой сохранения
+        const actionCell = row.insertCell();
+        actionCell.className = 'actions-column';
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'ui-btn ui-btn-primary save-rule-btn';
+        saveBtn.textContent = 'Сохранить';
+        actionCell.appendChild(saveBtn);
 
         // Применяем права к только что созданной кнопке
-        const saveBtn = card.querySelector('.save-rule-btn');
         if (App.userPermissions && !App.userPermissions.actions.can_save) {
             saveBtn.disabled = true;
             saveBtn.style.cursor = 'not-allowed';
         }
 
+        // Обработчик сохранения для конкретной строки
         saveBtn.addEventListener('click', async () => {
             const newPermissions = {
-                can_access_app: card.querySelector('[data-perm="can_access_app"]').checked,
+                can_access_app: row.querySelector('[data-perm="can_access_app"]').checked,
                 tabs: {
-                    cashbox: card.querySelector('[data-perm="tabs.cashbox"]').checked,
-                    statistics: card.querySelector('[data-perm="tabs.statistics"]').checked,
-                    access: card.querySelector('[data-perm="tabs.access"]').checked,
+                    cashbox: row.querySelector('[data-perm="tabs.cashbox"]').checked,
+                    statistics: row.querySelector('[data-perm="tabs.statistics"]').checked,
+                    access: row.querySelector('[data-perm="tabs.access"]').checked,
                 },
                 actions: {
-                    can_save: card.querySelector('[data-perm="actions.can_save"]').checked,
-                    can_delete: card.querySelector('[data-perm="actions.can_delete"]').checked,
+                    can_save: row.querySelector('[data-perm="actions.can_save"]').checked,
+                    can_delete: row.querySelector('[data-perm="actions.can_delete"]').checked,
                 }
             };
             
