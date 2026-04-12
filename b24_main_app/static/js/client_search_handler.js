@@ -1,5 +1,6 @@
 // static/js/client_search_handler.js
 (function() {
+
     /**
      * Класс для реализации живого поиска клиентов (контактов) Bitrix24 с debounce и пагинацией.
      * Использует BX24.callMethod для прямого взаимодействия с API.
@@ -45,7 +46,7 @@
         /**
          * Утилита debounce для предотвращения слишком частых вызовов функции.
          * @param {function} func - Функция, которую нужно отложить.
-         * @param {number} delay - Задержка в миллисесекундах.
+         * @param {number} delay - Задержка в миллисекундах.
          * @returns {function} - Дебаунсированная функция.
          */
         debounce(func, delay) {
@@ -86,6 +87,10 @@
                 "EMAIL": `%${query}%`
             };
 
+            console.log(`[ClientSearchHandler] Performing search for query: "${query}", page: ${page}`);
+            console.log('[ClientSearchHandler] Filter sent to API:', filter);
+            console.log('[ClientSearchHandler] Start offset:', start);
+
             try {
                 // Оборачиваем BX24.callMethod в Promise для использования async/await
                 const response = await new Promise((resolve, reject) => {
@@ -108,13 +113,16 @@
                 const contacts = response.data();
                 this.totalItems = response.total(); // Общее количество найденных элементов для пагинации
 
+                console.log('[ClientSearchHandler] API Response - Total items:', this.totalItems);
+                console.log('[ClientSearchHandler] API Response - Contacts data:', contacts);
+
                 this.renderSearchResults(contacts);
                 this.updatePaginationUI(this.totalItems, this.currentPage);
 
             } catch (error) {
                 // Этот блок ловит ошибки, которые были reject'нуты из Promise (ошибки API)
                 // или другие неожиданные ошибки (например, сетевые, если Promise не был создан).
-                console.error('Search error:', error);
+                console.error('[ClientSearchHandler] Search error:', error);
                 let errorMessage = 'Произошла ошибка при выполнении запроса.';
                 if (error && error.error_description) {
                     errorMessage = `Ошибка поиска: ${error.error_description}`;
@@ -146,16 +154,19 @@
 
             contacts.forEach(contact => {
                 const item = document.createElement('div');
+
                 item.className = 'client-search-results-item';
                 item.dataset.id = contact.ID;
 
                 let displayInfo = `${contact.LAST_NAME || ''} ${contact.NAME || ''} ${contact.SECOND_NAME || ''}`.trim();
+
 
                 // Добавляем телефоны, если есть
                 if (contact.PHONE && contact.PHONE.length > 0) {
                     const phones = contact.PHONE.map(p => p.VALUE).join(', ');
                     displayInfo += ` (Тел: ${phones})`;
                 }
+
                 // Добавляем email, если есть
                 if (contact.EMAIL && contact.EMAIL.length > 0) {
                     const emails = contact.EMAIL.map(e => e.VALUE).join(', ');
