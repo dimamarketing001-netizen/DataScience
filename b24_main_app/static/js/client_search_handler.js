@@ -94,9 +94,18 @@
                     order: { "LAST_NAME": "ASC", "NAME": "ASC" } // Сортировка для предсказуемого порядка
                 });
 
+                // ДОБАВЛЕНА ПРОВЕРКА: Если response не существует, обрабатываем это как ошибку
+                if (!response) {
+                    console.error('Bitrix24 API Error: BX24.callMethod вернул пустой ответ.');
+                    this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Ошибка поиска: Не удалось получить ответ от Bitrix24 API.</div>`;
+                    this.searchResultsContainer.style.display = 'block';
+                    this.updatePaginationUI(0, 1);
+                    return;
+                }
+
                 if (response.error()) {
                     console.error('Bitrix24 API Error:', response.error());
-                    this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Ошибка поиска: ${response.error().error_description}</div>`;
+                    this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Ошибка поиска: ${response.error().error_description || 'Неизвестная ошибка API'}</div>`;
                     this.searchResultsContainer.style.display = 'block';
                     this.updatePaginationUI(0, 1);
                     return;
@@ -110,7 +119,7 @@
 
             } catch (error) {
                 console.error('Network or unexpected error:', error);
-                this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Произошла ошибка при выполнении запроса.</div>`;
+                this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Произошла ошибка при выполнении запроса: ${error.message || error}.</div>`;
                 this.searchResultsContainer.style.display = 'block';
                 this.updatePaginationUI(0, 1);
             } finally {
