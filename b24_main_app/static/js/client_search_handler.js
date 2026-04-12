@@ -45,7 +45,7 @@
         /**
          * Утилита debounce для предотвращения слишком частых вызовов функции.
          * @param {function} func - Функция, которую нужно отложить.
-         * @param {number} delay - Задержка в миллисекундах.
+         * @param {number} delay - Задержка в миллисесекундах.
          * @returns {function} - Дебаунсированная функция.
          */
         debounce(func, delay) {
@@ -87,30 +87,24 @@
             };
 
             try {
-                const response = await BX24.callMethod('crm.contact.list', {
-                    filter: filter,
-                    select: ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE', 'EMAIL'],
-                    start: start,
-                    order: { "LAST_NAME": "ASC", "NAME": "ASC" } // Сортировка для предсказуемого порядка
+                // Оборачиваем BX24.callMethod в Promise для использования async/await
+                const response = await new Promise((resolve, reject) => {
+                    BX24.callMethod('crm.contact.list', {
+                        filter: filter,
+                        select: ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE', 'EMAIL'],
+                        start: start,
+                        order: { "LAST_NAME": "ASC", "NAME": "ASC" } // Сортировка для предсказуемого порядка
+                    }, (result) => {
+                        // result здесь - это объект ajaxResult из документации
+                        if (result.error()) {
+                            reject(result.error()); // Отклоняем Promise при ошибке API
+                        } else {
+                            resolve(result); // Разрешаем Promise с объектом ajaxResult
+                        }
+                    });
                 });
 
-                // ДОБАВЛЕНА ПРОВЕРКА: Если response не существует, обрабатываем это как ошибку
-                if (!response) {
-                    console.error('Bitrix24 API Error: BX24.callMethod вернул пустой ответ.');
-                    this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Ошибка поиска: Не удалось получить ответ от Bitrix24 API.</div>`;
-                    this.searchResultsContainer.style.display = 'block';
-                    this.updatePaginationUI(0, 1);
-                    return;
-                }
-
-                if (response.error()) {
-                    console.error('Bitrix24 API Error:', response.error());
-                    this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Ошибка поиска: ${response.error().error_description || 'Неизвестная ошибка API'}</div>`;
-                    this.searchResultsContainer.style.display = 'block';
-                    this.updatePaginationUI(0, 1);
-                    return;
-                }
-
+                // Теперь 'response' - это объект ajaxResult, и мы можем безопасно вызывать его методы
                 const contacts = response.data();
                 this.totalItems = response.total(); // Общее количество найденных элементов для пагинации
 
@@ -118,8 +112,19 @@
                 this.updatePaginationUI(this.totalItems, this.currentPage);
 
             } catch (error) {
-                console.error('Network or unexpected error:', error);
-                this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">Произошла ошибка при выполнении запроса: ${error.message || error}.</div>`;
+                // Этот блок ловит ошибки, которые были reject'нуты из Promise (ошибки API)
+                // или другие неожиданные ошибки (например, сетевые, если Promise не был создан).
+                console.error('Search error:', error);
+                let errorMessage = 'Произошла ошибка при выполнении запроса.';
+                if (error && error.error_description) {
+                    errorMessage = `Ошибка поиска: ${error.error_description}`;
+                } else if (error && error.message) {
+                    errorMessage = `Произошла ошибка при выполнении запроса: ${error.message}`;
+                } else if (typeof error === 'string') {
+                    errorMessage = `Произошла ошибка при выполнении запроса: ${error}`;
+                }
+
+                this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">${errorMessage}</div>`;
                 this.searchResultsContainer.style.display = 'block';
                 this.updatePaginationUI(0, 1);
             } finally {
