@@ -42,7 +42,7 @@ def init_db():
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `expenses` (
-              `id` int(11) NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `expense_date` date NOT NULL, `amount` decimal(10, 2) NOT NULL,
+              `id` int(11) NOT NULL AUTO_INCREMENT, `expense_date` date NOT NULL, `amount` decimal(10, 2) NOT NULL,
               `category` varchar(255) DEFAULT NULL, `category_val` varchar(255) DEFAULT NULL, `employee_id` varchar(50) DEFAULT NULL,
               `source_id` varchar(50) DEFAULT NULL, `contact_id` varchar(50) DEFAULT NULL, `comment` text,
               `added_by_user_id` varchar(50) DEFAULT NULL, `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`)
