@@ -10,11 +10,21 @@
 </head>
 <body>
     <div id="loader-overlay" class="loader-overlay"><div class="loader"></div></div>
-    <!-- Кастомное уведомление об успехе/ошибке -->
-    <div id="notification-overlay" class="notification-overlay" style="display: none;">
-        <div class="notification-content">
-            <div class="notification-icon"></div>
-            <div class="notification-message"></div>
+
+    <!-- Контейнер для toast-уведомлений (успех) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Модальное окно для ошибок -->
+    <div id="error-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-icon error-icon"></div>
+                <div class="ui-form-title-text" id="error-modal-title">Ошибка</div>
+            </div>
+            <div class="modal-text" id="error-modal-text"></div>
+            <div class="modal-buttons">
+                <button id="error-modal-ok-btn" class="ui-btn ui-btn-primary">ОК</button>
+            </div>
         </div>
     </div>
 

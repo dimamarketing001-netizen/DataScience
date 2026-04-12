@@ -1,5 +1,5 @@
 // Модуль для управления правами доступа
-App.initializeAccessTab = async function() {
+App.initializeAccessTab = async function () {
     console.log("Initializing Access Tab...");
 
     const employeeSelect = document.getElementById('access-employee-select');
@@ -22,7 +22,7 @@ App.initializeAccessTab = async function() {
         const res = await fetch(`?action=initial_data_for_access`);
         if (!res.ok) throw new Error('Failed to load entities for access tab');
         const data = await res.json();
-        
+
         availableUsers = data.users || [];
         availableDepartments = data.departments || [];
 
@@ -41,11 +41,11 @@ App.initializeAccessTab = async function() {
             option.textContent = dep.name;
             departmentSelect.appendChild(option);
         });
-        
+
         await loadAccessRules();
-    } catch (e) { 
+    } catch (e) {
         console.error("Failed to load entities for access tab", e);
-        alert('Не удалось загрузить данные для настройки доступов.');
+        await App.Notify.error('Ошибка', 'Не удалось загрузить данные для настройки доступов.');
     } finally {
         App.hideLoader();
     }
@@ -62,31 +62,31 @@ App.initializeAccessTab = async function() {
         }
     });
 
-    document.getElementById('add-access-rule-btn').addEventListener('click', () => {
+    document.getElementById('add-access-rule-btn').addEventListener('click', async () => {
         const selectedType = accessTypeSelect.value;
         const selectedId = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
-        
+
         if (!selectedId || document.querySelector(`tr[data-entity-id="${selectedId}"]`)) {
-            alert('Это правило уже добавлено или ничего не выбрано.');
+            await App.Notify.error('Ошибка', 'Это правило уже добавлено или ничего не выбрано.');
             return;
         }
-        
+
         const entityList = selectedType === 'employee' ? availableUsers : availableDepartments;
         const entity = entityList.find(e => String(e.id) === selectedId);
 
         if (entity) {
             renderAccessRuleRow(entity.id, entity.name, {
                 can_access_app: true,
-                tabs: { cashbox: false, statistics: false, access: false },
-                actions: { can_save: false, can_delete: false }
+                tabs: {cashbox: false, statistics: false, access: false},
+                actions: {can_save: false, can_delete: false}
             });
         }
     });
 
     // --- Функции модального окна ---
-    
+
     function showDeleteConfirmation(entityId, rowElement, entityName) {
-        ruleToDelete = { entityId, rowElement, entityName };
+        ruleToDelete = {entityId, rowElement, entityName};
         deleteRuleModal.style.display = 'flex';
     }
 
@@ -100,31 +100,31 @@ App.initializeAccessTab = async function() {
     confirmDeleteRuleBtn.addEventListener('click', async () => {
         if (!ruleToDelete) return;
 
-        const { entityId, rowElement, entityName } = ruleToDelete;
+        const {entityId, rowElement, entityName} = ruleToDelete;
         App.showLoader();
         try {
             // ИЗМЕНЕНО: Структура тела запроса теперь полностью повторяет структуру сохранения
             const res = await fetch(`?action=access_rights`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
                     entity_id: entityId,
                     entity_name: entityName,
                     sub_action: 'delete', // Сигнал для бэкенда на удаление
                     permissions: { // Добавляем пустой объект permissions, чтобы соответствовать структуре
                         can_access_app: false,
-                        tabs: { cashbox: false, statistics: false, access: false },
-                        actions: { can_save: false, can_delete: false }
+                        tabs: {cashbox: false, statistics: false, access: false},
+                        actions: {can_save: false, can_delete: false}
                     }
                 })
             });
 
             if (!res.ok) throw new Error('Server responded with an error during deletion');
-            
+
             rowElement.remove();
-            alert('Правило удалено.');
+            App.Notify.success('Правило удалено.');
         } catch (e) {
-            alert('Ошибка удаления правила.');
+            await App.Notify.error('Ошибка', 'Ошибка удаления правила.');
             console.error(e);
         } finally {
             App.hideLoader();
@@ -166,7 +166,7 @@ App.initializeAccessTab = async function() {
 
         const actionCell = row.insertCell();
         actionCell.className = 'actions-column';
-        
+
         const saveBtn = document.createElement('button');
         saveBtn.className = 'ui-btn ui-btn-primary save-rule-btn';
         saveBtn.textContent = 'Сохранить';
@@ -199,12 +199,12 @@ App.initializeAccessTab = async function() {
                     can_delete: row.querySelector('[data-perm="actions.can_delete"]').checked,
                 }
             };
-            
+
             App.showLoader();
             try {
                 const res = await fetch(`?action=access_rights`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         entity_id: entityId,
                         entity_name: entityName,
@@ -212,9 +212,9 @@ App.initializeAccessTab = async function() {
                     })
                 });
                 if (!res.ok) throw new Error('Server responded with an error');
-                alert('Права сохранены!');
+                App.Notify.success('Права сохранены!');
             } catch (e) {
-                alert('Ошибка сохранения прав.');
+                await App.Notify.error('Ошибка', 'Ошибка сохранения прав.');
                 console.error(e);
             } finally {
                 App.hideLoader();

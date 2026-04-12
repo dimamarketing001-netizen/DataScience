@@ -25,24 +25,6 @@ App.initializeCashbox = async function() {
     const prevPageBtn = document.getElementById('prev-page-btn');
     const nextPageBtn = document.getElementById('next-page-btn');
 
-    // --- Элементы для кастомных уведомлений ---
-    const notificationOverlay = document.getElementById('notification-overlay');
-    const notificationIcon = notificationOverlay.querySelector('.notification-icon');
-    const notificationMessage = notificationOverlay.querySelector('.notification-message');
-
-    // --- Вспомогательная функция для кастомных уведомлений ---
-    function showCustomNotification(message, type = 'success', duration = 3000) {
-        notificationMessage.textContent = message;
-        notificationIcon.className = 'notification-icon'; // Сброс классов
-        notificationIcon.classList.add(type); // Добавление класса типа (success/error)
-
-        notificationOverlay.classList.add('show');
-
-        setTimeout(() => {
-            notificationOverlay.classList.remove('show');
-        }, duration);
-    }
-
     // --- Инициализация ---
     App.showLoader();
     try {
@@ -58,7 +40,7 @@ App.initializeCashbox = async function() {
         
         await loadExpensesTable();
     } catch (error) {
-        showCustomNotification(`Критическая ошибка инициализации кассы: ${error.message}`, 'error');
+        await App.Notify.error('Ошибка', `Критическая ошибка инициализации кассы: ${error.message}`);
     } finally {
         App.hideLoader();
     }
@@ -112,7 +94,7 @@ App.initializeCashbox = async function() {
             App.cashbox.ui.renderExpensesTable(data.expenses, openEditModal, openDeleteConfirmModal);
             currentPage = App.cashbox.ui.updatePaginationControls(data.total_records, data.limit, data.offset);
         } catch (error) {
-            showCustomNotification(`Ошибка загрузки расходов: ${error.message}`, 'error');
+            await App.Notify.error('Ошибка', `Ошибка загрузки расходов: ${error.message}`);
             App.cashbox.ui.elements.expensesTableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки расходов.</td></tr>`;
         } finally {
             App.hideLoader();
@@ -160,7 +142,7 @@ App.initializeCashbox = async function() {
 
         // --- Валидация ---
         if (formData.category_val === 'employees' && !formData.employee_id) {
-            showCustomNotification("Поле 'Сотрудник' обязательно для категории 'Сотрудники'.", 'error');
+            await App.Notify.error('Ошибка', "Поле 'Сотрудник' обязательно для категории 'Сотрудники'.");
             return;
         }
 
@@ -215,12 +197,12 @@ App.initializeCashbox = async function() {
             App.showLoader();
             try {
                 await App.cashbox.api.addExpense({ ...formData, added_by_user_id: App.currentUser.ID });
-                showCustomNotification("Расход успешно сохранен!");
+                App.Notify.success("Расход успешно сохранен!");
                 expenseForm.reset();
                 App.cashbox.ui.toggleDynamicFields('');
                 loadExpensesTable(1);
             } catch (error) {
-                showCustomNotification(`Ошибка сохранения: ${error.message}`, 'error');
+                await App.Notify.error('Ошибка сохранения', error.message);
             } finally {
                 App.hideLoader();
             }
@@ -234,7 +216,7 @@ App.initializeCashbox = async function() {
             // Передаем доступных сотрудников и подрядчиков в openEditModal UI-модуля
             App.cashbox.ui.openEditModal(expense, availableEmployees, availableContractors);
         } catch (error) {
-            showCustomNotification(`Ошибка загрузки данных для редактирования: ${error.message}`, 'error');
+            await App.Notify.error('Ошибка', `Ошибка загрузки данных для редактирования: ${error.message}`);
         } finally {
             App.hideLoader();
         }
@@ -276,7 +258,7 @@ App.initializeCashbox = async function() {
 
         // --- Валидация ---
         if (selectedCategory === 'employees' && !formData.employee_id) {
-            showCustomNotification("Поле 'Сотрудник' обязательно для категории 'Сотрудники'.", 'error');
+            await App.Notify.error('Ошибка', "Поле 'Сотрудник' обязательно для категории 'Сотрудники'.");
             return;
         }
 
@@ -321,7 +303,7 @@ App.initializeCashbox = async function() {
 
         const isConfirmed = await App.showCustomConfirm({
             title: 'Подтвердите обновление расхода',
-            text: 'Выверены, что хотите обновить следующий расход?',
+            text: 'Вы уверены, что хотите обновить следующий расход?',
             data: formDataForDisplay,
             confirmButtonText: 'Обновить'
         });
@@ -330,11 +312,11 @@ App.initializeCashbox = async function() {
             App.showLoader();
             try {
                 await App.cashbox.api.updateExpense(formData);
-                showCustomNotification('Расход успешно обновлен!');
+                App.Notify.success('Расход успешно обновлен!');
                 App.cashbox.ui.closeEditModal();
                 loadExpensesTable(currentPage);
             } catch (error) {
-                showCustomNotification(`Ошибка обновления: ${error.message}`, 'error');
+                await App.Notify.error('Ошибка обновления', error.message);
             } finally {
                 App.hideLoader();
             }
@@ -351,12 +333,12 @@ App.initializeCashbox = async function() {
         App.showLoader();
         try {
             await App.cashbox.api.deleteExpense(expenseToDeleteId);
-            showCustomNotification('Расход удален.');
+            App.Notify.success('Расход удален.');
             App.cashbox.ui.closeDeleteConfirmModal();
             expenseToDeleteId = null;
             loadExpensesTable(currentPage);
         } catch (error) {
-            showCustomNotification(`Ошибка удаления: ${error.message}`, 'error');
+            await App.Notify.error('Ошибка удаления', error.message);
         } finally {
             App.hideLoader();
         }

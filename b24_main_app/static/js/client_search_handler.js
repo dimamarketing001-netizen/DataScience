@@ -142,8 +142,11 @@
                     errorMessage = `Ошибка поиска по полю ${error.field}: ${error.error.error_description || error.error.message || 'Неизвестная ошибка'}`;
                 }
 
-                this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">${errorMessage}</div>`;
-                this.searchResultsContainer.style.display = 'block';
+                // Используем новую систему уведомлений для критических ошибок
+                await App.Notify.error('Ошибка поиска клиента', errorMessage);
+                // Очищаем контейнер результатов, так как ошибка модальная
+                this.searchResultsContainer.innerHTML = '';
+                this.searchResultsContainer.style.display = 'none';
             } finally {
                 App.hideLoader(); // Скрываем глобальный лоадер
             }

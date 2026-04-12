@@ -9,6 +9,9 @@ window.App = {
     currentUser: null,
     userPermissions: null,
     
+    // Объект для управления уведомлениями
+    Notify: {},
+
     // Общие функции и UI элементы будут добавлены сюда
 };
 
@@ -22,14 +25,59 @@ BX24.ready(() => {
     const mainMenu = document.getElementById('main-menu');
     const menuCards = document.querySelectorAll('.menu-card');
     const backButtons = document.querySelectorAll('.back-button');
+    
+    // Элементы для кастомных уведомлений
+    const toastContainer = document.getElementById('toast-container');
+    const errorModal = document.getElementById('error-modal');
+    const errorModalTitle = document.getElementById('error-modal-title');
+    const errorModalText = document.getElementById('error-modal-text');
+    const errorModalOkBtn = document.getElementById('error-modal-ok-btn');
+
+    // Элементы для кастомного подтверждения
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmationModalTitle = document.getElementById('confirmation-modal-title');
     const confirmationModalText = document.getElementById('confirmation-modal-text');
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const cancelActionBtn = document.getElementById('cancel-action-btn');
 
+    // --- СИСТЕМА УВЕДОМЛЕНИЙ ---
+    App.Notify.success = (message) => {
+        const toast = document.createElement('div');
+        toast.className = 'toast show';
+        toast.innerHTML = `
+            <div class="toast-icon success-icon"></div>
+            <div class="toast-message">${message}</div>
+        `;
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            // Удаляем элемент после завершения анимации
+            setTimeout(() => {
+                toast.remove();
+            }, 500);
+        }, 3000);
+    };
+
+    App.Notify.error = (title, message) => {
+        return new Promise(resolve => {
+            errorModalTitle.textContent = title;
+            errorModalText.innerHTML = message; // Используем innerHTML для поддержки HTML в сообщении
+            errorModal.style.display = 'flex';
+
+            // Удаляем предыдущий обработчик, чтобы избежать многократного вызова
+            const newOkBtn = errorModalOkBtn.cloneNode(true);
+            errorModalOkBtn.parentNode.replaceChild(newOkBtn, errorModalOkBtn);
+            
+            newOkBtn.onclick = () => {
+                errorModal.style.display = 'none';
+                resolve();
+            };
+        });
+    };
+
+
     // --- ГЛОБАЛЬНЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-    // Прикрепляем к App, чтобы сделать их доступными для других модулей
     App.showLoader = () => loaderOverlay.style.display = 'flex';
     App.hideLoader = () => loaderOverlay.style.display = 'none';
 
@@ -68,11 +116,19 @@ BX24.ready(() => {
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
             confirmationModal.style.display = 'flex';
-            confirmActionBtn.onclick = () => {
+            
+            // Важно клонировать кнопки, чтобы избежать накопления обработчиков
+            const newConfirmBtn = confirmActionBtn.cloneNode(true);
+            confirmActionBtn.parentNode.replaceChild(newConfirmBtn, confirmActionBtn);
+
+            const newCancelBtn = cancelActionBtn.cloneNode(true);
+            cancelActionBtn.parentNode.replaceChild(newCancelBtn, cancelActionBtn);
+
+            newConfirmBtn.onclick = () => {
                 confirmationModal.style.display = 'none';
                 resolve(true);
             };
-            cancelActionBtn.onclick = () => {
+            newCancelBtn.onclick = () => {
                 confirmationModal.style.display = 'none';
                 resolve(false);
             };
@@ -108,6 +164,7 @@ BX24.ready(() => {
         BX24.callMethod('user.current', {}, async (res) => {
             if (res.error()) {
                 console.error("Failed to get current user:", res.error());
+                await App.Notify.error('Ошибка авторизации', 'Не удалось получить данные текущего пользователя. Попробуйте перезагрузить страницу.');
                 applyPermissions(null);
                 return;
             }
@@ -118,14 +175,12 @@ BX24.ready(() => {
                 const departmentId = (App.currentUser.UF_DEPARTMENT && App.currentUser.UF_DEPARTMENT.length > 0) ? App.currentUser.UF_DEPARTMENT[0] : '';
                 const permRes = await fetch(`?action=my_permissions&user_id=${App.currentUser.ID}&department_id=${departmentId}`);
                 
-                const rawText = await permRes.text();
-                console.log("Raw response from server for permissions:", rawText);
-
                 if (!permRes.ok) {
-                    throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${rawText}`);
+                    const errorText = await permRes.text();
+                    throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
                 }
 
-                App.userPermissions = JSON.parse(rawText);
+                App.userPermissions = await permRes.json();
                 console.log("User permissions received:", App.userPermissions);
 
                 if (applyPermissions(App.userPermissions)) {
@@ -134,6 +189,7 @@ BX24.ready(() => {
                 }
             } catch (e) {
                 console.error("Error during permission check:", e);
+                await App.Notify.error('Ошибка получения доступов', `Произошла критическая ошибка при проверке прав доступа. ${e.message}`);
                 applyPermissions(null);
             } finally {
                 App.hideLoader();
