@@ -47,7 +47,7 @@ App.cashbox.ui = {
         const { expensesTableBody } = this.elements;
         expensesTableBody.innerHTML = '';
         if (!expenses || expenses.length === 0) {
-            expensesTableBody.innerHTML = `<tr><td colspan="10">Нет записей о расходах по заданным фильтрам.</td></tr>`;
+            expensesTableBody.innerHTML = `<tr><td colspan="12">Нет записей о расходах по заданным фильтрам.</td></tr>`;
             return;
         }
         expenses.forEach(expense => {
@@ -60,6 +60,8 @@ App.cashbox.ui = {
             row.insertCell().textContent = expense.source_name || '—';
             row.insertCell().textContent = expense.contact_name || '—';
             row.insertCell().textContent = expense.comment || '—';
+            row.insertCell().textContent = expense.paid_leads !== null ? expense.paid_leads : '—'; // Добавлено
+            row.insertCell().textContent = expense.free_leads !== null ? expense.free_leads : '—'; // Добавлено
             row.insertCell().textContent = expense.added_by_user_name || 'Неизвестно';
             
             const actionsCell = row.insertCell();
