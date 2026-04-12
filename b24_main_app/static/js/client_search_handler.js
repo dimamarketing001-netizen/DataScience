@@ -25,11 +25,12 @@
             this.prevPageBtn = options.prevPageBtn;
             this.nextPageBtn = options.nextPageBtn;
             this.itemsPerPage = options.itemsPerPage || 10;
-            this.debounceDelay = options.debounceDelay || 500;
+            this.debounceDelay = options.debounceDelay || 700; // Увеличено для последовательных запросов
 
             this.currentPage = 1;
             this.currentSearchQuery = '';
             this.totalItems = 0;
+            this.allFoundContacts = []; // Храним все найденные и дедуплицированные контакты для клиентской пагинации
 
             // Проверка наличия всех необходимых элементов
             if (!this.searchInput || !this.searchResultsContainer || !this.selectedClientIdInput ||
@@ -46,7 +47,7 @@
         /**
          * Утилита debounce для предотвращения слишком частых вызовов функции.
          * @param {function} func - Функция, которую нужно отложить.
-         * @param {number} delay - Задержка в миллисекундах.
+         * @param {number} delay - Задержка в миллисесекундах.
          * @returns {function} - Дебаунсированная функция.
          */
         debounce(func, delay) {
@@ -61,7 +62,7 @@
         /**
          * Выполняет поиск клиентов через Bitrix24 API.
          * @param {string} query - Поисковый запрос.
-         * @param {number} page - Номер страницы результатов.
+         * @param {number} page - Номер страницы результатов (для клиентской пагинации).
          */
         async performClientSearch(query, page = 1) {
             // Если запрос пуст, очищаем результаты и скрываем контейнер
@@ -69,6 +70,7 @@
                 this.searchResultsContainer.innerHTML = '';
                 this.searchResultsContainer.style.display = 'none';
                 this.updatePaginationUI(0, 1);
+                this.allFoundContacts = [];
                 return;
             }
 
@@ -76,56 +78,71 @@
             this.currentPage = page;
             App.showLoader(); // Показываем глобальный лоадер
 
-            const start = (this.currentPage - 1) * this.itemsPerPage;
+            // Поля, по которым будем искать
+            const searchFields = ['NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE', 'EMAIL'];
+            const uniqueContactsMap = new Map(); // Для дедупликации контактов
 
-            // Формируем фильтр для поиска по имени, фамилии, телефону и email
-            const filter = {
-                "0": { // Предложенная вами структура
-                    "LOGIC": "OR", // Ищем по любому из полей
-                    "NAME": `*${query}*`,
-                    "LAST_NAME": `*${query}*`,
-                    "SECOND_NAME": `*${query}*`, // Добавляем отчество для полноты поиска
-                    "PHONE": `*${query}*`,
-                    "EMAIL": `*${query}*`
-                }
-            };
-
-            console.log(`[ClientSearchHandler] Performing search for query: "${query}", page: ${page}`);
-            console.log('[ClientSearchHandler] Filter sent to API:', filter);
-            console.log('[ClientSearchHandler] Start offset:', start);
+            console.log(`[ClientSearchHandler] Performing sequential search for query: "${query}", page: ${page}`);
 
             try {
-                // Оборачиваем BX24.callMethod в Promise для использования async/await
-                const response = await new Promise((resolve, reject) => {
-                    BX24.callMethod('crm.contact.list', {
-                        filter: filter,
-                        select: ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE', 'EMAIL'],
-                        start: start,
-                        order: { "LAST_NAME": "ASC", "NAME": "ASC" } // Сортировка для предсказуемого порядка
-                    }, (result) => {
-                        // result здесь - это объект ajaxResult из документации
-                        if (result.error()) {
-                            reject(result.error()); // Отклоняем Promise при ошибке API
-                        } else {
-                            resolve(result); // Разрешаем Promise с объектом ajaxResult
-                        }
+                for (const field of searchFields) {
+                    const filter = {};
+                    // Используем wildcard '*' для частичного совпадения
+                    filter[field] = `*${query}*`;
+
+                    console.log(`[ClientSearchHandler] Sending API call for field "${field}" with filter:`, filter);
+
+                    const response = await new Promise((resolve, reject) => {
+                        BX24.callMethod('crm.contact.list', {
+                            filter: filter,
+                            select: ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE', 'EMAIL'],
+                            start: 0, // Всегда запрашиваем с начала для каждого поля
+                            limit: 50, // Ограничиваем количество результатов для каждого запроса
+                            order: { "LAST_NAME": "ASC", "NAME": "ASC" }
+                        }, (result) => {
+                            if (result.error()) {
+                                reject({ field: field, error: result.error() });
+                            } else {
+                                resolve({ field: field, data: result.data(), total: result.total() });
+                            }
+                        });
                     });
+
+                    console.log(`[ClientSearchHandler] API call for field "${response.field}" fulfilled. Total found: ${response.total}, Data:`, response.data);
+
+                    for (const contact of response.data) {
+                        uniqueContactsMap.set(contact.ID, contact);
+                    }
+                }
+
+                this.allFoundContacts = Array.from(uniqueContactsMap.values());
+                // Сортируем объединенные контакты для предсказуемого отображения
+                this.allFoundContacts.sort((a, b) => {
+                    const lastNameA = (a.LAST_NAME || '').toLowerCase();
+                    const lastNameB = (b.LAST_NAME || '').toLowerCase();
+                    if (lastNameA < lastNameB) return -1;
+                    if (lastNameA > lastNameB) return 1;
+
+                    const nameA = (a.NAME || '').toLowerCase();
+                    const nameB = (b.NAME || '').toLowerCase();
+                    if (nameA < nameB) return -1;
+                    if (nameA > nameB) return 1;
+                    return 0;
                 });
 
-                // Теперь 'response' - это объект ajaxResult, и мы можем безопасно вызывать его методы
-                const contacts = response.data();
-                this.totalItems = response.total(); // Общее количество найденных элементов для пагинации
+                this.totalItems = this.allFoundContacts.length;
+                console.log('[ClientSearchHandler] Combined unique contacts found:', this.totalItems, this.allFoundContacts);
 
-                console.log('[ClientSearchHandler] API Response - Total items:', this.totalItems);
-                console.log('[ClientSearchHandler] API Response - Contacts data:', contacts);
+                // Применяем клиентскую пагинацию к объединенным результатам
+                const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+                const endIndex = startIndex + this.itemsPerPage;
+                const contactsToRender = this.allFoundContacts.slice(startIndex, endIndex);
 
-                this.renderSearchResults(contacts);
+                this.renderSearchResults(contactsToRender);
                 this.updatePaginationUI(this.totalItems, this.currentPage);
 
             } catch (error) {
-                // Этот блок ловит ошибки, которые были reject'нуты из Promise (ошибки API)
-                // или другие неожиданные ошибки (например, сетевые, если Promise не был создан).
-                console.error('[ClientSearchHandler] Search error:', error);
+                console.error('[ClientSearchHandler] General search error during sequential calls:', error);
                 let errorMessage = 'Произошла ошибка при выполнении запроса.';
                 if (error && error.error_description) {
                     errorMessage = `Ошибка поиска: ${error.error_description}`;
@@ -133,7 +150,10 @@
                     errorMessage = `Произошла ошибка при выполнении запроса: ${error.message}`;
                 } else if (typeof error === 'string') {
                     errorMessage = `Произошла ошибка при выполнении запроса: ${error}`;
+                } else if (error && error.field) { // Ошибка конкретного поля
+                    errorMessage = `Ошибка поиска по полю ${error.field}: ${error.error.error_description || error.error.message || 'Неизвестная ошибка'}`;
                 }
+
 
                 this.searchResultsContainer.innerHTML = `<div class="client-search-results-item">${errorMessage}</div>`;
                 this.searchResultsContainer.style.display = 'block';
@@ -200,7 +220,7 @@
             this.nextPageBtn.disabled = current >= totalPages;
 
             const paginationContainer = this.pageInfoSpan.closest('.pagination-controls');
-            if (total <= this.itemsPerPage) {
+            if (total <= this.itemsPerPage && total <= this.allFoundContacts.length) { // Учитываем, что allFoundContacts может быть больше, чем itemsPerPage
                 if (paginationContainer) paginationContainer.style.display = 'none'; // Скрываем пагинацию, если нет или мало результатов
             } else {
                 if (paginationContainer) paginationContainer.style.display = 'flex'; // Показываем пагинацию
