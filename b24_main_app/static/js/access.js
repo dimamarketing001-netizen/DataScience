@@ -2,12 +2,15 @@
 App.initializeAccessTab = async function() {
     console.log("Initializing Access Tab...");
 
-    const selectEl = document.getElementById('access-entity-select');
+    const employeeSelect = document.getElementById('access-employee-select');
+    const departmentSelect = document.getElementById('access-department-select');
+    const employeeSelectWrapper = document.getElementById('access-employee-select-wrapper');
+    const departmentSelectWrapper = document.getElementById('access-department-select-wrapper');
+    const accessTypeRadios = document.querySelectorAll('input[name="access-type"]');
     const rulesTableBody = document.getElementById('access-rules-table-body');
     
     let availableUsers = [];
     let availableDepartments = [];
-    let allAvailableEntities = [];
 
     // --- Инициализация ---
     App.showLoader();
@@ -18,39 +21,24 @@ App.initializeAccessTab = async function() {
         
         availableUsers = data.users || [];
         availableDepartments = data.departments || [];
-        allAvailableEntities = [...availableUsers, ...availableDepartments];
 
-        // --- Новая логика для заполнения select с optgroup ---
-        selectEl.innerHTML = ''; // Очищаем select
-        
-        // Добавляем опцию по умолчанию
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'Выберите правило...';
-        selectEl.appendChild(defaultOption);
-
-        // Создаем и заполняем группу "Сотрудники"
-        const usersGroup = document.createElement('optgroup');
-        usersGroup.label = 'Сотрудники';
+        // Заполняем селект для сотрудников
+        employeeSelect.innerHTML = '<option value="">Выберите сотрудника...</option>';
         availableUsers.forEach(user => {
             const option = document.createElement('option');
             option.value = user.id;
             option.textContent = user.name;
-            usersGroup.appendChild(option);
+            employeeSelect.appendChild(option);
         });
-        selectEl.appendChild(usersGroup);
 
-        // Создаем и заполняем группу "Отделы"
-        const departmentsGroup = document.createElement('optgroup');
-        departmentsGroup.label = 'Отделы';
+        // Заполняем селект для отделов
+        departmentSelect.innerHTML = '<option value="">Выберите отдел...</option>';
         availableDepartments.forEach(dep => {
             const option = document.createElement('option');
             option.value = dep.id;
             option.textContent = dep.name;
-            departmentsGroup.appendChild(option);
+            departmentSelect.appendChild(option);
         });
-        selectEl.appendChild(departmentsGroup);
-        // ----------------------------------------------------
         
         await loadAccessRules();
     } catch (e) { 
@@ -62,19 +50,33 @@ App.initializeAccessTab = async function() {
 
     // --- Обработчики событий ---
 
+    // Переключение между селектами
+    accessTypeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'employee') {
+                employeeSelectWrapper.style.display = '';
+                departmentSelectWrapper.style.display = 'none';
+            } else {
+                employeeSelectWrapper.style.display = 'none';
+                departmentSelectWrapper.style.display = '';
+            }
+        });
+    });
+
     // Добавление нового правила в таблицу
     document.getElementById('add-access-rule-btn').addEventListener('click', () => {
-        const selectedId = selectEl.value;
+        const selectedType = document.querySelector('input[name="access-type"]:checked').value;
+        const selectedId = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
         
-        // Проверка, что что-то выбрано и что правило для этой сущности еще не добавлено
         if (!selectedId || document.querySelector(`tr[data-entity-id="${selectedId}"]`)) {
             alert('Это правило уже добавлено или ничего не выбрано.');
             return;
         }
         
-        const entity = allAvailableEntities.find(e => e.id === selectedId);
+        const entityList = selectedType === 'employee' ? availableUsers : availableDepartments;
+        const entity = entityList.find(e => String(e.id) === selectedId);
+
         if (entity) {
-            // Добавляем новую строку в таблицу с правами по умолчанию
             renderAccessRuleRow(entity.id, entity.name, {
                 can_access_app: true,
                 tabs: { cashbox: false, statistics: false, access: false },
