@@ -6,7 +6,7 @@ App.initializeAccessTab = async function() {
     const departmentSelect = document.getElementById('access-department-select');
     const employeeSelectWrapper = document.getElementById('access-employee-select-wrapper');
     const departmentSelectWrapper = document.getElementById('access-department-select-wrapper');
-    const accessTypeRadios = document.querySelectorAll('input[name="access-type"]');
+    const accessTypeSelect = document.getElementById('access-type-select'); // Новый селект
     const rulesTableBody = document.getElementById('access-rules-table-body');
     
     let availableUsers = [];
@@ -50,22 +50,20 @@ App.initializeAccessTab = async function() {
 
     // --- Обработчики событий ---
 
-    // Переключение между селектами
-    accessTypeRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.value === 'employee') {
-                employeeSelectWrapper.style.display = '';
-                departmentSelectWrapper.style.display = 'none';
-            } else {
-                employeeSelectWrapper.style.display = 'none';
-                departmentSelectWrapper.style.display = '';
-            }
-        });
+    // Переключение между селектами в зависимости от выбора в новом дропдауне
+    accessTypeSelect.addEventListener('change', () => {
+        if (accessTypeSelect.value === 'employee') {
+            employeeSelectWrapper.style.display = '';
+            departmentSelectWrapper.style.display = 'none';
+        } else {
+            employeeSelectWrapper.style.display = 'none';
+            departmentSelectWrapper.style.display = '';
+        }
     });
 
     // Добавление нового правила в таблицу
     document.getElementById('add-access-rule-btn').addEventListener('click', () => {
-        const selectedType = document.querySelector('input[name="access-type"]:checked').value;
+        const selectedType = accessTypeSelect.value;
         const selectedId = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
         
         if (!selectedId || document.querySelector(`tr[data-entity-id="${selectedId}"]`)) {

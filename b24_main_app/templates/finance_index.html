@@ -208,14 +208,13 @@
                 <div class="ui-form-row">
                     <div class="ui-form-label"><div class="ui-ctl-label-text">Тип правила</div></div>
                     <div class="ui-form-content">
-                        <label class="ui-ctl ui-ctl-radio">
-                            <input type="radio" name="access-type" value="employee" class="ui-ctl-element" checked>
-                            <div class="ui-ctl-label-text">На сотрудника</div>
-                        </label>
-                        <label class="ui-ctl ui-ctl-radio">
-                            <input type="radio" name="access-type" value="department" class="ui-ctl-element">
-                            <div class="ui-ctl-label-text">На отдел</div>
-                        </label>
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="access-type-select" class="ui-ctl-element">
+                                <option value="employee">На сотрудника</option>
+                                <option value="department">На отдел</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
