@@ -130,7 +130,6 @@ App.initializeCashbox = async function() {
         const formData = {
             date: document.getElementById('expense-date').value,
             amount: parseFloat(document.getElementById('expense-amount').value),
-            category_text: expenseCategory.options[expenseCategory.selectedIndex].text,
             category_val: expenseCategory.value,
             comment: document.getElementById('expense-comment').value,
             employee_id: document.getElementById('expense-employee').value,
@@ -142,7 +141,7 @@ App.initializeCashbox = async function() {
         const formDataForDisplay = {
             'Дата': formData.date,
             'Сумма': formData.amount,
-            'Категория': formData.category_text,
+            'Категория': expenseCategory.options[expenseCategory.selectedIndex].text,
         };
 
         if (formData.comment) {
@@ -218,7 +217,6 @@ App.initializeCashbox = async function() {
             id: document.getElementById('edit-expense-id').value,
             date: document.getElementById('edit-expense-date').value,
             amount: parseFloat(document.getElementById('edit-expense-amount').value),
-            category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
             category_val: selectedCategory,
             comment: document.getElementById('edit-expense-comment').value,
             employee_id: '',
@@ -227,26 +225,62 @@ App.initializeCashbox = async function() {
             payment_type: '',
         };
 
+        // Формируем данные для отображения в попапе подтверждения
+        const formDataForDisplay = {
+            'Дата': formData.date,
+            'Сумма': formData.amount,
+            'Категория': editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
+        };
+
         // Заполняем динамические поля в зависимости от категории
         if (selectedCategory === 'employees') {
             formData.employee_id = document.getElementById('edit-expense-employee').value;
             formData.payment_type = document.getElementById('edit-expense-payment-type').value;
+            const employeeSelect = document.getElementById('edit-expense-employee');
+            if (employeeSelect.value) {
+                formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
+            }
+            const paymentTypeSelect = document.getElementById('edit-expense-payment-type');
+            if (paymentTypeSelect.value) {
+                formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
+            }
         } else if (selectedCategory === 'marketing') {
             formData.source_id = document.getElementById('edit-expense-contractor').value;
+            const contractorSelect = document.getElementById('edit-expense-contractor');
+            if (contractorSelect.value) {
+                formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
+            }
         } else if (selectedCategory === 'clients') {
             formData.contact_id = document.getElementById('edit-selected-client-id').value;
+            const clientSearchInput = document.getElementById('edit-expense-client-search');
+            if (clientSearchInput.value) {
+                formDataForDisplay['Клиент'] = clientSearchInput.value;
+            }
         }
 
-        App.showLoader();
-        try {
-            await App.cashbox.api.updateExpense(formData);
-            showCustomNotification('Расход успешно обновлен!');
-            App.cashbox.ui.closeEditModal();
-            loadExpensesTable(currentPage);
-        } catch (error) {
-            showCustomNotification(`Ошибка обновления: ${error.message}`, 'error');
-        } finally {
-            App.hideLoader();
+        if (formData.comment) {
+            formDataForDisplay['Комментарий'] = formData.comment;
+        }
+
+        const isConfirmed = await App.showCustomConfirm({
+            title: 'Подтвердите обновление расхода',
+            text: 'Вы уверены, что хотите обновить следующий расход?',
+            data: formDataForDisplay,
+            confirmButtonText: 'Обновить'
+        });
+
+        if (isConfirmed) {
+            App.showLoader();
+            try {
+                await App.cashbox.api.updateExpense(formData);
+                showCustomNotification('Расход успешно обновлен!');
+                App.cashbox.ui.closeEditModal();
+                loadExpensesTable(currentPage);
+            } catch (error) {
+                showCustomNotification(`Ошибка обновления: ${error.message}`, 'error');
+            } finally {
+                App.hideLoader();
+            }
         }
     }
 
