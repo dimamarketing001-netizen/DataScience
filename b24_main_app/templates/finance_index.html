@@ -206,28 +206,9 @@
             <div class="ui-card">
                 <div class="ui-form-title" style="margin-top: 0;"><div class="ui-form-title-text">Добавить правило</div></div>
                 <div class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Как хочешь добавить правило?</div></div>
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник или отдел</div></div>
                     <div class="ui-form-content">
-                        <label class="ui-ctl ui-ctl-radio">
-                            <input type="radio" name="access_entity_type" value="user" class="ui-ctl-element" checked>
-                            <div class="ui-ctl-label-text">На сотрудника</div>
-                        </label>
-                        <label class="ui-ctl ui-ctl-radio">
-                            <input type="radio" name="access_entity_type" value="department" class="ui-ctl-element">
-                            <div class="ui-ctl-label-text">На отдел</div>
-                        </label>
-                    </div>
-                </div>
-                <div id="access-user-selector-container" class="ui-form-row">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
-                    <div class="ui-form-content">
-                        <select id="access-user-select" class="ui-ctl-element"></select>
-                    </div>
-                </div>
-                <div id="access-department-selector-container" class="ui-form-row" style="display: none;">
-                    <div class="ui-form-label"><div class="ui-ctl-label-text">Отдел</div></div>
-                    <div class="ui-form-content">
-                        <select id="access-department-select" class="ui-ctl-element"></select>
+                        <select id="access-entity-select" class="ui-ctl-element"></select>
                     </div>
                 </div>
                 <div class="ui-form-row ui-form-row-actions">
@@ -328,7 +309,6 @@
                                 <input type="text" id="edit-expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
                             </div>
                             <div id="edit-client-search-results" class="client-search-results"></div>
-                            <!-- Пагинация для поиска клиентов в модальном окне редактирования (удалена) -->
                             <input type="hidden" id="edit-selected-client-id">
                         </div>
                     </div>
