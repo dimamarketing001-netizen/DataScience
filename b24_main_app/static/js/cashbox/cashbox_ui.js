@@ -118,6 +118,25 @@ App.cashbox.ui = {
     
     toggleDynamicFields: function(categoryValue, formType = 'add') {
         const fields = formType === 'edit' ? this.elements.editDynamicFields : this.elements.dynamicFields;
+        
+        // --- ДОБАВЛЕНО: Очистка всех динамических полей перед переключением ---
+        if (formType === 'add') {
+            document.getElementById('expense-employee').value = '';
+            document.getElementById('expense-contractor').value = '';
+            document.getElementById('selected-client-id').value = '';
+            document.getElementById('expense-client-search').value = '';
+            document.getElementById('expense-paid-leads').value = '';
+            document.getElementById('expense-free-leads').value = '';
+        } else { // formType === 'edit'
+            document.getElementById('edit-expense-employee').value = '';
+            document.getElementById('edit-expense-contractor').value = '';
+            document.getElementById('edit-selected-client-id').value = '';
+            document.getElementById('edit-expense-client-search').value = '';
+            document.getElementById('edit-expense-paid-leads').value = '';
+            document.getElementById('edit-expense-free-leads').value = '';
+        }
+        // --------------------------------------------------------------------
+
         Object.values(fields).forEach(field => field.style.display = 'none');
         if (fields[categoryValue]) {
             fields[categoryValue].style.display = 'block';

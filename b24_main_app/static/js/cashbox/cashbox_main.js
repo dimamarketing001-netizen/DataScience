@@ -69,6 +69,21 @@ App.initializeCashbox = async function() {
     expenseCategory.addEventListener('change', (event) => {
         const selectedCategory = event.target.value;
         App.cashbox.ui.toggleDynamicFields(selectedCategory, 'add');
+        
+        // --- ДОБАВЛЕНО: Явный сброс ID при смене категории ---
+        // Это гарантирует, что даже если UI не успел обновиться,
+        // мы не отправим на сервер лишние ID.
+        if (selectedCategory !== 'clients') {
+            document.getElementById('selected-client-id').value = '';
+        }
+        if (selectedCategory !== 'employees') {
+            document.getElementById('expense-employee').value = '';
+        }
+        if (selectedCategory !== 'marketing') {
+            document.getElementById('expense-contractor').value = '';
+        }
+        // ----------------------------------------------------
+
         if (selectedCategory === 'employees') {
             App.populateSelect(document.getElementById('expense-employee'), availableEmployees.map(u => ({id: u.ID, name: u.NAME})), 'Выберите сотрудника...');
         } else if (selectedCategory === 'marketing') {
