@@ -578,7 +578,12 @@ body {
     cursor: pointer;
 }
 
-.ui-form-content {
+.ui-ctl-radio .ui-ctl-element {
+    transform: scale(1.3); /* Увеличиваем размер радио-кнопки */
+    margin-right: 5px; /* Добавляем отступ справа от радио-кнопки */
+}
+
+.ui-form-row > .ui-form-content {
     display: flex;
     flex-wrap: wrap; /* Добавлено для переноса на маленьких экранах */
     gap: 10px; /* Добавлен отступ между элементами */
