@@ -141,7 +141,10 @@ BX24.ready(() => {
 
     // --- ЛОГИКА ДОСТУПОВ И АВТОРИЗАЦИИ ---
     function applyPermissions(permissions) {
-        if (!permissions || !permissions.can_access_app) {
+        // Проверяем, есть ли доступ хотя бы к одной вкладке
+        const hasAnyAccess = Object.values(permissions.tabs).some(tab => tab.view);
+
+        if (!hasAnyAccess) {
             App.showScreen(document.getElementById('no-access-screen'));
             appContainer.style.display = 'block';
             App.hideLoader();
@@ -150,13 +153,17 @@ BX24.ready(() => {
 
         menuCards.forEach(card => {
             const tabName = card.dataset.tab;
-            card.style.display = permissions.tabs[tabName] ? 'block' : 'none';
-        });
-
-        // Эта общая настройка применяется ко всем кнопкам "Сохранить" в приложении
-        document.querySelectorAll('[data-action="save"]').forEach(btn => {
-            btn.disabled = !permissions.actions.can_save;
-            btn.style.cursor = permissions.actions.can_save ? 'pointer' : 'not-allowed';
+            // Убедимся, что права для этой вкладки существуют
+            if (permissions.tabs[tabName]) {
+                if (permissions.tabs[tabName].view) {
+                    card.classList.remove('ui-disabled-card');
+                } else {
+                    card.classList.add('ui-disabled-card');
+                }
+            } else {
+                // Если для вкладки вообще нет прав, блокируем ее
+                card.classList.add('ui-disabled-card');
+            }
         });
         
         return true;
@@ -169,7 +176,6 @@ BX24.ready(() => {
             if (res.error()) {
                 console.error("Failed to get current user:", res.error());
                 await App.Notify.error('Ошибка авторизации', 'Не удалось получить данные текущего пользователя. Попробуйте перезагрузить страницу.');
-                applyPermissions(null);
                 return;
             }
             App.currentUser = res.data();
@@ -194,7 +200,6 @@ BX24.ready(() => {
             } catch (e) {
                 console.error("Error during permission check:", e);
                 await App.Notify.error('Ошибка получения доступов', `Произошла критическая ошибка при проверке прав доступа. ${e.message}`);
-                applyPermissions(null);
             } finally {
                 App.hideLoader();
             }

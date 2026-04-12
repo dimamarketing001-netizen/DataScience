@@ -26,21 +26,8 @@ App.initializeAccessTab = async function () {
         availableUsers = data.users || [];
         availableDepartments = data.departments || [];
 
-        employeeSelect.innerHTML = '<option value="">Выберите сотрудника...</option>';
-        availableUsers.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.id;
-            option.textContent = user.name;
-            employeeSelect.appendChild(option);
-        });
-
-        departmentSelect.innerHTML = '<option value="">Выберите отдел...</option>';
-        availableDepartments.forEach(dep => {
-            const option = document.createElement('option');
-            option.value = dep.id;
-            option.textContent = dep.name;
-            departmentSelect.appendChild(option);
-        });
+        App.populateSelect(employeeSelect, availableUsers.map(u => ({id: u.id, name: u.name})), 'Выберите сотрудника...');
+        App.populateSelect(departmentSelect, availableDepartments.map(d => ({id: d.id, name: d.name})), 'Выберите отдел...');
 
         await loadAccessRules();
     } catch (e) {
@@ -64,22 +51,28 @@ App.initializeAccessTab = async function () {
 
     document.getElementById('add-access-rule-btn').addEventListener('click', async () => {
         const selectedType = accessTypeSelect.value;
-        const selectedId = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
+        const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
+        const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
+        const entityId = entityIdPrefix + selectedValue;
 
-        if (!selectedId || document.querySelector(`tr[data-entity-id="${selectedId}"]`)) {
+        if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
             await App.Notify.error('Ошибка', 'Это правило уже добавлено или ничего не выбрано.');
             return;
         }
 
         const entityList = selectedType === 'employee' ? availableUsers : availableDepartments;
-        const entity = entityList.find(e => String(e.id) === selectedId);
+        const entity = entityList.find(e => String(e.id) === selectedValue);
 
         if (entity) {
-            renderAccessRuleRow(entity.id, entity.name, {
-                can_access_app: true,
-                tabs: {cashbox: false, statistics: false, access: false},
-                actions: {can_save: false, can_delete: false}
-            });
+            // Создаем правило с новой структурой по умолчанию
+            const defaultPermissions = {
+                tabs: {
+                    cashbox: { view: false, save: false, delete: false },
+                    statistics: { view: false },
+                    access: { view: false, save: false, delete: false }
+                }
+            };
+            renderAccessRuleRow(entityId, entity.name, defaultPermissions);
         }
     });
 
@@ -100,23 +93,13 @@ App.initializeAccessTab = async function () {
     confirmDeleteRuleBtn.addEventListener('click', async () => {
         if (!ruleToDelete) return;
 
-        const {entityId, rowElement, entityName} = ruleToDelete;
+        const {entityId, rowElement} = ruleToDelete;
         App.showLoader();
         try {
-            // ИЗМЕНЕНО: Структура тела запроса теперь полностью повторяет структуру сохранения
             const res = await fetch(`?action=access_rights`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    entity_id: entityId,
-                    entity_name: entityName,
-                    sub_action: 'delete', // Сигнал для бэкенда на удаление
-                    permissions: { // Добавляем пустой объект permissions, чтобы соответствовать структуре
-                        can_access_app: false,
-                        tabs: {cashbox: false, statistics: false, access: false},
-                        actions: {can_save: false, can_delete: false}
-                    }
-                })
+                body: JSON.stringify({ entity_id: entityId, sub_action: 'delete' })
             });
 
             if (!res.ok) throw new Error('Server responded with an error during deletion');
@@ -148,6 +131,15 @@ App.initializeAccessTab = async function () {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
+        // --- Обработка для совместимости со старой структурой ---
+        const perms = permissions.tabs ? permissions : {
+            tabs: {
+                cashbox: { view: permissions.tabs.cashbox, save: permissions.actions.can_save, delete: permissions.actions.can_delete },
+                statistics: { view: permissions.tabs.statistics },
+                access: { view: permissions.tabs.access, save: permissions.actions.can_save, delete: permissions.actions.can_delete }
+            }
+        };
+
         const nameCell = row.insertCell();
         nameCell.textContent = entityName;
 
@@ -155,12 +147,22 @@ App.initializeAccessTab = async function () {
         permsCell.className = 'access-grid-cell';
         permsCell.innerHTML = `
             <div class="access-grid">
-                <label><input type="checkbox" data-perm="can_access_app" ${permissions.can_access_app ? 'checked' : ''}> Доступ к приложению</label>
-                <label><input type="checkbox" data-perm="tabs.cashbox" ${permissions.tabs.cashbox ? 'checked' : ''}> Вкладка "Касса"</label>
-                <label><input type="checkbox" data-perm="tabs.statistics" ${permissions.tabs.statistics ? 'checked' : ''}> Вкладка "Статистика"</label>
-                <label><input type="checkbox" data-perm="tabs.access" ${permissions.tabs.access ? 'checked' : ''}> Вкладка "Доступы"</label>
-                <label><input type="checkbox" data-perm="actions.can_save" ${permissions.actions.can_save ? 'checked' : ''}> Право на сохр./ред.</label>
-                <label><input type="checkbox" data-perm="actions.can_delete" ${permissions.actions.can_delete ? 'checked' : ''}> Право на удаление</label>
+                <div class="access-group">
+                    <strong>Касса:</strong>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.view" ${perms.tabs.cashbox?.view ? 'checked' : ''}> Просмотр</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.save" ${perms.tabs.cashbox?.save ? 'checked' : ''}> Сохранение</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.delete" ${perms.tabs.cashbox?.delete ? 'checked' : ''}> Удаление</label>
+                </div>
+                <div class="access-group">
+                    <strong>Доступы:</strong>
+                    <label><input type="checkbox" data-perm="tabs.access.view" ${perms.tabs.access?.view ? 'checked' : ''}> Просмотр</label>
+                    <label><input type="checkbox" data-perm="tabs.access.save" ${perms.tabs.access?.save ? 'checked' : ''}> Сохранение</label>
+                    <label><input type="checkbox" data-perm="tabs.access.delete" ${perms.tabs.access?.delete ? 'checked' : ''}> Удаление</label>
+                </div>
+                <div class="access-group">
+                    <strong>Статистика:</strong>
+                    <label><input type="checkbox" data-perm="tabs.statistics.view" ${perms.tabs.statistics?.view ? 'checked' : ''}> Просмотр</label>
+                </div>
             </div>
         `;
 
@@ -177,26 +179,45 @@ App.initializeAccessTab = async function () {
         deleteBtn.textContent = 'Удалить';
         actionCell.appendChild(deleteBtn);
 
-        if (App.userPermissions && !App.userPermissions.actions.can_save) {
+        // Блокировка кнопок на основе прав текущего пользователя
+        if (!App.userPermissions.tabs.access.save) {
             saveBtn.disabled = true;
-            saveBtn.style.cursor = 'not-allowed';
         }
-        if (App.userPermissions && !App.userPermissions.actions.can_delete) {
+        if (!App.userPermissions.tabs.access.delete) {
             deleteBtn.disabled = true;
-            deleteBtn.style.cursor = 'not-allowed';
         }
+
+        // Логика для отключения чекбоксов действий, если нет права на просмотр
+        const cashboxView = row.querySelector('[data-perm="tabs.cashbox.view"]');
+        const accessView = row.querySelector('[data-perm="tabs.access.view"]');
+        
+        const updateDisabledState = () => {
+            row.querySelector('[data-perm="tabs.cashbox.save"]').disabled = !cashboxView.checked;
+            row.querySelector('[data-perm="tabs.cashbox.delete"]').disabled = !cashboxView.checked;
+            row.querySelector('[data-perm="tabs.access.save"]').disabled = !accessView.checked;
+            row.querySelector('[data-perm="tabs.access.delete"]').disabled = !accessView.checked;
+        };
+        
+        cashboxView.addEventListener('change', updateDisabledState);
+        accessView.addEventListener('change', updateDisabledState);
+        updateDisabledState(); // Первоначальная установка
 
         saveBtn.addEventListener('click', async () => {
             const newPermissions = {
-                can_access_app: row.querySelector('[data-perm="can_access_app"]').checked,
                 tabs: {
-                    cashbox: row.querySelector('[data-perm="tabs.cashbox"]').checked,
-                    statistics: row.querySelector('[data-perm="tabs.statistics"]').checked,
-                    access: row.querySelector('[data-perm="tabs.access"]').checked,
-                },
-                actions: {
-                    can_save: row.querySelector('[data-perm="actions.can_save"]').checked,
-                    can_delete: row.querySelector('[data-perm="actions.can_delete"]').checked,
+                    cashbox: {
+                        view: row.querySelector('[data-perm="tabs.cashbox.view"]').checked,
+                        save: row.querySelector('[data-perm="tabs.cashbox.save"]').checked,
+                        delete: row.querySelector('[data-perm="tabs.cashbox.delete"]').checked,
+                    },
+                    statistics: {
+                        view: row.querySelector('[data-perm="tabs.statistics.view"]').checked,
+                    },
+                    access: {
+                        view: row.querySelector('[data-perm="tabs.access.view"]').checked,
+                        save: row.querySelector('[data-perm="tabs.access.save"]').checked,
+                        delete: row.querySelector('[data-perm="tabs.access.delete"]').checked,
+                    }
                 }
             };
 

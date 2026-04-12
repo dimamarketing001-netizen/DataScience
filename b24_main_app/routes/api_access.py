@@ -11,6 +11,8 @@ def get_my_permissions():
     """
     Определяет и возвращает права доступа для текущего пользователя,
     основываясь на его ID и ID отдела.
+    Складывает права из нескольких правил (например, личные и по отделу).
+    Обеспечивает обратную совместимость со старой структурой прав.
     """
     try:
         user_id = request.args.get('user_id')
@@ -27,11 +29,15 @@ def get_my_permissions():
         cursor = conn.cursor(dictionary=True)
 
         try:
+            # Новая структура прав по умолчанию
             final_permissions = {
-                "can_access_app": False,
-                "tabs": {"cashbox": False, "statistics": False, "access": False},
-                "actions": {"can_save": False, "can_delete": False}
+                "tabs": {
+                    "cashbox": {"view": False, "save": False, "delete": False},
+                    "statistics": {"view": False},
+                    "access": {"view": False, "save": False, "delete": False}
+                }
             }
+            
             entities_to_check = [f"user_{user_id}"]
             if department_id:
                 entities_to_check.append(f"department_{department_id}")
@@ -40,17 +46,39 @@ def get_my_permissions():
             query = f"SELECT permissions FROM access_rights WHERE entity_id IN ({query_placeholders})"
             cursor.execute(query, tuple(entities_to_check))
             
-            for row in cursor.fetchall():
-                perms = json.loads(row['permissions']) if isinstance(row['permissions'], str) else row['permissions']
-                if perms.get('can_access_app'):
-                    final_permissions['can_access_app'] = True
-                for tab, access in perms.get('tabs', {}).items():
-                    if access:
-                        final_permissions['tabs'][tab] = True
-                for action, access in perms.get('actions', {}).items():
-                    if access:
-                        final_permissions['actions'][action] = True
-            
+            all_perms = [json.loads(row['permissions']) if isinstance(row['permissions'], str) else row['permissions'] for row in cursor.fetchall()]
+
+            for perms in all_perms:
+                # --- Обработка старой структуры для обратной совместимости ---
+                if 'can_access_app' in perms:
+                    # Если есть глобальный доступ, даем доступ ко всем вкладкам, которые были в старой структуре
+                    if perms.get('can_access_app'):
+                        for tab_name, has_access in perms.get('tabs', {}).items():
+                            if has_access and tab_name in final_permissions['tabs']:
+                                final_permissions['tabs'][tab_name]['view'] = True
+                    
+                    # Применяем старые глобальные права на новые детальные
+                    old_actions = perms.get('actions', {})
+                    if old_actions.get('can_save'):
+                        if final_permissions['tabs']['cashbox']['view']:
+                            final_permissions['tabs']['cashbox']['save'] = True
+                        if final_permissions['tabs']['access']['view']:
+                            final_permissions['tabs']['access']['save'] = True
+                    if old_actions.get('can_delete'):
+                        if final_permissions['tabs']['cashbox']['view']:
+                            final_permissions['tabs']['cashbox']['delete'] = True
+                        if final_permissions['tabs']['access']['view']:
+                            final_permissions['tabs']['access']['delete'] = True
+                
+                # --- Обработка новой структуры ---
+                else:
+                    for tab_name, tab_perms in perms.get('tabs', {}).items():
+                        if tab_name in final_permissions['tabs']:
+                            current_tab = final_permissions['tabs'][tab_name]
+                            for perm_key, has_access in tab_perms.items():
+                                if has_access:
+                                    current_tab[perm_key] = True
+
             return jsonify(final_permissions)
         finally:
             if conn and conn.is_connected():
@@ -97,6 +125,7 @@ def handle_access_rights():
             # Если не удаление, то это создание/обновление
             entity_type = 'user' if 'user_' in entity_id else 'department'
             query = "INSERT INTO access_rights (entity_id, entity_type, entity_name, permissions) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), entity_name = VALUES(entity_name)"
+            # Сохраняем уже новую структуру прав
             params = (entity_id, entity_type, data['entity_name'], json.dumps(data['permissions']))
             cursor.execute(query, params)
             conn.commit()

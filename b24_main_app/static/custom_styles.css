@@ -258,7 +258,7 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.4);
-    display: flex;
+    display: none; /* Управляется через JS */
     justify-content: center;
     align-items: center;
     z-index: 3000;
@@ -268,6 +268,7 @@ body {
 }
 
 .notification-overlay.show {
+    display: flex;
     opacity: 1;
     visibility: visible;
 }
@@ -332,7 +333,7 @@ body {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    display: flex;
+    display: none; /* Управляется через JS */
     justify-content: center;
     align-items: center;
     z-index: 1000;
@@ -454,12 +455,19 @@ body {
     margin: 0 5px;
     color: #0b66c3; /* Цвет иконок */
     font-size: 16px;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, opacity 0.2s ease;
 }
 
 .expenses-table .action-icon:hover {
     color: #0a58a6;
 }
+
+.action-icon-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed !important;
+}
+
 
 /* --- Стили для формы фильтров --- */
 .filter-form {
@@ -550,6 +558,13 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
+.ui-disabled-card {
+    pointer-events: none;
+    opacity: 0.6;
+    filter: grayscale(1);
+    cursor: not-allowed !important;
+}
+
 .menu-card-icon {
     font-size: 48px;
     color: #2fc6f6;
@@ -575,23 +590,6 @@ body {
     margin: 20px 0;
 }
 
-.ui-ctl-radio {
-    width: auto; /* Изменено: чтобы не растягивался на всю ширину */
-    margin-right: 20px;
-    cursor: pointer;
-}
-
-.ui-ctl-radio .ui-ctl-element {
-    transform: scale(1.3); /* Увеличиваем размер радио-кнопки */
-    margin-right: 5px; /* Добавляем отступ справа от радио-кнопки */
-}
-
-.ui-form-row > .ui-form-content {
-    display: flex;
-    flex-wrap: wrap; /* Добавлено для переноса на маленьких экранах */
-    gap: 10px; /* Добавлен отступ между элементами */
-}
-
 .access-rules-table {
     width: 100%;
     border-collapse: collapse;
@@ -604,7 +602,7 @@ body {
     text-align: left;
     font-size: 13px;
     color: #333;
-    vertical-align: middle;
+    vertical-align: top; /* Выравнивание по верху для лучшего вида групп */
 }
 
 .access-rules-table th {
@@ -618,20 +616,32 @@ body {
 }
 
 .access-grid-cell .access-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.access-grid-cell .access-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.access-grid-cell .access-group strong {
+    margin-bottom: 5px;
+    font-weight: 600;
 }
 
 .access-grid-cell label {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    font-weight: normal;
 }
 
 .access-grid-cell input[type="checkbox"] {
-    transform: scale(1.3); /* Увеличиваем размер чекбокса */
-    margin-right: 5px; /* Добавляем отступ справа от чекбокса */
+    transform: scale(1.2);
+    margin-right: 5px;
 }
 
 .access-rules-table .actions-column {
@@ -640,6 +650,7 @@ body {
     gap: 5px;
     justify-content: center;
     align-items: center;
+    vertical-align: middle;
 }
 
 .access-rules-table .actions-column .ui-btn {
@@ -654,7 +665,8 @@ body {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 2 колонки на средних экранах */
     }
     .access-grid-cell .access-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 

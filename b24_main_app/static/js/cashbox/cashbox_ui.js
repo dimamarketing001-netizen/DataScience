@@ -50,6 +50,10 @@ App.cashbox.ui = {
             expensesTableBody.innerHTML = `<tr><td colspan="12">Нет записей о расходах по заданным фильтрам.</td></tr>`;
             return;
         }
+        
+        const canSave = App.userPermissions.tabs.cashbox.save;
+        const canDelete = App.userPermissions.tabs.cashbox.delete;
+
         expenses.forEach(expense => {
             const row = expensesTableBody.insertRow();
             row.insertCell().textContent = expense.id;
@@ -60,23 +64,25 @@ App.cashbox.ui = {
             row.insertCell().textContent = expense.source_name || '—';
             row.insertCell().textContent = expense.contact_name || '—';
             row.insertCell().textContent = expense.comment || '—';
-            row.insertCell().textContent = expense.paid_leads !== null ? expense.paid_leads : '—'; // Добавлено
-            row.insertCell().textContent = expense.free_leads !== null ? expense.free_leads : '—'; // Добавлено
+            row.insertCell().textContent = expense.paid_leads !== null ? expense.paid_leads : '—';
+            row.insertCell().textContent = expense.free_leads !== null ? expense.free_leads : '—';
             row.insertCell().textContent = expense.added_by_user_name || 'Неизвестно';
             
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
-            if (App.userPermissions.actions.can_save) {
-                actionsCell.innerHTML += `<span class="action-icon edit-icon" data-id="${expense.id}" title="Редактировать">✏️</span>`;
-            }
-            if (App.userPermissions.actions.can_delete) {
-                actionsCell.innerHTML += `<span class="action-icon delete-icon" data-id="${expense.id}" title="Удалить">🗑️</span>`;
-            }
+
+            const editIconClass = canSave ? 'action-icon edit-icon' : 'action-icon edit-icon action-icon-disabled';
+            const deleteIconClass = canDelete ? 'action-icon delete-icon' : 'action-icon delete-icon action-icon-disabled';
+
+            actionsCell.innerHTML = `
+                <span class="${editIconClass}" data-id="${expense.id}" title="Редактировать">✏️</span>
+                <span class="${deleteIconClass}" data-id="${expense.id}" title="Удалить">🗑️</span>
+            `;
         });
 
         // Навешиваем обработчики на новые иконки
-        expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => icon.addEventListener('click', (e) => onEdit(e.target.dataset.id)));
-        expensesTableBody.querySelectorAll('.delete-icon').forEach(icon => icon.addEventListener('click', (e) => onDelete(e.target.dataset.id)));
+        expensesTableBody.querySelectorAll('.edit-icon:not(.action-icon-disabled)').forEach(icon => icon.addEventListener('click', (e) => onEdit(e.target.dataset.id)));
+        expensesTableBody.querySelectorAll('.delete-icon:not(.action-icon-disabled)').forEach(icon => icon.addEventListener('click', (e) => onDelete(e.target.dataset.id)));
     },
 
     updatePaginationControls: function(totalRecords, limit, offset) {
@@ -161,7 +167,6 @@ App.cashbox.ui = {
         editExpenseForm.reset();
 
         document.getElementById('edit-expense-id').value = expense.id;
-        // Поле "Название" удалено, поэтому не заполняем
         document.getElementById('edit-expense-amount').value = expense.amount;
         document.getElementById('edit-expense-comment').value = expense.comment;
         
@@ -202,7 +207,6 @@ App.cashbox.ui = {
             if (editExpenseContractor) editExpenseContractor.value = '';
             if (editExpenseClientSearch) editExpenseClientSearch.value = '';
             if (editSelectedClientId) editSelectedClientId.value = '';
-            // Сбрасываем новые поля лидов
             if (editExpensePaidLeads) editExpensePaidLeads.value = '';
             if (editExpenseFreeLeads) editExpenseFreeLeads.value = '';
         };
@@ -213,9 +217,7 @@ App.cashbox.ui = {
     closeEditModal: function() {
         this.elements.editExpenseModal.style.display = 'none';
         this.elements.editExpenseForm.reset();
-        // Скрываем все динамические поля при закрытии модального окна
         this.toggleDynamicFields('', 'edit');
-        // Сбрасываем новые поля лидов при закрытии
         if (this.elements.editExpensePaidLeads) this.elements.editExpensePaidLeads.value = '';
         if (this.elements.editExpenseFreeLeads) this.elements.editExpenseFreeLeads.value = '';
     },
