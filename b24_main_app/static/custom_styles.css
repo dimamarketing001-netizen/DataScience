@@ -11,7 +11,7 @@ body {
 }
 
 .workarea-content-paddings {
-    max-width: 900px;
+    max-width: 1200px; /* Увеличена максимальная ширина */
     margin: 0 auto;
     /* background-color: #fff; */ /* Перенесено в ui-card */
     /* padding: 20px; */ /* Перенесено в ui-card */
