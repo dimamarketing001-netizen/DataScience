@@ -631,6 +631,19 @@ body {
     margin-right: 5px; /* Добавляем отступ справа от чекбокса */
 }
 
+.access-rules-table .actions-column {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+    align-items: center;
+}
+
+.access-rules-table .actions-column .ui-btn {
+    width: 100%; /* Растягиваем кнопки на всю ширину ячейки */
+    box-sizing: border-box; /* Учитываем padding и border в ширине */
+}
+
 
 /* --- Адаптивность --- */
 @media (max-width: 768px) {
