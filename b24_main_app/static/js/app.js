@@ -32,14 +32,11 @@ BX24.ready(() => {
     const notificationTitle = document.getElementById('notification-title');
     const notificationText = document.getElementById('notification-text');
     const notificationButtons = document.getElementById('notification-buttons');
-    const notificationOkBtn = document.getElementById('notification-ok-btn');
-
+    
     // Элементы для кастомного подтверждения
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmationModalTitle = document.getElementById('confirmation-modal-title');
     const confirmationModalText = document.getElementById('confirmation-modal-text');
-    const confirmActionBtn = document.getElementById('confirm-action-btn');
-    const cancelActionBtn = document.getElementById('cancel-action-btn');
 
     // --- СИСТЕМА УВЕДОМЛЕНИЙ ---
     App.Notify.success = (message) => {
@@ -65,7 +62,8 @@ BX24.ready(() => {
 
             notificationOverlay.classList.add('show');
 
-            // Пересоздаем кнопку, чтобы избежать накопления обработчиков
+            // Получаем свежую ссылку на кнопку и пересоздаем ее
+            let notificationOkBtn = document.getElementById('notification-ok-btn');
             const newOkBtn = notificationOkBtn.cloneNode(true);
             notificationOkBtn.parentNode.replaceChild(newOkBtn, notificationOkBtn);
             
@@ -113,8 +111,13 @@ BX24.ready(() => {
             }
             confirmationModalText.innerHTML = contentHtml;
 
+            // Получаем свежие ссылки на кнопки каждый раз при вызове функции
+            let confirmActionBtn = document.getElementById('confirm-action-btn');
+            let cancelActionBtn = document.getElementById('cancel-action-btn');
+
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
+
             confirmationModal.style.display = 'flex';
             
             // Важно клонировать кнопки, чтобы избежать накопления обработчиков
