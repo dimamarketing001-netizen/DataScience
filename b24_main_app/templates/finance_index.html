@@ -11,26 +11,14 @@
 <body>
     <div id="loader-overlay" class="loader-overlay"><div class="loader"></div></div>
 
-    <!-- Модальное окно для УСПЕХА -->
-    <div id="success-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-icon success-icon"></div>
-            </div>
-            <div class="modal-text" id="success-modal-text"></div>
-        </div>
-    </div>
-
-    <!-- Модальное окно для ОШИБОК -->
-    <div id="error-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-icon error-icon"></div>
-                <div class="ui-form-title-text" id="error-modal-title">Ошибка</div>
-            </div>
-            <div class="modal-text" id="error-modal-text"></div>
-            <div class="modal-buttons">
-                <button id="error-modal-ok-btn" class="ui-btn ui-btn-primary">ОК</button>
+    <!-- Универсальный контейнер для уведомлений App.Notify -->
+    <div id="notification-overlay" class="notification-overlay" style="display: none;">
+        <div class="notification-popup">
+            <div id="notification-icon" class="notification-popup-icon"></div>
+            <div id="notification-title" class="notification-popup-title"></div>
+            <div id="notification-text" class="notification-popup-text"></div>
+            <div id="notification-buttons" class="notification-popup-buttons">
+                <button id="notification-ok-btn" class="ui-btn ui-btn-primary">ОК</button>
             </div>
         </div>
     </div>

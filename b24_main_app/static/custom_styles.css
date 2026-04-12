@@ -3,7 +3,7 @@
  */
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #f5f7f8;
     margin: 0;
     padding: 20px;
@@ -13,10 +13,6 @@ body {
 .workarea-content-paddings {
     max-width: 1200px; /* Увеличена максимальная ширина */
     margin: 0 auto;
-    /* background-color: #fff; */ /* Перенесено в ui-card */
-    /* padding: 20px; */ /* Перенесено в ui-card */
-    /* border-radius: 12px; */ /* Перенесено в ui-card */
-    /* box-shadow: 0 2px 8px rgba(0,0,0,0.05); */ /* Перенесено в ui-card */
 }
 
 .ui-form-title-text {
@@ -249,21 +245,26 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* --- Custom Notification Overlay --- */
+/*
+ * ===================================================================
+ *  Новая система уведомлений App.Notify
+ * ===================================================================
+ */
+
 .notification-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(0, 0, 0, 0.4);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 2000;
+    z-index: 3000;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .notification-overlay.show {
@@ -271,48 +272,57 @@ body {
     visibility: visible;
 }
 
-.notification-content {
+.notification-popup {
+    font-family: "Open Sans", sans-serif;
     background-color: #fff;
-    padding: 30px;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    transform: translateY(20px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    padding: 30px;
+    width: 320px;
+    max-width: 90%;
+    text-align: center;
+    transform: scale(0.9);
     opacity: 0;
-    transition: transform 0.3s ease, opacity 0.3s ease;
+    transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-.notification-overlay.show .notification-content {
-    transform: translateY(0);
+.notification-overlay.show .notification-popup {
+    transform: scale(1);
     opacity: 1;
 }
 
-.notification-icon {
-    width: 60px;
-    height: 60px;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
+.notification-popup-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px auto;
 }
 
-.notification-icon.success {
-    background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"%3e%3cpath d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM16.7071 9.70711C17.0976 9.31658 17.0976 8.68342 16.7071 8.29289C16.3166 7.90237 15.6834 7.90237 15.2929 8.29289L10.0001 13.5858L8.29295 11.8787C7.90242 11.4882 7.26926 11.4882 6.87874 11.8787C6.48821 12.2692 6.48821 12.9024 6.87874 13.2929L9.29295 15.7071C9.68347 16.0976 10.3166 16.0976 10.7071 15.7071L16.7071 9.70711Z" fill="%2318A058"/%3e%3c/svg%3e');
+.notification-popup-icon.success-icon {
+    background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"%3e%3ccircle cx="12" cy="12" r="10" fill="%234CAF50"/%3e%3cpath d="M9 12.5L11 14.5L15 10.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/%3e%3c/svg%3e');
 }
 
-.notification-icon.error {
-    background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"%3e%3cpath d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM12 7C12.5523 7 13 7.44772 13 8V13C13 13.5523 12.5523 14 12 14C11.4477 14 11 13.5523 11 13V8C11 7.44772 11.4477 7 12 7ZM12 15C11.4477 15 11 15.4477 11 16C11 16.5523 11.4477 17 12 17C12.5523 17 13 16.5523 13 16C13 15.4477 12.5523 15 12 15Z" fill="%23E04832"/%3e%3c/svg%3e');
+.notification-popup-icon.error-icon {
+    background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"%3e%3ccircle cx="12" cy="12" r="10" fill="%23F44336"/%3e%3cpath d="M15 9L9 15M9 9L15 15" stroke="white" stroke-width="2" stroke-linecap="round"/%3e%3c/svg%3e');
 }
 
-.notification-message {
+.notification-popup-title {
     font-size: 18px;
     font-weight: 600;
     color: #333;
-    text-align: center;
+    margin-bottom: 8px;
 }
 
+.notification-popup-text {
+    font-size: 16px;
+    color: #535c69;
+    line-height: 1.5;
+    margin-bottom: 25px;
+}
+
+.notification-popup-buttons {
+    display: flex;
+    justify-content: center;
+}
 
 /* --- Стили для модальных окон (перенесены из index.html) --- */
 .modal-overlay {
@@ -453,15 +463,8 @@ body {
 
 /* --- Стили для формы фильтров --- */
 .filter-form {
-    /* display: flex; */ /* Удаляем flex, т.к. используем grid внутри */
-    /* flex-wrap: wrap; */
     gap: 15px;
     margin-bottom: 20px;
-    /* padding: 20px; */ /* Перенесено в ui-card */
-    /* border: 1px solid #eef2f4; */ /* Перенесено в ui-card */
-    /* border-radius: 8px; */ /* Перенесено в ui-card */
-    /* background-color: #f8f9fa; */ /* Перенесено в ui-card */
-    /* box-shadow: 0 1px 3px rgba(0,0,0,0.03); */ /* Перенесено в ui-card */
 }
 
 .filter-grid {

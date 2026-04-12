@@ -26,13 +26,13 @@ BX24.ready(() => {
     const menuCards = document.querySelectorAll('.menu-card');
     const backButtons = document.querySelectorAll('.back-button');
     
-    // Элементы для кастомных уведомлений
-    const successModal = document.getElementById('success-modal');
-    const successModalText = document.getElementById('success-modal-text');
-    const errorModal = document.getElementById('error-modal');
-    const errorModalTitle = document.getElementById('error-modal-title');
-    const errorModalText = document.getElementById('error-modal-text');
-    const errorModalOkBtn = document.getElementById('error-modal-ok-btn');
+    // --- Элементы системы уведомлений ---
+    const notificationOverlay = document.getElementById('notification-overlay');
+    const notificationIcon = document.getElementById('notification-icon');
+    const notificationTitle = document.getElementById('notification-title');
+    const notificationText = document.getElementById('notification-text');
+    const notificationButtons = document.getElementById('notification-buttons');
+    const notificationOkBtn = document.getElementById('notification-ok-btn');
 
     // Элементы для кастомного подтверждения
     const confirmationModal = document.getElementById('confirmation-modal');
@@ -43,26 +43,34 @@ BX24.ready(() => {
 
     // --- СИСТЕМА УВЕДОМЛЕНИЙ ---
     App.Notify.success = (message) => {
-        successModalText.innerHTML = message;
-        successModal.style.display = 'flex';
+        notificationIcon.className = 'notification-popup-icon success-icon';
+        notificationTitle.style.display = 'none'; // No title for success
+        notificationText.innerHTML = message;
+        notificationButtons.style.display = 'none'; // No buttons for success
+
+        notificationOverlay.classList.add('show');
 
         setTimeout(() => {
-            successModal.style.display = 'none';
-        }, 3000);
+            notificationOverlay.classList.remove('show');
+        }, 1000); // Исчезает через 1 секунду
     };
 
     App.Notify.error = (title, message) => {
         return new Promise(resolve => {
-            errorModalTitle.textContent = title;
-            errorModalText.innerHTML = message; // Используем innerHTML для поддержки HTML в сообщении
-            errorModal.style.display = 'flex';
+            notificationIcon.className = 'notification-popup-icon error-icon';
+            notificationTitle.style.display = 'block';
+            notificationTitle.textContent = title;
+            notificationText.innerHTML = message;
+            notificationButtons.style.display = 'flex';
 
-            // Удаляем предыдущий обработчик, чтобы избежать многократного вызова
-            const newOkBtn = errorModalOkBtn.cloneNode(true);
-            errorModalOkBtn.parentNode.replaceChild(newOkBtn, errorModalOkBtn);
+            notificationOverlay.classList.add('show');
+
+            // Пересоздаем кнопку, чтобы избежать накопления обработчиков
+            const newOkBtn = notificationOkBtn.cloneNode(true);
+            notificationOkBtn.parentNode.replaceChild(newOkBtn, notificationOkBtn);
             
             newOkBtn.onclick = () => {
-                errorModal.style.display = 'none';
+                notificationOverlay.classList.remove('show');
                 resolve();
             };
         });
