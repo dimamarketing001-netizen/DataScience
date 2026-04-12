@@ -80,7 +80,12 @@
 
             // Формируем фильтр для поиска по имени, фамилии, телефону и email
             const filter = {
-                "SEARCH": query // Используем поле SEARCH для общего поиска по всем ключевым полям
+                "LOGIC": "OR", // Ищем по любому из полей
+                "NAME": `*${query}*`,
+                "LAST_NAME": `*${query}*`,
+                "SECOND_NAME": `*${query}*`, // Добавляем отчество для полноты поиска
+                "PHONE": `*${query}*`,
+                "EMAIL": `*${query}*`
             };
 
             console.log(`[ClientSearchHandler] Performing search for query: "${query}", page: ${page}`);
