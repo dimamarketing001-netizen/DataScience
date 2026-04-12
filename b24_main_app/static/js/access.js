@@ -104,20 +104,20 @@ App.initializeAccessTab = async function() {
         App.showLoader();
         try {
             const res = await fetch(`?action=access_rights`, {
-                method: 'POST', // ИЗМЕНЕНО: с DELETE на POST
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     entity_id: entityId,
-                    sub_action: 'delete' // ДОБАВЛЕНО: параметр для бэкенда
+                    sub_action: 'delete'
                 })
             });
 
             if (!res.ok) throw new Error('Server responded with an error during deletion');
             
             rowElement.remove();
-            App.showNotification('Правило удалено.', 'success');
+            alert('Правило удалено.'); // ИЗМЕНЕНО: Заменено на alert
         } catch (e) {
-            App.showNotification('Ошибка удаления правила.', 'error');
+            alert('Ошибка удаления правила.'); // ИЗМЕНЕНО: Заменено на alert
             console.error(e);
         } finally {
             App.hideLoader();
@@ -205,9 +205,9 @@ App.initializeAccessTab = async function() {
                     })
                 });
                 if (!res.ok) throw new Error('Server responded with an error');
-                App.showNotification('Права сохранены!', 'success');
+                alert('Права сохранены!');
             } catch (e) {
-                App.showNotification('Ошибка сохранения прав.', 'error');
+                alert('Ошибка сохранения прав.');
                 console.error(e);
             } finally {
                 App.hideLoader();
