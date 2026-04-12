@@ -200,7 +200,8 @@ App.initializeCashbox = async function() {
         App.showLoader();
         try {
             const expense = await App.cashbox.api.getSingleExpense(expenseId);
-            App.cashbox.ui.openEditModal(expense);
+            // Передаем доступных сотрудников и подрядчиков в openEditModal UI-модуля
+            App.cashbox.ui.openEditModal(expense, availableEmployees, availableContractors);
         } catch (error) {
             showCustomNotification(`Ошибка загрузки данных для редактирования: ${error.message}`, 'error');
         } finally {
@@ -210,15 +211,34 @@ App.initializeCashbox = async function() {
 
     async function handleUpdateExpense(event) {
         event.preventDefault();
+
+        const editExpenseCategory = document.getElementById('edit-expense-category');
+        const selectedCategory = editExpenseCategory.value;
+
         const formData = {
             id: document.getElementById('edit-expense-id').value,
-            name: document.getElementById('edit-expense-name').value,
             date: document.getElementById('edit-expense-date').value,
             amount: parseFloat(document.getElementById('edit-expense-amount').value),
-            category_text: document.getElementById('edit-expense-category').options[document.getElementById('edit-expense-category').selectedIndex].text,
-            category_val: document.getElementById('edit-expense-category').value,
+            category_text: editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
+            category_val: selectedCategory,
             comment: document.getElementById('edit-expense-comment').value,
+            name: '', // Поле "Название" удалено
+            employee_id: '',
+            source_id: '',
+            contact_id: '',
+            payment_type: '',
         };
+
+        // Заполняем динамические поля в зависимости от категории
+        if (selectedCategory === 'employees') {
+            formData.employee_id = document.getElementById('edit-expense-employee').value;
+            formData.payment_type = document.getElementById('edit-expense-payment-type').value;
+        } else if (selectedCategory === 'marketing') {
+            formData.source_id = document.getElementById('edit-expense-contractor').value;
+        } else if (selectedCategory === 'clients') {
+            formData.contact_id = document.getElementById('edit-selected-client-id').value;
+        }
+
         App.showLoader();
         try {
             await App.cashbox.api.updateExpense(formData);
