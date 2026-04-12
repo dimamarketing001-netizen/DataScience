@@ -80,11 +80,7 @@
 
             // Формируем фильтр для поиска по имени, фамилии, телефону и email
             const filter = {
-                "LOGIC": "OR", // Ищем по любому из полей
-                "NAME": `%${query}%`,
-                "LAST_NAME": `%${query}%`,
-                "PHONE": `%${query}%`, // Bitrix24 API позволяет искать по значениям PHONE/EMAIL напрямую
-                "EMAIL": `%${query}%`
+                "NAME": `%${query}%` // Ищем только по имени
             };
 
             console.log(`[ClientSearchHandler] Performing search for query: "${query}", page: ${page}`);
@@ -275,15 +271,5 @@ BX24.ready(function() {
         pageInfoSpan: document.getElementById('edit-client-page-info'),
         prevPageBtn: document.getElementById('edit-prev-client-page-btn'),
         nextPageBtn: document.getElementById('edit-next-client-page-btn')
-    });
-});
-
-BX24.ready(function() {
-    BX24.callMethod('crm.contact.get', { id: 1240 }, function(result) { // Замените 123 на реальный ID контакта
-        if (result.error()) {
-            console.error(result.error());
-        } else {
-            console.log(result.data());
-        }
     });
 });
