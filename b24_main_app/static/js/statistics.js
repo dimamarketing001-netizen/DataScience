@@ -15,13 +15,11 @@ App.initializeStatistics = async function () {
     async function initialize() {
         App.showLoader();
         try {
-            // Инициализация Flatpickr с правильными датами
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: firstDayOfMonth });
             flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: today });
 
-            // Загрузка источников для фильтра
             const sources = await getLeadSources();
             App.populateSelect(sourceFilterSelect, sources, "Все источники");
 
@@ -55,21 +53,15 @@ App.initializeStatistics = async function () {
     // --- Загрузка данных ---
     async function loadStatistics() {
         App.showLoader();
-        const params = new URLSearchParams({
+        const params = {
             date_from: startDateInput.value,
             date_to: endDateInput.value,
             source_id: sourceFilterSelect.value
-        });
+        };
 
         try {
-            const response = await fetch(`/?action=get_statistics&${params.toString()}`);
-            if (!response.ok) {
-                throw new Error(`Ошибка сети: ${response.statusText}`);
-            }
-            const data = await response.json();
-            if (data.error) {
-                throw new Error(data.error);
-            }
+            // Используем новый API-модуль
+            const data = await App.statistics.api.getStatistics(params);
             renderTableBody(data);
         } catch (error) {
             console.error("Failed to load statistics:", error);
