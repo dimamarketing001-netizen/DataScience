@@ -486,6 +486,16 @@ body {
     color: #0a58a6;
 }
 
+.summary-row {
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
+
+.summary-row td {
+    border-top: 2px solid #c6cdd3;
+}
+
+
 /* --- Стили для формы фильтров --- */
 .filter-form {
     gap: 15px;

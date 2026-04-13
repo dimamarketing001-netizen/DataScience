@@ -1,40 +1,24 @@
 from flask import request, jsonify, current_app
 from core.b24 import b24_call_method
+from functools import reduce
 
 # Статусы лидов, соответствующие каждой группе
 LEAD_STATUS_GROUPS = {
     # Группа "Дозвон"
-    # Включает все лиды, которые прошли первичную стадию и находятся в работе или дальше
     "answered": [
-        "UC_JX4Z7B",  # для возврата (промежуточный)
-        "UC_XBXVYQ",  # Обзвон
-        "UC_VUPL02",  # Охлаждение (обзвон)
-        "UC_3VLL3Y",  # Назначен звонок
-        "UC_MD85GI",  # Не Дожал
-        "UC_O5Z3U3",  # Не пришел на ВСТР
-        "UC_TG2I2A",  # Назначена Встреча
-        "UC_DK6IWL",  # Пришел на встречу
-        "UC_YL1CVZ",  # Думает после встречи
-        "CONVERTED"   # Завершить обработку лида (Успех)
+        "UC_JX4Z7B", "UC_XBXVYQ", "UC_VUPL02", "UC_3VLL3Y", "UC_MD85GI", 
+        "UC_O5Z3U3", "UC_TG2I2A", "UC_DK6IWL", "UC_YL1CVZ", "CONVERTED"
     ],
     # Группа "Назначена встреча"
     "meeting_scheduled": [
-        "UC_O5Z3U3",  # Не пришел на ВСТР
-        "UC_TG2I2A",  # Назначена Встреча
-        "UC_DK6IWL",  # Пришел на встречу
-        "UC_YL1CVZ",  # Думает после встречи
-        "CONVERTED"   # Завершить обработку лида (Успех)
+        "UC_O5Z3U3", "UC_TG2I2A", "UC_DK6IWL", "UC_YL1CVZ", "CONVERTED"
     ],
     # Группа "Приход"
     "arrival": [
-        "UC_DK6IWL",  # Пришел на встречу
-        "UC_YL1CVZ",  # Думает после встречи
-        "CONVERTED"   # Завершить обработку лида (Успех)
+        "UC_DK6IWL", "UC_YL1CVZ", "CONVERTED"
     ],
     # Группа "Успех"
-    "success": [
-        "CONVERTED"   # Завершить обработку лида (Успех)
-    ]
+    "success": ["CONVERTED"]
 }
 
 def fetch_all_leads_sync(filter_params):
@@ -66,7 +50,7 @@ def fetch_all_leads_sync(filter_params):
     return leads
 
 def get_statistics():
-    """Собирает, обрабатывает и возвращает статистику по лидам."""
+    """Собирает, обрабатывает и возвращает статистику по лидам, включая итоговую строку."""
     try:
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
@@ -95,6 +79,9 @@ def get_statistics():
             leads_by_source[sid].append(lead)
 
         statistics = []
+        total_counts = {group: 0 for group in LEAD_STATUS_GROUPS}
+        total_counts['total'] = 0
+
         for sid, leads in leads_by_source.items():
             source_name = source_map.get(sid, f"Неизвестный ({sid})")
             
@@ -107,6 +94,10 @@ def get_statistics():
                     if status_id in statuses:
                         counts[group] += 1
             
+            # Суммируем в общие счетчики
+            for key in counts:
+                total_counts[key] += counts[key]
+
             stats_row = {
                 "source_name": source_name,
                 "total": counts['total'],
@@ -118,6 +109,18 @@ def get_statistics():
             statistics.append(stats_row)
         
         statistics.sort(key=lambda x: x['total'], reverse=True)
+
+        # Добавляем итоговую строку, если есть данные
+        if total_counts['total'] > 0:
+            summary_row = {
+                "source_name": "Итого",
+                "total": total_counts['total'],
+                "answered": calculate_conversion(total_counts['answered'], total_counts['total'], total_counts['total']),
+                "meeting_scheduled": calculate_conversion(total_counts['meeting_scheduled'], total_counts['answered'], total_counts['total']),
+                "arrival": calculate_conversion(total_counts['arrival'], total_counts['meeting_scheduled'], total_counts['total']),
+                "success": calculate_conversion(total_counts['success'], total_counts['arrival'], total_counts['total']),
+            }
+            statistics.append(summary_row)
 
         return jsonify(statistics)
 

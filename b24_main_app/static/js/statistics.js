@@ -60,7 +60,6 @@ App.initializeStatistics = async function () {
         };
 
         try {
-            // Используем новый API-модуль
             const data = await App.statistics.api.getStatistics(params);
             renderTableBody(data);
         } catch (error) {
@@ -95,6 +94,9 @@ App.initializeStatistics = async function () {
 
         data.forEach(row => {
             const tr = document.createElement('tr');
+            if (row.source_name === "Итого") {
+                tr.classList.add('summary-row');
+            }
             tr.innerHTML = `
                 <td>${row.source_name}</td>
                 <td>${row.total}</td>
