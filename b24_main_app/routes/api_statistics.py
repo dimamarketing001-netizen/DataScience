@@ -47,7 +47,6 @@ def get_statistics():
         deal_ids = [deal['ID'] for deal in deals]
         invoices = fetch_paginated_data('crm.invoice.list', {'filter': {'UF_DEAL_ID': deal_ids}, 'select': ['ID', 'UF_DEAL_ID', 'STATUS_ID', 'PRICE']}) if deal_ids else []
 
-        # --- Получение расходов из локальной БД ---
         expenses_by_source = defaultdict(float)
         conn = get_db_connection()
         if conn:
@@ -108,6 +107,8 @@ def get_statistics():
                 "deals_with_payment": len(data['deals_with_payment']),
                 "invoices_sum": data['invoices_sum'],
                 "expenses": data['expenses'],
+                "cpl": data['expenses'] / data['total'] if data['total'] > 0 else 0,
+                "cpo": data['expenses'] / len(data['deals_with_payment']) if len(data['deals_with_payment']) > 0 else 0,
                 "romi": calculate_romi(data['invoices_sum'], data['expenses'])
             })
 
@@ -137,6 +138,8 @@ def get_statistics():
                 "clients_with_payment": calculate_conversion(summary['clients_with_payment_count'], summary['clients'], summary['total']),
                 "deals": summary['deals'], "deals_with_payment": summary['deals_with_payment'],
                 "invoices_sum": summary['invoices_sum'], "expenses": summary['expenses'],
+                "cpl": summary['expenses'] / summary['total'] if summary['total'] > 0 else 0,
+                "cpo": summary['expenses'] / summary['deals_with_payment'] if summary['deals_with_payment'] > 0 else 0,
                 "romi": calculate_romi(summary['invoices_sum'], summary['expenses'])
             }
             final_statistics.append(summary_row)

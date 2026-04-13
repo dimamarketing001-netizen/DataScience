@@ -65,7 +65,7 @@ App.initializeStatistics = async function () {
         } catch (error) {
             console.error("Failed to load statistics:", error);
             await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
-            tableBody.innerHTML = `<tr><td colspan="13">Ошибка загрузки данных.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="15">Ошибка загрузки данных.</td></tr>`;
         } finally {
             App.hideLoader();
         }
@@ -75,19 +75,21 @@ App.initializeStatistics = async function () {
     function renderTableHead() {
         tableHead.innerHTML = `
             <tr>
-                <th>Источник</th>
-                <th>Лиды</th>
-                <th>Дозвон</th>
-                <th>Назначена встреча</th>
-                <th>Приход</th>
-                <th>Успех</th>
-                <th>Клиенты</th>
-                <th>Клиенты с оплатой</th>
-                <th>Сделки</th>
-                <th>Сделки с оплатой</th>
-                <th>Сумма счетов</th>
-                <th>Расходы</th>
-                <th>ROMI</th>
+                <th class="group-1">Источник</th>
+                <th class="group-2">Расходы</th>
+                <th class="group-2">Лиды</th>
+                <th class="group-2">CPL</th>
+                <th class="group-3">Дозвон</th>
+                <th class="group-3">Назначена встреча</th>
+                <th class="group-3">Приход</th>
+                <th class="group-3">Успех</th>
+                <th class="group-4">Клиенты</th>
+                <th class="group-4">Клиенты с оплатой</th>
+                <th class="group-4">Сделки</th>
+                <th class="group-4">Сделки с оплатой</th>
+                <th class="group-4">CPO</th>
+                <th class="group-5">Сумма счетов</th>
+                <th class="group-5">ROMI</th>
             </tr>
         `;
     }
@@ -95,7 +97,7 @@ App.initializeStatistics = async function () {
     function renderTableBody(data) {
         tableBody.innerHTML = '';
         if (!data || data.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="13">Нет данных за выбранный период.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="15">Нет данных за выбранный период.</td></tr>`;
             return;
         }
 
@@ -105,28 +107,30 @@ App.initializeStatistics = async function () {
                 tr.classList.add('summary-row');
             }
             tr.innerHTML = `
-                <td>${row.source_name}</td>
-                <td>${row.total}</td>
-                ${createCell(row.answered)}
-                ${createCell(row.meeting_scheduled)}
-                ${createCell(row.arrival)}
-                ${createCell(row.success)}
-                <td>${row.clients}</td>
-                ${createCell(row.clients_with_payment)}
-                <td>${row.deals}</td>
-                <td>${row.deals_with_payment}</td>
-                <td>${formatCurrency(row.invoices_sum)}</td>
-                <td>${formatCurrency(row.expenses)}</td>
-                <td>${row.romi.toFixed(2)}%</td>
+                <td class="group-1">${row.source_name}</td>
+                <td class="group-2">${formatCurrency(row.expenses)}</td>
+                <td class="group-2">${row.total}</td>
+                <td class="group-2">${formatCurrency(row.cpl)}</td>
+                ${createCell(row.answered, 'group-3')}
+                ${createCell(row.meeting_scheduled, 'group-3')}
+                ${createCell(row.arrival, 'group-3')}
+                ${createCell(row.success, 'group-3')}
+                <td class="group-4">${row.clients}</td>
+                ${createCell(row.clients_with_payment, 'group-4')}
+                <td class="group-4">${row.deals}</td>
+                <td class="group-4">${row.deals_with_payment}</td>
+                <td class="group-4">${formatCurrency(row.cpo)}</td>
+                <td class="group-5">${formatCurrency(row.invoices_sum)}</td>
+                <td class="group-5">${row.romi.toFixed(2)}%</td>
             `;
             tableBody.appendChild(tr);
         });
     }
 
-    function createCell(data) {
-        if (!data) return '<td>-</td>';
+    function createCell(data, groupClass) {
+        if (!data) return `<td class="${groupClass}">-</td>`;
         return `
-            <td>
+            <td class="${groupClass}">
                 ${data.count}
                 <span class="conversion-percent">(${data.conv_from_prev.toFixed(1)}% / ${data.conv_from_total.toFixed(1)}%)</span>
             </td>

@@ -11,7 +11,7 @@ body {
 }
 
 .workarea-content-paddings {
-    max-width: 1200px; /* Увеличена максимальная ширина */
+    max-width: 1600px; /* Увеличена максимальная ширина для новых столбцов */
     margin: 0 auto;
 }
 
@@ -442,7 +442,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     margin-top: 0;
-    min-width: 1000px;
+    min-width: 1400px; /* Увеличено для новых столбцов */
 }
 
 .expenses-table th, .expenses-table td {
@@ -452,6 +452,7 @@ body {
     font-size: 13px;
     color: #333;
     white-space: nowrap;
+    vertical-align: middle;
 }
 
 .expenses-table th {
@@ -499,7 +500,18 @@ body {
     color: #828b95;
     font-size: 12px;
     margin-left: 5px;
+    display: block; /* Для переноса на новую строку */
 }
+
+/* Стили для группировки столбцов */
+.expenses-table .group-1 { border-right: 2px solid #aed5ff; }
+.expenses-table .group-2 { background-color: #f0f8ff; }
+.expenses-table .group-2:last-of-type { border-right: 2px solid #aed5ff; }
+.expenses-table .group-3 { background-color: #f8f8f8; }
+.expenses-table .group-3:last-of-type { border-right: 2px solid #aed5ff; }
+.expenses-table .group-4 { background-color: #f0f8ff; }
+.expenses-table .group-4:last-of-type { border-right: 2px solid #aed5ff; }
+.expenses-table .group-5 { background-color: #f8f8f8; }
 
 
 /* --- Стили для формы фильтров --- */
