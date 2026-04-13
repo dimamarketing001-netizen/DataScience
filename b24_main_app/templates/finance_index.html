@@ -194,14 +194,41 @@
         <!-- ЭКРАН: СТАТИСТИКА -->
         <div id="statistics-screen" class="app-screen" data-tab="statistics">
             <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
-            <div class="ui-form-title"><div class="ui-form-title-text">Статистика по лидам</div></div>
-            <div class="filter-container">
-                <div class="filter-item"><input type="text" id="startDate" class="ui-ctl-element" placeholder="Начальная дата"></div>
-                <div class="filter-item"><input type="text" id="endDate" class="ui-ctl-element" placeholder="Конечная дата"></div>
-                <div class="filter-item"><select id="sourceFilter" class="ui-ctl-element"><option value="">Все источники</option></select></div>
-                <div class="filter-item"><button id="apply-filter-btn" class="ui-btn ui-btn-primary">Применить</button></div>
+            <div class="ui-card">
+                <div class="ui-form-title"><div class="ui-form-title-text">Статистика по лидам</div></div>
+                <form id="statistics-filter-form" class="ui-form filter-form">
+                    <div class="ui-form-row">
+                        <div class="ui-form-content">
+                            <div class="filter-grid">
+                                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
+                                    <input type="text" id="stats-start-date" class="ui-ctl-element" placeholder="Дата от...">
+                                </div>
+                                <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
+                                    <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
+                                </div>
+                                <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                                    <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                                    <select id="stats-source-filter" class="ui-ctl-element"><option value="">Все источники</option></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ui-form-row ui-form-row-bottom-buttons">
+                        <div class="ui-form-content">
+                            <button type="submit" class="ui-btn ui-btn-primary">Применить</button>
+                            <button type="button" id="stats-reset-btn" class="ui-btn ui-btn-light-border">Сбросить</button>
+                        </div>
+                    </div>
+                </form>
             </div>
-            <div id="dashboard-container" class="dashboard-container"></div>
+            <div class="ui-card">
+                <div class="expenses-table-container">
+                    <table class="expenses-table">
+                        <thead id="statistics-table-head"></thead>
+                        <tbody id="statistics-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- ЭКРАН: ДОСТУПЫ -->

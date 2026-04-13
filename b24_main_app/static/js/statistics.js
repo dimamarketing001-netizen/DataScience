@@ -1,112 +1,122 @@
 // Модуль для управления вкладкой "Статистика"
-App.initializeStatistics = async function() {
-    console.log("Initializing Statistics module...");
-
-    // --- Переменные модуля ---
-    let sortedStatuses = [];
+App.initializeStatistics = async function () {
+    console.log("Initializing Statistics Tab...");
 
     // --- Элементы UI ---
-    const dashboardContainer = document.getElementById('dashboard-container');
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    const sourceFilter = document.getElementById('sourceFilter');
-    const applyFilterBtn = document.getElementById('apply-filter-btn');
-
-    if (!dashboardContainer || !startDateInput || !endDateInput || !sourceFilter || !applyFilterBtn) {
-        console.error("Ошибка инициализации: один из элементов экрана статистики не найден.");
-        return;
-    }
+    const filterForm = document.getElementById('statistics-filter-form');
+    const startDateInput = document.getElementById('stats-start-date');
+    const endDateInput = document.getElementById('stats-end-date');
+    const sourceFilterSelect = document.getElementById('stats-source-filter');
+    const resetBtn = document.getElementById('stats-reset-btn');
+    const tableHead = document.getElementById('statistics-table-head');
+    const tableBody = document.getElementById('statistics-table-body');
 
     // --- Инициализация ---
-    flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-    flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", altInput: true, altFormat: "d.m.Y" });
-    applyFilterBtn.addEventListener('click', fetchLeadsAndRenderDashboard);
-    
-    await fetchInitialDataForStatistics();
-
-    // --- Функции модуля ---
-    async function fetchInitialDataForStatistics() {
+    async function initialize() {
         App.showLoader();
         try {
-            // Предполагается, что этот эндпоинт будет создан в api_statistics.py
-            const response = await fetch(`?action=initial_data_for_stats`); 
-            if (!response.ok) throw new Error('Failed to load initial data for statistics');
-            const data = await response.json();
+            // Инициализация Flatpickr
+            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: new Date().fp_月初() });
+            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
 
-            if (data.sources) {
-                sourceFilter.innerHTML = '<option value="">Все источники</option>';
-                data.sources.forEach(source => {
-                    const option = document.createElement('option');
-                    option.value = source.STATUS_ID;
-                    option.textContent = source.NAME;
-                    sourceFilter.appendChild(option);
-                });
-            }
-            if (data.statuses) {
-                sortedStatuses = data.statuses.sort((a, b) => parseInt(a.SORT) - parseInt(b.SORT));
-            }
-            await fetchLeadsAndRenderDashboard();
+            // Загрузка источников для фильтра
+            const sources = await App.api.getSources();
+            App.populateSelect(sourceFilterSelect, sources, "Все источники");
+
+            renderTableHead();
+            await loadStatistics();
         } catch (error) {
-            console.error("Error fetching initial data for statistics:", error);
-            dashboardContainer.innerHTML = `<p>Ошибка загрузки данных для статистики: ${error.message}</p>`;
+            console.error("Error initializing statistics tab:", error);
+            await App.Notify.error('Ошибка инициализации', `Не удалось загрузить начальные данные: ${error.message}`);
         } finally {
             App.hideLoader();
         }
     }
 
-    async function fetchLeadsAndRenderDashboard() {
+    // --- Загрузка данных ---
+    async function loadStatistics() {
         App.showLoader();
-        const queryParams = new URLSearchParams({
-            action: 'leads', // Предполагается, что этот эндпоинт будет создан в api_statistics.py
-            startDate: startDateInput.value,
-            endDate: endDateInput.value,
-            source: sourceFilter.value
+        const params = new URLSearchParams({
+            date_from: startDateInput.value,
+            date_to: endDateInput.value,
+            source_id: sourceFilterSelect.value
         });
 
         try {
-            const response = await fetch(`?${queryParams}`);
-            if (!response.ok) throw new Error('Failed to load leads');
-            const leads = await response.json();
-            renderDashboard(leads);
+            const response = await fetch(`/?action=get_statistics&${params.toString()}`);
+            if (!response.ok) {
+                throw new Error(`Ошибка сети: ${response.statusText}`);
+            }
+            const data = await response.json();
+            renderTableBody(data);
         } catch (error) {
-            console.error("Error fetching leads:", error);
-            dashboardContainer.innerHTML = `<p>Ошибка загрузки лидов: ${error.message}</p>`;
+            console.error("Failed to load statistics:", error);
+            await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
+            tableBody.innerHTML = `<tr><td colspan="5">Ошибка загрузки данных.</td></tr>`;
         } finally {
             App.hideLoader();
         }
     }
 
-    function renderDashboard(leads) {
-        dashboardContainer.innerHTML = '';
-        const totalLeads = leads.length;
-        if (totalLeads === 0) {
-            dashboardContainer.innerHTML = '<p>Лиды по заданным фильтрам не найдены.</p>';
+    // --- Рендеринг таблицы ---
+    function renderTableHead() {
+        tableHead.innerHTML = `
+            <tr>
+                <th>Источник</th>
+                <th>Лиды</th>
+                <th>Дозвон</th>
+                <th>Назначена встреча</th>
+                <th>Приход</th>
+                <th>Успех</th>
+            </tr>
+        `;
+    }
+
+    function renderTableBody(data) {
+        tableBody.innerHTML = '';
+        if (!data || data.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6">Нет данных за выбранный период.</td></tr>`;
             return;
         }
-        const statusCounts = leads.reduce((acc, lead) => {
-            acc[lead.STATUS_ID] = (acc[lead.STATUS_ID] || 0) + 1;
-            return acc;
-        }, {});
-        let previousStatusCount = totalLeads;
-        sortedStatuses.forEach(status => {
-            const count = statusCounts[status.STATUS_ID] || 0;
-            let conversionRate = 0;
-            if (previousStatusCount > 0 && previousStatusCount !== totalLeads) {
-                conversionRate = ((count / previousStatusCount) * 100).toFixed(1);
-            }
-            const card = document.createElement('div');
-            card.className = 'status-card';
-            if (previousStatusCount !== totalLeads) {
-                card.innerHTML += `<div class="conversion-arrow">↓ ${conversionRate}%</div>`;
-            }
-            card.innerHTML += `
-                <h3>${status.NAME}</h3>
-                <p>Количество лидов: <span class="count">${count}</span></p>
+
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${row.source_name}</td>
+                <td>${row.total}</td>
+                ${createCell(row.answered)}
+                ${createCell(row.meeting_scheduled)}
+                ${createCell(row.arrival)}
+                ${createCell(row.success)}
             `;
-            dashboardContainer.appendChild(card);
-            if (count > 0) {
-                previousStatusCount = count;
-            }
+            tableBody.appendChild(tr);
         });
     }
+
+    function createCell(data) {
+        if (!data) return '<td>-</td>';
+        return `
+            <td>
+                ${data.count}
+                <span class="conversion-percent">(${data.conv_from_prev.toFixed(1)}% / ${data.conv_from_total.toFixed(1)}%)</span>
+            </td>
+        `;
+    }
+
+    // --- Обработчики событий ---
+    filterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        loadStatistics();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        filterForm.reset();
+        // Сброс дат на значения по умолчанию
+        startDateInput._flatpickr.setDate(new Date().fp_月初());
+        endDateInput._flatpickr.setDate(new Date());
+        loadStatistics();
+    });
+
+    // --- Запуск ---
+    initialize();
 };

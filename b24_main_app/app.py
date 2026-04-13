@@ -6,7 +6,7 @@ from core.db import init_db
 from routes.api_cashbox import get_cashbox_initial_data, add_expense, get_expenses, get_single_expense, update_expense, delete_expense
 from routes.api_access import get_my_permissions, handle_access_rights
 from routes.api_common import search_contacts, get_initial_data_for_access
-# from routes.api_statistics import ... (когда появится логика)
+from routes.api_statistics import get_statistics
 
 # --- Инициализация приложения ---
 logging.basicConfig(level=logging.INFO)
@@ -31,7 +31,8 @@ api_actions = {
     'search_contacts': search_contacts,
     'initial_data_for_access': get_initial_data_for_access,
     
-    # Statistics actions (пока нет)
+    # Statistics actions
+    'get_statistics': get_statistics,
 }
 
 # --- Главный маршрутизатор ---
