@@ -65,7 +65,7 @@ App.initializeStatistics = async function () {
         } catch (error) {
             console.error("Failed to load statistics:", error);
             await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
-            tableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки данных.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="13">Ошибка загрузки данных.</td></tr>`;
         } finally {
             App.hideLoader();
         }
@@ -86,6 +86,8 @@ App.initializeStatistics = async function () {
                 <th>Сделки</th>
                 <th>Сделки с оплатой</th>
                 <th>Сумма счетов</th>
+                <th>Расходы</th>
+                <th>ROMI</th>
             </tr>
         `;
     }
@@ -93,7 +95,7 @@ App.initializeStatistics = async function () {
     function renderTableBody(data) {
         tableBody.innerHTML = '';
         if (!data || data.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="11">Нет данных за выбранный период.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="13">Нет данных за выбранный период.</td></tr>`;
             return;
         }
 
@@ -113,7 +115,9 @@ App.initializeStatistics = async function () {
                 ${createCell(row.clients_with_payment)}
                 <td>${row.deals}</td>
                 <td>${row.deals_with_payment}</td>
-                <td>${new Intl.NumberFormat('ru-RU').format(row.invoices_sum)}</td>
+                <td>${formatCurrency(row.invoices_sum)}</td>
+                <td>${formatCurrency(row.expenses)}</td>
+                <td>${row.romi.toFixed(2)}%</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -127,6 +131,10 @@ App.initializeStatistics = async function () {
                 <span class="conversion-percent">(${data.conv_from_prev.toFixed(1)}% / ${data.conv_from_total.toFixed(1)}%)</span>
             </td>
         `;
+    }
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(value || 0);
     }
 
     // --- Обработчики событий ---
