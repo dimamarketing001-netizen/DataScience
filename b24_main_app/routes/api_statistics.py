@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from core.b24_api import b24_call_method
+from core.b24 import b24_call_method
 import asyncio
 
 stats_api = Blueprint('api_statistics', __name__)
