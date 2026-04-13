@@ -24,6 +24,16 @@ App.initializeCashbox = async function() {
     const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
     const prevPageBtn = document.getElementById('prev-page-btn');
     const nextPageBtn = document.getElementById('next-page-btn');
+    const addExpenseBtn = expenseForm.querySelector('button[type="submit"]');
+    const updateExpenseBtn = editExpenseForm.querySelector('button[type="submit"]');
+
+    // --- Применение прав доступа ---
+    if (!App.userPermissions.tabs.cashbox.save) {
+        addExpenseBtn.classList.add('access-restricted');
+    }
+    if (!App.userPermissions.tabs.cashbox.edit) {
+        updateExpenseBtn.classList.add('access-restricted');
+    }
 
     // --- Инициализация ---
     App.showLoader();
@@ -52,9 +62,6 @@ App.initializeCashbox = async function() {
         const selectedCategory = event.target.value;
         App.cashbox.ui.toggleDynamicFields(selectedCategory, 'add');
         
-        // --- ДОБАВЛЕНО: Явный сброс ID при смене категории ---
-        // Это гарантирует, что даже если UI не успел обновиться,
-        // мы не отправим на сервер лишние ID.
         if (selectedCategory !== 'clients') {
             document.getElementById('selected-client-id').value = '';
         }
@@ -64,7 +71,6 @@ App.initializeCashbox = async function() {
         if (selectedCategory !== 'marketing') {
             document.getElementById('expense-contractor').value = '';
         }
-        // ----------------------------------------------------
 
         if (selectedCategory === 'employees') {
             App.populateSelect(document.getElementById('expense-employee'), availableEmployees.map(u => ({id: u.ID, name: u.NAME})), 'Выберите сотрудника...');
@@ -95,7 +101,7 @@ App.initializeCashbox = async function() {
             currentPage = App.cashbox.ui.updatePaginationControls(data.total_records, data.limit, data.offset);
         } catch (error) {
             await App.Notify.error('Ошибка', `Ошибка загрузки расходов: ${error.message}`);
-            App.cashbox.ui.elements.expensesTableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки расходов.</td></tr>`;
+            App.cashbox.ui.elements.expensesTableBody.innerHTML = `<tr><td colspan="12">Ошибка загрузки расходов.</td></tr>`;
         } finally {
             App.hideLoader();
         }
@@ -122,8 +128,8 @@ App.initializeCashbox = async function() {
 
     async function handleAddExpense(event) {
         event.preventDefault();
+        if (!App.userPermissions.tabs.cashbox.save) return;
 
-        // Собираем данные из формы
         const paidLeadsValue = document.getElementById('expense-paid-leads').value;
         const freeLeadsValue = document.getElementById('expense-free-leads').value;
 
@@ -136,54 +142,37 @@ App.initializeCashbox = async function() {
             employee_id: document.getElementById('expense-employee').value,
             source_id: document.getElementById('expense-contractor').value,
             contact_id: document.getElementById('selected-client-id').value,
-            paid_leads: paidLeadsValue === '' ? null : parseInt(paidLeadsValue), // Convert empty string to null
-            free_leads: freeLeadsValue === '' ? null : parseInt(freeLeadsValue), // Convert empty string to null
+            paid_leads: paidLeadsValue === '' ? null : parseInt(paidLeadsValue),
+            free_leads: freeLeadsValue === '' ? null : parseInt(freeLeadsValue),
         };
 
-        // --- Валидация ---
         if (formData.category_val === 'employees' && !formData.employee_id) {
             await App.Notify.error('Ошибка', "Поле 'Сотрудник' обязательно для категории 'Сотрудники'.");
             return;
         }
 
-        // Формируем данные для отображения в попапе подтверждения
         const formDataForDisplay = {
             'Дата': formData.date,
             'Сумма': formData.amount,
             'Категория': formData.category_text,
         };
 
-        if (formData.comment) {
-            formDataForDisplay['Комментарий'] = formData.comment;
-        }
-
-        // Добавляем динамические поля, если они выбраны
+        if (formData.comment) formDataForDisplay['Комментарий'] = formData.comment;
+        
         const selectedCategory = formData.category_val;
         if (selectedCategory === 'employees') {
             const employeeSelect = document.getElementById('expense-employee');
-            if (employeeSelect.value) {
-                formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
-            }
+            if (employeeSelect.value) formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
             const paymentTypeSelect = document.getElementById('expense-payment-type');
-            if (paymentTypeSelect.value) {
-                formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
-            }
+            if (paymentTypeSelect.value) formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
         } else if (selectedCategory === 'marketing') {
             const contractorSelect = document.getElementById('expense-contractor');
-            if (contractorSelect.value) {
-                formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
-            }
-            if (formData.paid_leads !== null) {
-                formDataForDisplay['Платные лиды'] = formData.paid_leads;
-            }
-            if (formData.free_leads !== null) {
-                formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
-            }
+            if (contractorSelect.value) formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
+            if (formData.paid_leads !== null) formDataForDisplay['Платные лиды'] = formData.paid_leads;
+            if (formData.free_leads !== null) formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
         } else if (selectedCategory === 'clients') {
             const clientSearchInput = document.getElementById('expense-client-search');
-            if (clientSearchInput.value) {
-                formDataForDisplay['Клиент'] = clientSearchInput.value;
-            }
+            if (clientSearchInput.value) formDataForDisplay['Клиент'] = clientSearchInput.value;
         }
 
         const isConfirmed = await App.showCustomConfirm({
@@ -213,7 +202,6 @@ App.initializeCashbox = async function() {
         App.showLoader();
         try {
             const expense = await App.cashbox.api.getSingleExpense(expenseId);
-            // Передаем доступных сотрудников и подрядчиков в openEditModal UI-модуля
             App.cashbox.ui.openEditModal(expense, availableEmployees, availableContractors);
         } catch (error) {
             await App.Notify.error('Ошибка', `Ошибка загрузки данных для редактирования: ${error.message}`);
@@ -224,6 +212,7 @@ App.initializeCashbox = async function() {
 
     async function handleUpdateExpense(event) {
         event.preventDefault();
+        if (!App.userPermissions.tabs.cashbox.edit) return;
 
         const editExpenseCategory = document.getElementById('edit-expense-category');
         const selectedCategory = editExpenseCategory.value;
@@ -242,11 +231,10 @@ App.initializeCashbox = async function() {
             source_id: '',
             contact_id: '',
             payment_type: '',
-            paid_leads: editPaidLeadsValue === '' ? null : parseInt(editPaidLeadsValue), // Convert empty string to null
-            free_leads: editFreeLeadsValue === '' ? null : parseInt(editFreeLeadsValue), // Convert empty string to null
+            paid_leads: editPaidLeadsValue === '' ? null : parseInt(editPaidLeadsValue),
+            free_leads: editFreeLeadsValue === '' ? null : parseInt(editFreeLeadsValue),
         };
 
-        // Заполняем динамические поля в зависимости от категории
         if (selectedCategory === 'employees') {
             formData.employee_id = document.getElementById('edit-expense-employee').value;
             formData.payment_type = document.getElementById('edit-expense-payment-type').value;
@@ -256,50 +244,33 @@ App.initializeCashbox = async function() {
             formData.contact_id = document.getElementById('edit-selected-client-id').value;
         }
 
-        // --- Валидация ---
         if (selectedCategory === 'employees' && !formData.employee_id) {
             await App.Notify.error('Ошибка', "Поле 'Сотрудник' обязательно для категории 'Сотрудники'.");
             return;
         }
 
-        // Формируем данные для отображения в попапе подтверждения
         const formDataForDisplay = {
             'Дата': formData.date,
             'Сумма': formData.amount,
             'Категория': editExpenseCategory.options[editExpenseCategory.selectedIndex].text,
         };
 
-        // Заполняем динамические поля в зависимости от категории
         if (selectedCategory === 'employees') {
             const employeeSelect = document.getElementById('edit-expense-employee');
-            if (employeeSelect.value) {
-                formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
-            }
+            if (employeeSelect.value) formDataForDisplay['Сотрудник'] = employeeSelect.options[employeeSelect.selectedIndex].text;
             const paymentTypeSelect = document.getElementById('edit-expense-payment-type');
-            if (paymentTypeSelect.value) {
-                formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
-            }
+            if (paymentTypeSelect.value) formDataForDisplay['Тип выплаты'] = paymentTypeSelect.options[paymentTypeSelect.selectedIndex].text;
         } else if (selectedCategory === 'marketing') {
             const contractorSelect = document.getElementById('edit-expense-contractor');
-            if (contractorSelect.value) {
-                formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
-            }
-            if (formData.paid_leads !== null) {
-                formDataForDisplay['Платные лиды'] = formData.paid_leads;
-            }
-            if (formData.free_leads !== null) {
-                formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
-            }
+            if (contractorSelect.value) formDataForDisplay['Подрядчик'] = contractorSelect.options[contractorSelect.selectedIndex].text;
+            if (formData.paid_leads !== null) formDataForDisplay['Платные лиды'] = formData.paid_leads;
+            if (formData.free_leads !== null) formDataForDisplay['Бесплатные лиды'] = formData.free_leads;
         } else if (selectedCategory === 'clients') {
             const clientSearchInput = document.getElementById('edit-expense-client-search');
-            if (clientSearchInput.value) {
-                formDataForDisplay['Клиент'] = clientSearchInput.value;
-            }
+            if (clientSearchInput.value) formDataForDisplay['Клиент'] = clientSearchInput.value;
         }
 
-        if (formData.comment) {
-            formDataForDisplay['Комментарий'] = formData.comment;
-        }
+        if (formData.comment) formDataForDisplay['Комментарий'] = formData.comment;
 
         const isConfirmed = await App.showCustomConfirm({
             title: 'Подтвердите обновление расхода',
@@ -329,7 +300,8 @@ App.initializeCashbox = async function() {
     }
 
     async function handleDeleteExpense() {
-        if (!expenseToDeleteId) return;
+        if (!expenseToDeleteId || !App.userPermissions.tabs.cashbox.delete) return;
+
         App.showLoader();
         try {
             await App.cashbox.api.deleteExpense(expenseToDeleteId);

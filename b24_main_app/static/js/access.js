@@ -64,10 +64,10 @@ App.initializeAccessTab = async function () {
         const entity = entityList.find(e => String(e.id) === selectedValue);
 
         if (entity) {
-            // Создаем правило с новой структурой по умолчанию
+            // Обновленная структура по умолчанию
             const defaultPermissions = {
                 tabs: {
-                    cashbox: { view: false, save: false, delete: false },
+                    cashbox: { view: false, save: false, edit: false, delete: false },
                     statistics: { view: false },
                     access: { view: false, save: false, delete: false }
                 }
@@ -131,10 +131,10 @@ App.initializeAccessTab = async function () {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
-        // --- Обработка для совместимости со старой структурой ---
+        // Обработка для совместимости со старой структурой
         const perms = permissions.tabs ? permissions : {
             tabs: {
-                cashbox: { view: permissions.tabs.cashbox, save: permissions.actions.can_save, delete: permissions.actions.can_delete },
+                cashbox: { view: permissions.tabs.cashbox, save: permissions.actions.can_save, edit: permissions.actions.can_save, delete: permissions.actions.can_delete },
                 statistics: { view: permissions.tabs.statistics },
                 access: { view: permissions.tabs.access, save: permissions.actions.can_save, delete: permissions.actions.can_delete }
             }
@@ -151,6 +151,7 @@ App.initializeAccessTab = async function () {
                     <strong>Касса:</strong>
                     <label><input type="checkbox" data-perm="tabs.cashbox.view" ${perms.tabs.cashbox?.view ? 'checked' : ''}> Просмотр</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.save" ${perms.tabs.cashbox?.save ? 'checked' : ''}> Сохранение</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.edit" ${perms.tabs.cashbox?.edit ? 'checked' : ''}> Редактирование</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.delete" ${perms.tabs.cashbox?.delete ? 'checked' : ''}> Удаление</label>
                 </div>
                 <div class="access-group">
@@ -179,20 +180,19 @@ App.initializeAccessTab = async function () {
         deleteBtn.textContent = 'Удалить';
         actionCell.appendChild(deleteBtn);
 
-        // Блокировка кнопок на основе прав текущего пользователя
         if (!App.userPermissions.tabs.access.save) {
-            saveBtn.disabled = true;
+            saveBtn.classList.add('access-restricted');
         }
         if (!App.userPermissions.tabs.access.delete) {
-            deleteBtn.disabled = true;
+            deleteBtn.classList.add('access-restricted');
         }
 
-        // Логика для отключения чекбоксов действий, если нет права на просмотр
         const cashboxView = row.querySelector('[data-perm="tabs.cashbox.view"]');
         const accessView = row.querySelector('[data-perm="tabs.access.view"]');
         
         const updateDisabledState = () => {
             row.querySelector('[data-perm="tabs.cashbox.save"]').disabled = !cashboxView.checked;
+            row.querySelector('[data-perm="tabs.cashbox.edit"]').disabled = !cashboxView.checked;
             row.querySelector('[data-perm="tabs.cashbox.delete"]').disabled = !cashboxView.checked;
             row.querySelector('[data-perm="tabs.access.save"]').disabled = !accessView.checked;
             row.querySelector('[data-perm="tabs.access.delete"]').disabled = !accessView.checked;
@@ -200,14 +200,16 @@ App.initializeAccessTab = async function () {
         
         cashboxView.addEventListener('change', updateDisabledState);
         accessView.addEventListener('change', updateDisabledState);
-        updateDisabledState(); // Первоначальная установка
+        updateDisabledState();
 
         saveBtn.addEventListener('click', async () => {
+            if(saveBtn.classList.contains('access-restricted')) return;
             const newPermissions = {
                 tabs: {
                     cashbox: {
                         view: row.querySelector('[data-perm="tabs.cashbox.view"]').checked,
                         save: row.querySelector('[data-perm="tabs.cashbox.save"]').checked,
+                        edit: row.querySelector('[data-perm="tabs.cashbox.edit"]').checked,
                         delete: row.querySelector('[data-perm="tabs.cashbox.delete"]').checked,
                     },
                     statistics: {
@@ -243,6 +245,7 @@ App.initializeAccessTab = async function () {
         });
 
         deleteBtn.addEventListener('click', () => {
+            if(deleteBtn.classList.contains('access-restricted')) return;
             showDeleteConfirmation(entityId, row, entityName);
         });
     }

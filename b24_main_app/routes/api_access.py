@@ -29,10 +29,10 @@ def get_my_permissions():
         cursor = conn.cursor(dictionary=True)
 
         try:
-            # Новая структура прав по умолчанию
+            # Новая структура прав по умолчанию, включающая 'edit'
             final_permissions = {
                 "tabs": {
-                    "cashbox": {"view": False, "save": False, "delete": False},
+                    "cashbox": {"view": False, "save": False, "edit": False, "delete": False},
                     "statistics": {"view": False},
                     "access": {"view": False, "save": False, "delete": False}
                 }
@@ -51,17 +51,16 @@ def get_my_permissions():
             for perms in all_perms:
                 # --- Обработка старой структуры для обратной совместимости ---
                 if 'can_access_app' in perms:
-                    # Если есть глобальный доступ, даем доступ ко всем вкладкам, которые были в старой структуре
                     if perms.get('can_access_app'):
                         for tab_name, has_access in perms.get('tabs', {}).items():
                             if has_access and tab_name in final_permissions['tabs']:
                                 final_permissions['tabs'][tab_name]['view'] = True
                     
-                    # Применяем старые глобальные права на новые детальные
                     old_actions = perms.get('actions', {})
                     if old_actions.get('can_save'):
                         if final_permissions['tabs']['cashbox']['view']:
                             final_permissions['tabs']['cashbox']['save'] = True
+                            final_permissions['tabs']['cashbox']['edit'] = True # <--- ОБНОВЛЕНО
                         if final_permissions['tabs']['access']['view']:
                             final_permissions['tabs']['access']['save'] = True
                     if old_actions.get('can_delete'):
@@ -107,7 +106,6 @@ def handle_access_rights():
             data = request.get_json()
             entity_id = data.get('entity_id')
 
-            # Проверяем, является ли это запросом на удаление
             if data.get('sub_action') == 'delete':
                 if not entity_id:
                     return jsonify({'error': 'entity_id is required for deletion'}), 400
@@ -119,13 +117,10 @@ def handle_access_rights():
                 if cursor.rowcount > 0:
                     return jsonify({'success': True, 'message': 'Rule deleted'})
                 else:
-                    # Это не ошибка, просто правило могло быть уже удалено
                     return jsonify({'success': True, 'message': 'Rule not found or already deleted'})
 
-            # Если не удаление, то это создание/обновление
             entity_type = 'user' if 'user_' in entity_id else 'department'
             query = "INSERT INTO access_rights (entity_id, entity_type, entity_name, permissions) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), entity_name = VALUES(entity_name)"
-            # Сохраняем уже новую структуру прав
             params = (entity_id, entity_type, data['entity_name'], json.dumps(data['permissions']))
             cursor.execute(query, params)
             conn.commit()
