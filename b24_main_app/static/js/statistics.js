@@ -15,12 +15,14 @@ App.initializeStatistics = async function () {
     async function initialize() {
         App.showLoader();
         try {
-            // Инициализация Flatpickr
-            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: new Date().fp_月初() });
-            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
+            // Инициализация Flatpickr с правильными датами
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: firstDayOfMonth });
+            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: today });
 
             // Загрузка источников для фильтра
-            const sources = await App.api.getSources();
+            const sources = await getLeadSources();
             App.populateSelect(sourceFilterSelect, sources, "Все источники");
 
             renderTableHead();
@@ -31,6 +33,23 @@ App.initializeStatistics = async function () {
         } finally {
             App.hideLoader();
         }
+    }
+    
+    async function getLeadSources() {
+        return new Promise((resolve, reject) => {
+            BX24.callMethod('crm.status.entity.items', { entityId: 'SOURCE' }, (result) => {
+                if (result.error()) {
+                    console.error("Failed to get lead sources:", result.error());
+                    reject(new Error("Не удалось загрузить источники лидов"));
+                } else {
+                    const sources = result.data().map(item => ({
+                        id: item.STATUS_ID,
+                        name: item.NAME
+                    }));
+                    resolve(sources);
+                }
+            });
+        });
     }
 
     // --- Загрузка данных ---
@@ -48,11 +67,14 @@ App.initializeStatistics = async function () {
                 throw new Error(`Ошибка сети: ${response.statusText}`);
             }
             const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
             renderTableBody(data);
         } catch (error) {
             console.error("Failed to load statistics:", error);
             await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
-            tableBody.innerHTML = `<tr><td colspan="5">Ошибка загрузки данных.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="6">Ошибка загрузки данных.</td></tr>`;
         } finally {
             App.hideLoader();
         }
@@ -111,9 +133,10 @@ App.initializeStatistics = async function () {
 
     resetBtn.addEventListener('click', () => {
         filterForm.reset();
-        // Сброс дат на значения по умолчанию
-        startDateInput._flatpickr.setDate(new Date().fp_月初());
-        endDateInput._flatpickr.setDate(new Date());
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDateInput._flatpickr.setDate(firstDayOfMonth);
+        endDateInput._flatpickr.setDate(today);
         loadStatistics();
     });
 

@@ -1,33 +1,29 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import request, jsonify, current_app
 from core.b24 import b24_call_method
-import asyncio
 
-stats_api = Blueprint('api_statistics', __name__)
-
-# Статусы лидов, соответствующие каждой группе
+# Примечание: ID статусов могут отличаться в вашем портале.
+# Это примерные ID для стандартных статусов лидов в Битрикс24.
+# 'PROCESSED' - это системный ID для успешного лида.
 LEAD_STATUS_GROUPS = {
-    "total": [], # Все лиды, специальная обработка
     "answered": ["2", "3", "14", "15", "4", "5", "6", "7", "8", "PROCESSED"],
     "meeting_scheduled": ["4", "5", "6", "7", "8", "PROCESSED"],
     "arrival": ["5", "6", "7", "8", "PROCESSED"],
     "success": ["PROCESSED"]
 }
 
-async def fetch_all_leads(filter_params):
-    """Асинхронно извлекает все лиды по заданным фильтрам, обрабатывая пагинацию."""
+def fetch_all_leads_sync(filter_params):
+    """Синхронно извлекает все лиды по заданным фильтрам, обрабатывая пагинацию."""
     leads = []
     start = 0
     while True:
-        filter_params['start'] = start
-        result = await asyncio.to_thread(
-            b24_call_method,
-            'crm.lead.list',
-            {
-                'filter': filter_params,
-                'select': ['ID', 'SOURCE_ID', 'STATUS_ID', 'DATE_CREATE'],
-                'order': {'DATE_CREATE': 'ASC'}
-            }
-        )
+        params = {
+            'filter': filter_params,
+            'select': ['ID', 'SOURCE_ID', 'STATUS_ID', 'DATE_CREATE'],
+            'order': {'DATE_CREATE': 'ASC'},
+            'start': start
+        }
+        result = b24_call_method('crm.lead.list', params)
+        
         if not result or 'result' not in result:
             break
         
@@ -43,15 +39,15 @@ async def fetch_all_leads(filter_params):
             break
     return leads
 
-@stats_api.route('/get_statistics', methods=['GET'])
 def get_statistics():
-    """
-    Собирает, обрабатывает и возвращает статистику по лидам.
-    """
+    """Собирает, обрабатывает и возвращает статистику по лидам."""
     try:
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         source_id = request.args.get('source_id')
+
+        if not date_from or not date_to:
+            return jsonify({'error': 'Date range is required'}), 400
 
         filter_params = {
             '>=DATE_CREATE': f"{date_from}T00:00:00",
@@ -60,14 +56,11 @@ def get_statistics():
         if source_id:
             filter_params['SOURCE_ID'] = source_id
 
-        # Получаем все лиды
-        all_leads = asyncio.run(fetch_all_leads(filter_params))
+        all_leads = fetch_all_leads_sync(filter_params)
 
-        # Получаем все источники лидов для маппинга ID в имя
         sources_result = b24_call_method('crm.status.entity.items', {'entityId': 'SOURCE'})
         source_map = {str(s['STATUS_ID']): s['NAME'] for s in sources_result.get('result', [])}
 
-        # Группируем лиды по источнику
         leads_by_source = {}
         for lead in all_leads:
             sid = str(lead.get('SOURCE_ID', 'unknown'))
@@ -75,12 +68,10 @@ def get_statistics():
                 leads_by_source[sid] = []
             leads_by_source[sid].append(lead)
 
-        # Рассчитываем статистику для каждого источника
         statistics = []
         for sid, leads in leads_by_source.items():
             source_name = source_map.get(sid, f"Неизвестный ({sid})")
             
-            # Подсчет по группам
             counts = {group: 0 for group in LEAD_STATUS_GROUPS}
             counts['total'] = len(leads)
 
@@ -90,7 +81,6 @@ def get_statistics():
                     if status_id in statuses:
                         counts[group] += 1
             
-            # Расчет конверсий
             stats_row = {
                 "source_name": source_name,
                 "total": counts['total'],
@@ -101,7 +91,6 @@ def get_statistics():
             }
             statistics.append(stats_row)
         
-        # Сортировка по общему количеству лидов
         statistics.sort(key=lambda x: x['total'], reverse=True)
 
         return jsonify(statistics)
