@@ -81,8 +81,19 @@ App.initializeCashbox = async function() {
 
     filterForm.addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
     resetFilterBtn.addEventListener('click', resetFilters);
-    expenseForm.addEventListener('submit', handleAddExpense);
-    editExpenseForm.addEventListener('submit', handleUpdateExpense);
+    
+    expenseForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (addExpenseBtn.classList.contains('access-restricted')) return;
+        handleAddExpense(e);
+    });
+    
+    editExpenseForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (updateExpenseBtn.classList.contains('access-restricted')) return;
+        handleUpdateExpense(e);
+    });
+
     cancelEditBtn.addEventListener('click', () => App.cashbox.ui.closeEditModal());
     confirmDeleteBtn.addEventListener('click', handleDeleteExpense);
     cancelDeleteBtn.addEventListener('click', () => App.cashbox.ui.closeDeleteConfirmModal());
@@ -127,9 +138,6 @@ App.initializeCashbox = async function() {
     }
 
     async function handleAddExpense(event) {
-        event.preventDefault();
-        if (!App.userPermissions.tabs.cashbox.save) return;
-
         const paidLeadsValue = document.getElementById('expense-paid-leads').value;
         const freeLeadsValue = document.getElementById('expense-free-leads').value;
 
@@ -211,9 +219,6 @@ App.initializeCashbox = async function() {
     }
 
     async function handleUpdateExpense(event) {
-        event.preventDefault();
-        if (!App.userPermissions.tabs.cashbox.edit) return;
-
         const editExpenseCategory = document.getElementById('edit-expense-category');
         const selectedCategory = editExpenseCategory.value;
 
@@ -300,7 +305,7 @@ App.initializeCashbox = async function() {
     }
 
     async function handleDeleteExpense() {
-        if (!expenseToDeleteId || !App.userPermissions.tabs.cashbox.delete) return;
+        if (!expenseToDeleteId) return;
 
         App.showLoader();
         try {

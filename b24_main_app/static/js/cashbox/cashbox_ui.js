@@ -80,9 +80,27 @@ App.cashbox.ui = {
             `;
         });
 
-        // Навешиваем обработчики только на НЕОГРАНИЧЕННЫЕ иконки
-        expensesTableBody.querySelectorAll('.edit-icon:not(.access-restricted)').forEach(icon => icon.addEventListener('click', (e) => onEdit(e.target.dataset.id)));
-        expensesTableBody.querySelectorAll('.delete-icon:not(.access-restricted)').forEach(icon => icon.addEventListener('click', (e) => onDelete(e.target.dataset.id)));
+        // Навешиваем обработчики на все иконки, а внутри проверяем права
+        expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('access-restricted')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                onEdit(e.currentTarget.dataset.id);
+            });
+        });
+        expensesTableBody.querySelectorAll('.delete-icon').forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('access-restricted')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                onDelete(e.currentTarget.dataset.id);
+            });
+        });
     },
 
     updatePaginationControls: function(totalRecords, limit, offset) {

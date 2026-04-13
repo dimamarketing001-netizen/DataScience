@@ -247,6 +247,30 @@ body {
 
 /*
  * ===================================================================
+ *  Система прав и доступов
+ * ===================================================================
+ */
+
+.access-restricted {
+    cursor: not-allowed !important;
+}
+
+/* Сброс hover-эффектов для заблокированных элементов */
+.access-restricted:hover,
+.access-restricted:focus {
+    filter: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    /* Для кнопок с цветным фоном */
+    background-color: var(--original-bg-color, initial) !important;
+    border-color: var(--original-border-color, initial) !important;
+    /* Для иконок и текста */
+    color: var(--original-color, initial) !important;
+}
+
+
+/*
+ * ===================================================================
  *  Новая система уведомлений App.Notify
  * ===================================================================
  */
@@ -461,13 +485,6 @@ body {
 .expenses-table .action-icon:hover {
     color: #0a58a6;
 }
-
-.action-icon-disabled {
-    opacity: 0.3;
-    pointer-events: none;
-    cursor: not-allowed !important;
-}
-
 
 /* --- Стили для формы фильтров --- */
 .filter-form {
