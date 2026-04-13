@@ -65,7 +65,7 @@ App.initializeStatistics = async function () {
         } catch (error) {
             console.error("Failed to load statistics:", error);
             await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
-            tableBody.innerHTML = `<tr><td colspan="6">Ошибка загрузки данных.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="11">Ошибка загрузки данных.</td></tr>`;
         } finally {
             App.hideLoader();
         }
@@ -81,6 +81,11 @@ App.initializeStatistics = async function () {
                 <th>Назначена встреча</th>
                 <th>Приход</th>
                 <th>Успех</th>
+                <th>Клиенты</th>
+                <th>Клиенты с оплатой</th>
+                <th>Сделки</th>
+                <th>Сделки с оплатой</th>
+                <th>Сумма счетов</th>
             </tr>
         `;
     }
@@ -88,7 +93,7 @@ App.initializeStatistics = async function () {
     function renderTableBody(data) {
         tableBody.innerHTML = '';
         if (!data || data.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="6">Нет данных за выбранный период.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="11">Нет данных за выбранный период.</td></tr>`;
             return;
         }
 
@@ -104,6 +109,11 @@ App.initializeStatistics = async function () {
                 ${createCell(row.meeting_scheduled)}
                 ${createCell(row.arrival)}
                 ${createCell(row.success)}
+                <td>${row.clients}</td>
+                ${createCell(row.clients_with_payment)}
+                <td>${row.deals}</td>
+                <td>${row.deals_with_payment}</td>
+                <td>${new Intl.NumberFormat('ru-RU').format(row.invoices_sum)}</td>
             `;
             tableBody.appendChild(tr);
         });

@@ -432,39 +432,39 @@ body {
     position: relative;
 }
 
-/* --- Стили для таблицы расходов --- */
+/* --- Стили для таблицы расходов и статистики --- */
 .expenses-table-container {
-    margin-top: 30px;
-    overflow-x: auto; /* Для горизонтального скролла на маленьких экранах */
+    margin-top: 20px;
+    overflow-x: auto;
 }
 
 .expenses-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    min-width: 800px; /* Минимальная ширина таблицы для предотвращения слишком сильного сжатия */
+    margin-top: 0;
+    min-width: 1000px;
 }
 
 .expenses-table th, .expenses-table td {
     border: 1px solid #eef2f4;
-    padding: 10px 8px;
+    padding: 12px 10px;
     text-align: left;
     font-size: 13px;
     color: #333;
+    white-space: nowrap;
 }
 
 .expenses-table th {
     background-color: #f8f9fa;
     font-weight: bold;
     color: #535c69;
-    white-space: nowrap; /* Предотвращает перенос текста в заголовках */
 }
 
 .expenses-table tr:nth-child(even) {
     background-color: #fdfdfd;
 }
 
-.expenses-table tr:hover {
+.expenses-table tr:not(.summary-row):hover {
     background-color: #f0f0f0;
 }
 
@@ -477,7 +477,7 @@ body {
 .expenses-table .action-icon {
     cursor: pointer;
     margin: 0 5px;
-    color: #0b66c3; /* Цвет иконок */
+    color: #0b66c3;
     font-size: 16px;
     transition: color 0.2s ease, opacity 0.2s ease;
 }
@@ -488,11 +488,17 @@ body {
 
 .summary-row {
     font-weight: bold;
-    background-color: #f8f9fa;
+    background-color: #f0f5fa;
 }
 
 .summary-row td {
-    border-top: 2px solid #c6cdd3;
+    border-top: 2px solid #c6cdd3 !important;
+}
+
+.conversion-percent {
+    color: #828b95;
+    font-size: 12px;
+    margin-left: 5px;
 }
 
 
