@@ -51,10 +51,11 @@ App.initializeAccessTab = async function () {
 
     document.getElementById('add-access-rule-btn').addEventListener('click', async () => {
         const selectedType = accessTypeSelect.value;
-        const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
         const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
         
-        const entityId = entityIdPrefix + selectedValue;
+        // --- ИСПРАВЛЕНИЕ: Префикс добавляется только если его нет ---
+        const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
+        const entityId = String(selectedValue).startsWith(entityIdPrefix) ? selectedValue : entityIdPrefix + selectedValue;
 
         if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
             await App.Notify.error('Ошибка', 'Это правило уже добавлено или ничего не выбрано.');
@@ -131,19 +132,16 @@ App.initializeAccessTab = async function () {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
-        // --- ИСПРАВЛЕНИЕ: Корректная обработка старой и новой структуры ---
         let perms;
         if (permissions.tabs && typeof permissions.tabs.cashbox === 'object') {
-            // Новая структура
             perms = permissions;
         } else {
-            // Старая структура, конвертируем на лету
             perms = {
                 tabs: {
                     cashbox: {
                         view: permissions.tabs?.cashbox,
                         save: permissions.actions?.can_save,
-                        edit: permissions.actions?.can_save, // edit = save для старых правил
+                        edit: permissions.actions?.can_save,
                         delete: permissions.actions?.can_delete
                     },
                     statistics: {
