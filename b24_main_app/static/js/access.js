@@ -52,10 +52,12 @@ App.initializeAccessTab = async function () {
     document.getElementById('add-access-rule-btn').addEventListener('click', async () => {
         const selectedType = accessTypeSelect.value;
         const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
-        
-        // --- ИСПРАВЛЕНИЕ: Префикс добавляется только если его нет ---
+
+        // Убираем возможный старый префикс и добавляем правильный
+        const cleanId = String(selectedValue).replace('user_', '').replace('department_', '');
         const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
         const entityId = String(selectedValue).startsWith(entityIdPrefix) ? selectedValue : entityIdPrefix + selectedValue;
+
 
         if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
             await App.Notify.error('Ошибка', 'Это правило уже добавлено или ничего не выбрано.');
