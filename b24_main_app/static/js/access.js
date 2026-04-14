@@ -53,6 +53,8 @@ App.initializeAccessTab = async function () {
         const selectedType = accessTypeSelect.value;
         const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
         const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
+        
+        // --- ИСПРАВЛЕНИЕ ---
         const entityId = entityIdPrefix + selectedValue;
 
         if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
