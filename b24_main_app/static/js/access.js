@@ -54,7 +54,6 @@ App.initializeAccessTab = async function () {
         const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
         const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
         
-        // --- ИСПРАВЛЕНИЕ ---
         const entityId = entityIdPrefix + selectedValue;
 
         if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
@@ -66,7 +65,6 @@ App.initializeAccessTab = async function () {
         const entity = entityList.find(e => String(e.id) === selectedValue);
 
         if (entity) {
-            // Обновленная структура по умолчанию
             const defaultPermissions = {
                 tabs: {
                     cashbox: { view: false, save: false, edit: false, delete: false },
@@ -133,14 +131,32 @@ App.initializeAccessTab = async function () {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
-        // Обработка для совместимости со старой структурой
-        const perms = permissions.tabs ? permissions : {
-            tabs: {
-                cashbox: { view: permissions.tabs.cashbox, save: permissions.actions.can_save, edit: permissions.actions.can_save, delete: permissions.actions.can_delete },
-                statistics: { view: permissions.tabs.statistics },
-                access: { view: permissions.tabs.access, save: permissions.actions.can_save, delete: permissions.actions.can_delete }
-            }
-        };
+        // --- ИСПРАВЛЕНИЕ: Корректная обработка старой и новой структуры ---
+        let perms;
+        if (permissions.tabs && typeof permissions.tabs.cashbox === 'object') {
+            // Новая структура
+            perms = permissions;
+        } else {
+            // Старая структура, конвертируем на лету
+            perms = {
+                tabs: {
+                    cashbox: {
+                        view: permissions.tabs?.cashbox,
+                        save: permissions.actions?.can_save,
+                        edit: permissions.actions?.can_save, // edit = save для старых правил
+                        delete: permissions.actions?.can_delete
+                    },
+                    statistics: {
+                        view: permissions.tabs?.statistics
+                    },
+                    access: {
+                        view: permissions.tabs?.access,
+                        save: permissions.actions?.can_save,
+                        delete: permissions.actions?.can_delete
+                    }
+                }
+            };
+        }
 
         const nameCell = row.insertCell();
         nameCell.textContent = entityName;
