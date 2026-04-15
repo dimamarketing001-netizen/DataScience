@@ -20,7 +20,6 @@ App.initializeCashbox = function() {
     let incomeModuleInitialized = false;
 
     // --- ОТЛАДКА и ПРИМЕНЕНИЕ ПРАВ ---
-    // Этот код теперь выполняется в правильный момент, когда App.userPermissions уже загружены
     console.log("CASHBOX PERMISSIONS CHECK:", JSON.stringify(App.userPermissions.tabs.cashbox, null, 2));
 
     if (!App.userPermissions.tabs.cashbox.income.view) {
@@ -31,12 +30,12 @@ App.initializeCashbox = function() {
     }
 
     // --- Навигация ---
-    incomeCard.addEventListener('click', () => {
-        if (incomeCard.classList.contains('access-restricted')) return;
+    incomeCard.addEventListener('click', (e) => {
+        if (e.currentTarget.classList.contains('access-restricted')) return;
         showSection('income');
     });
-    expenseCard.addEventListener('click', () => {
-        if (expenseCard.classList.contains('access-restricted')) return;
+    expenseCard.addEventListener('click', (e) => {
+        if (e.currentTarget.classList.contains('access-restricted')) return;
         showSection('expense');
     });
     backToChoiceBtns.forEach(btn => btn.addEventListener('click', () => showSection('choice')));
