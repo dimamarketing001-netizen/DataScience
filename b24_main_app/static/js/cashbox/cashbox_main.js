@@ -11,15 +11,31 @@ App.cashbox = {
         const backToChoiceBtns = document.querySelectorAll('.cashbox-back-button');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const incomeCard = document.getElementById('goto-add-income');
+        const expenseCard = document.getElementById('goto-add-expense');
 
         // --- Состояние ---
         let itemToDelete = { id: null, type: null };
         let expenseModuleInitialized = false;
         let incomeModuleInitialized = false;
 
+        // --- Применение прав доступа к карточкам ---
+        if (!App.userPermissions.tabs.cashbox.income.view) {
+            incomeCard.classList.add('access-restricted');
+        }
+        if (!App.userPermissions.tabs.cashbox.expense.view) {
+            expenseCard.classList.add('access-restricted');
+        }
+
         // --- Навигация ---
-        document.getElementById('goto-add-income').addEventListener('click', () => showSection('income'));
-        document.getElementById('goto-add-expense').addEventListener('click', () => showSection('expense'));
+        incomeCard.addEventListener('click', () => {
+            if (incomeCard.classList.contains('access-restricted')) return;
+            showSection('income');
+        });
+        expenseCard.addEventListener('click', () => {
+            if (expenseCard.classList.contains('access-restricted')) return;
+            showSection('expense');
+        });
         backToChoiceBtns.forEach(btn => btn.addEventListener('click', () => showSection('choice')));
 
         function showSection(sectionName) {
@@ -48,7 +64,19 @@ App.cashbox = {
         };
 
         async function handleDeleteItem() {
-            if (!itemToDelete.id || !App.userPermissions.tabs.cashbox.delete) return;
+            if (!itemToDelete.id) return;
+            
+            const canDelete = itemToDelete.type === 'income' 
+                ? App.userPermissions.tabs.cashbox.income.delete 
+                : App.userPermissions.tabs.cashbox.expense.delete;
+            
+            if (!canDelete) {
+                // Это дополнительная проверка, т.к. кнопка и так должна быть неактивна.
+                // Но лучше перестраховаться.
+                await App.Notify.error('Доступ запрещен', 'У вас нет прав на удаление этой записи.');
+                return;
+            }
+
             App.showLoader();
             try {
                 if (itemToDelete.type === 'income') {
