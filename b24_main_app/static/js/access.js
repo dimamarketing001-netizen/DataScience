@@ -65,7 +65,6 @@ App.initializeAccessTab = async function () {
         }
 
         const entityList = selectedType === 'employee' ? availableUsers : availableDepartments;
-        const entity = entityList.find(e => String(e.id) === selectedValue);
 
         if (entity) {
             const defaultPermissions = {

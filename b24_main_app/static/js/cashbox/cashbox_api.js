@@ -30,5 +30,28 @@ App.cashbox.api = {
         return App.api.request('delete_expense', { id }, {
             method: 'DELETE'
         });
+    },
+
+    // --- Новые методы для приходов ---
+
+    getIncomes: function(params) {
+        return App.api.request('get_incomes', params);
+    },
+
+    addIncome: function(data) {
+        return App.api.request('add_income', {}, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    deleteIncome: function(id) {
+        return App.api.request('delete_income', { id }, {
+            method: 'DELETE'
+        });
+    },
+
+    getClientDeals: function(contactId) {
+        return App.api.request('get_client_deals', { contact_id: contactId });
     }
 };

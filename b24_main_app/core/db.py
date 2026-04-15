@@ -31,33 +31,7 @@ def init_db():
     cursor = conn.cursor()
     
     try:
-        try:
-            cursor.execute("ALTER TABLE `expenses` ADD COLUMN `category_val` VARCHAR(255) DEFAULT NULL AFTER `category`")
-            logger.info("Column 'category_val' added to 'expenses' table.")
-        except mysql.connector.Error as alter_err:
-            if alter_err.errno == errorcode.ER_DUP_FIELDNAME:
-                logger.info("Column 'category_val' already exists in 'expenses' table.")
-            else:
-                raise alter_err
-
-        try:
-            cursor.execute("ALTER TABLE `expenses` ADD COLUMN `paid_leads` INT DEFAULT NULL AFTER `comment`")
-            logger.info("Column 'paid_leads' added to 'expenses' table.")
-        except mysql.connector.Error as alter_err:
-            if alter_err.errno == errorcode.ER_DUP_FIELDNAME:
-                logger.info("Column 'paid_leads' already exists in 'expenses' table.")
-            else:
-                raise alter_err
-
-        try:
-            cursor.execute("ALTER TABLE `expenses` ADD COLUMN `free_leads` INT DEFAULT NULL AFTER `paid_leads`")
-            logger.info("Column 'free_leads' added to 'expenses' table.")
-        except mysql.connector.Error as alter_err:
-            if alter_err.errno == errorcode.ER_DUP_FIELDNAME:
-                logger.info("Column 'free_leads' already exists in 'expenses' table.")
-            else:
-                raise alter_err
-
+        # --- Инициализация таблицы расходов ---
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `expenses` (
               `id` int(11) NOT NULL AUTO_INCREMENT, `expense_date` date NOT NULL, `amount` decimal(10, 2) NOT NULL,
@@ -68,11 +42,24 @@ def init_db():
             ) ENGINE=InnoDB
         """)
         logger.info("Table 'expenses' is ready.")
-    except mysql.connector.Error as err:
-        if err.errno != errorcode.ER_TABLE_EXISTS_ERROR:
-             logger.error(f"Error initializing 'expenses' table: {err.msg}")
 
-    try:
+        # --- Инициализация таблицы приходов ---
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `incomes` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `income_date` date NOT NULL,
+              `amount` decimal(10, 2) NOT NULL,
+              `contact_id` varchar(50) DEFAULT NULL,
+              `deal_id` varchar(50) DEFAULT NULL,
+              `comment` text,
+              `added_by_user_id` varchar(50) DEFAULT NULL,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB
+        """)
+        logger.info("Table 'incomes' is ready.")
+
+        # --- Инициализация таблицы прав доступа ---
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `access_rights` (
               `id` INT AUTO_INCREMENT PRIMARY KEY, `entity_id` VARCHAR(50) NOT NULL UNIQUE, `entity_type` VARCHAR(20) NOT NULL,
@@ -80,8 +67,9 @@ def init_db():
             ) ENGINE=InnoDB
         """)
         logger.info("Table 'access_rights' is ready.")
+
     except mysql.connector.Error as err:
-        logger.error(f"Error initializing 'access_rights' table: {err.msg}")
+        logger.error(f"Error during DB initialization: {err.msg}")
     
     finally:
         cursor.close()

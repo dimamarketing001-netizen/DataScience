@@ -19,26 +19,25 @@ App.cashbox.ui = {
             marketing: document.getElementById('edit-marketing-fields'),
             clients: document.getElementById('edit-client-fields')
         },
-        // Элементы для фильтра
         filterCategory: document.getElementById('filter-category'),
         filterEmployeeWrapper: document.getElementById('filter-employee-wrapper'),
         filterContractorWrapper: document.getElementById('filter-contractor-wrapper'),
         resetFilterBtn: document.getElementById('reset-filter-btn'),
-
-        // Элементы для формы редактирования (добавлены/обновлены)
         editExpenseCategory: document.getElementById('edit-expense-category'),
         editExpenseEmployee: document.getElementById('edit-expense-employee'),
         editExpensePaymentType: document.getElementById('edit-expense-payment-type'),
         editExpenseContractor: document.getElementById('edit-expense-contractor'),
         editExpenseClientSearch: document.getElementById('edit-expense-client-search'),
         editSelectedClientId: document.getElementById('edit-selected-client-id'),
-
-        // Новые элементы для лидов (добавление)
         expensePaidLeads: document.getElementById('expense-paid-leads'),
         expenseFreeLeads: document.getElementById('expense-free-leads'),
-        // Новые элементы для лидов (редактирование)
         editExpensePaidLeads: document.getElementById('edit-expense-paid-leads'),
         editExpenseFreeLeads: document.getElementById('edit-expense-free-leads'),
+        
+        // Новые элементы для приходов
+        incomesTableBody: document.getElementById('incomes-table-body'),
+        incomeDealWrapper: document.getElementById('income-deal-wrapper'),
+        incomeDealSelect: document.getElementById('income-deal-select'),
     },
 
     // --- Функции рендеринга и управления UI ---
@@ -80,7 +79,6 @@ App.cashbox.ui = {
             `;
         });
 
-        // Навешиваем обработчики на все иконки, а внутри проверяем права
         expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => {
             icon.addEventListener('click', (e) => {
                 if (e.currentTarget.classList.contains('access-restricted')) {
@@ -101,6 +99,55 @@ App.cashbox.ui = {
                 onDelete(e.currentTarget.dataset.id);
             });
         });
+    },
+
+    renderIncomesTable: function(incomes, onDelete) {
+        const { incomesTableBody } = this.elements;
+        incomesTableBody.innerHTML = '';
+        if (!incomes || incomes.length === 0) {
+            incomesTableBody.innerHTML = `<tr><td colspan="8">Нет записей о приходах.</td></tr>`;
+            return;
+        }
+
+        const canDelete = App.userPermissions.tabs.cashbox.delete;
+
+        incomes.forEach(income => {
+            const row = incomesTableBody.insertRow();
+            row.insertCell().textContent = income.id;
+            row.insertCell().textContent = income.income_date;
+            row.insertCell().textContent = parseFloat(income.amount).toFixed(2);
+            row.insertCell().textContent = income.contact_name || '—';
+            row.insertCell().textContent = income.deal_name || '—';
+            row.insertCell().textContent = income.comment || '—';
+            row.insertCell().textContent = income.added_by_user_name || 'Неизвестно';
+            
+            const actionsCell = row.insertCell();
+            actionsCell.className = 'actions-column';
+            const deleteIconClass = canDelete ? 'action-icon delete-icon' : 'action-icon delete-icon access-restricted';
+            actionsCell.innerHTML = `<span class="${deleteIconClass}" data-id="${income.id}" title="Удалить">🗑️</span>`;
+        });
+
+        incomesTableBody.querySelectorAll('.delete-icon').forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('access-restricted')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                onDelete(e.currentTarget.dataset.id);
+            });
+        });
+    },
+
+    renderDealSelect: function(deals) {
+        const { incomeDealWrapper, incomeDealSelect } = this.elements;
+        if (deals && deals.length > 0) {
+            App.populateSelect(incomeDealSelect, deals, 'Выберите сделку...');
+            incomeDealWrapper.style.display = '';
+        } else {
+            incomeDealWrapper.style.display = 'none';
+            incomeDealSelect.innerHTML = '';
+        }
     },
 
     updatePaginationControls: function(totalRecords, limit, offset) {
