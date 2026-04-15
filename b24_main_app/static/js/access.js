@@ -65,7 +65,7 @@ App.initializeAccessTab = async function () {
         if (entity) {
             const defaultPermissions = {
                 tabs: {
-                    cashbox: { view: false, income: { view: false, save: false, delete: false }, expense: { view: false, save: false, edit: false, delete: false } },
+                    cashbox: { view: false, income: { view: false, save: false, edit: false, delete: false }, expense: { view: false, save: false, edit: false, delete: false } },
                     statistics: { view: false },
                     access: { view: false, save: false, delete: false }
                 }
@@ -122,7 +122,7 @@ App.initializeAccessTab = async function () {
         const row = rulesTableBody.insertRow();
         row.dataset.entityId = entityId;
 
-        const perms = permissions; // Бэкенд теперь всегда отдает новую структуру
+        const perms = permissions;
 
         const nameCell = row.insertCell();
         nameCell.textContent = entityName;
@@ -139,6 +139,7 @@ App.initializeAccessTab = async function () {
                     <strong>Касса / Приходы:</strong>
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.view" ${perms.tabs.cashbox?.income?.view ? 'checked' : ''}> Просмотр</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.save" ${perms.tabs.cashbox?.income?.save ? 'checked' : ''}> Сохранение</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.income.edit" ${perms.tabs.cashbox?.income?.edit ? 'checked' : ''}> Редактирование</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.delete" ${perms.tabs.cashbox?.income?.delete ? 'checked' : ''}> Удаление</label>
                 </div>
                 <div class="access-group">
@@ -175,7 +176,6 @@ App.initializeAccessTab = async function () {
         if (!App.userPermissions.tabs.access.save) saveBtn.classList.add('access-restricted');
         if (!App.userPermissions.tabs.access.delete) deleteBtn.classList.add('access-restricted');
 
-        // Логика блокировки чекбоксов
         const cashboxView = row.querySelector('[data-perm="tabs.cashbox.view"]');
         const incomeView = row.querySelector('[data-perm="tabs.cashbox.income.view"]');
         const expenseView = row.querySelector('[data-perm="tabs.cashbox.expense.view"]');
@@ -187,6 +187,7 @@ App.initializeAccessTab = async function () {
             expenseView.disabled = !cashboxChecked;
             
             row.querySelector('[data-perm="tabs.cashbox.income.save"]').disabled = !cashboxChecked || !incomeView.checked;
+            row.querySelector('[data-perm="tabs.cashbox.income.edit"]').disabled = !cashboxChecked || !incomeView.checked;
             row.querySelector('[data-perm="tabs.cashbox.income.delete"]').disabled = !cashboxChecked || !incomeView.checked;
             
             row.querySelector('[data-perm="tabs.cashbox.expense.save"]').disabled = !cashboxChecked || !expenseView.checked;
@@ -209,6 +210,7 @@ App.initializeAccessTab = async function () {
                         income: {
                             view: row.querySelector('[data-perm="tabs.cashbox.income.view"]').checked,
                             save: row.querySelector('[data-perm="tabs.cashbox.income.save"]').checked,
+                            edit: row.querySelector('[data-perm="tabs.cashbox.income.edit"]').checked,
                             delete: row.querySelector('[data-perm="tabs.cashbox.income.delete"]').checked,
                         },
                         expense: {

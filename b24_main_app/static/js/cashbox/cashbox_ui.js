@@ -34,7 +34,6 @@ App.cashbox.ui = {
         editExpensePaidLeads: document.getElementById('edit-expense-paid-leads'),
         editExpenseFreeLeads: document.getElementById('edit-expense-free-leads'),
         
-        // Новые элементы для приходов
         incomesTableBody: document.getElementById('incomes-table-body'),
         incomeDealWrapper: document.getElementById('income-deal-wrapper'),
         incomeDealSelect: document.getElementById('income-deal-select'),
@@ -50,8 +49,8 @@ App.cashbox.ui = {
             return;
         }
         
-        const canEdit = App.userPermissions.tabs.cashbox.edit;
-        const canDelete = App.userPermissions.tabs.cashbox.delete;
+        const canEdit = App.userPermissions.tabs.cashbox.expense.edit;
+        const canDelete = App.userPermissions.tabs.cashbox.expense.delete;
 
         expenses.forEach(expense => {
             const row = expensesTableBody.insertRow();
@@ -109,7 +108,7 @@ App.cashbox.ui = {
             return;
         }
 
-        const canDelete = App.userPermissions.tabs.cashbox.delete;
+        const canDelete = App.userPermissions.tabs.cashbox.income.delete;
 
         incomes.forEach(income => {
             const row = incomesTableBody.insertRow();
