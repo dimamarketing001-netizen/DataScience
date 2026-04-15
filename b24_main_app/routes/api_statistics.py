@@ -1,5 +1,5 @@
 from flask import request, jsonify, current_app
-from core.b24 import b24_call_method
+from core.b24 import b24_call_method, fetch_paginated_data
 from core.db import get_db_connection
 from collections import defaultdict
 
@@ -10,21 +10,8 @@ LEAD_STATUS_GROUPS = {
     "success": ["CONVERTED"]
 }
 
-def fetch_paginated_data(method, params):
-    items = []
-    start = 0
-    while True:
-        params['start'] = start
-        result = b24_call_method(method, params)
-        if not result or 'result' not in result: break
-        batch = result.get('result', [])
-        if not batch: break
-        items.extend(batch)
-        start = result.get('next', None)
-        if start is None: break
-    return items
-
 def get_statistics():
+    """Собирает, обрабатывает и возвращает статистику по лидам, сделкам и счетам."""
     try:
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')

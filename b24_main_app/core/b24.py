@@ -18,6 +18,37 @@ def b24_call_method(method, params={}):
         logger.error(f"Ошибка в b24_call_method для {method}: {e}", exc_info=True)
         return None
 
+def fetch_paginated_data(method, params):
+    """Универсальная функция для извлечения данных с пагинацией."""
+    items = []
+    start = 0
+    while True:
+        # Копируем параметры, чтобы не изменять оригинальный словарь
+        current_params = params.copy()
+        current_params['start'] = start
+        
+        result = b24_call_method(method, current_params)
+        
+        if not result or 'result' not in result:
+            logger.warning(f"Прерывание пагинации для {method}: нет ключа 'result'. Ответ: {result}")
+            break
+        
+        batch = result.get('result', [])
+        if not isinstance(batch, list):
+             logger.warning(f"Прерывание пагинации для {method}: 'result' не является списком. Ответ: {result}")
+             break
+        if not batch:
+            break
+            
+        items.extend(batch)
+        
+        # Проверяем наличие 'next' для следующей итерации
+        if 'next' in result:
+            start = result['next']
+        else:
+            break
+    return items
+
 def _get_b24_entity_name(entity_type, entity_id):
     if not entity_id: return None
     cache_key = f"{entity_type}_{entity_id}"
@@ -35,6 +66,11 @@ def _get_b24_entity_name(entity_type, entity_id):
             if response and response.get('result'):
                 contact = response['result']
                 name = f"{contact.get('LAST_NAME', '')} {contact.get('NAME', '')}".strip()
+        elif entity_type == 'deal':
+            response = b24_call_method('crm.deal.get', {'ID': entity_id})
+            if response and response.get('result'):
+                deal = response['result']
+                name = deal.get('TITLE', f"Сделка #{entity_id}")
         elif entity_type == 'source':
             response = b24_call_method('crm.status.list', {'filter[ENTITY_ID]': 'SOURCE'})
             if response and response.get('result'):
