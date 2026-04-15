@@ -22,11 +22,17 @@ App.initializeCashbox = function() {
     // --- ОТЛАДКА и ПРИМЕНЕНИЕ ПРАВ ---
     console.log("CASHBOX PERMISSIONS CHECK:", JSON.stringify(App.userPermissions.tabs.cashbox, null, 2));
 
-    if (!App.userPermissions.tabs.cashbox.income.view) {
-        incomeCard.classList.add('access-restricted');
+    // --- ИСПРАВЛЕНИЕ: Явное добавление/удаление класса ---
+    if (App.userPermissions.tabs.cashbox.income.view) {
+        incomeCard.classList.remove('access-restricted', 'ui-disabled-card');
+    } else {
+        incomeCard.classList.add('access-restricted', 'ui-disabled-card');
     }
-    if (!App.userPermissions.tabs.cashbox.expense.view) {
-        expenseCard.classList.add('access-restricted');
+
+    if (App.userPermissions.tabs.cashbox.expense.view) {
+        expenseCard.classList.remove('access-restricted', 'ui-disabled-card');
+    } else {
+        expenseCard.classList.add('access-restricted', 'ui-disabled-card');
     }
 
     // --- Навигация ---
