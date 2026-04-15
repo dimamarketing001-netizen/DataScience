@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, render_template
 
 # Импорт функций из модулей
 from core.db import init_db
-from routes.api_cashbox import get_cashbox_initial_data, add_expense, get_expenses, get_single_expense, update_expense, delete_expense
+from routes.api_cashbox import get_cashbox_initial_data, add_expense, get_expenses, get_single_expense, update_expense, delete_expense, add_income, get_incomes, update_income, delete_income, get_client_deals
 from routes.api_access import get_my_permissions, handle_access_rights
 from routes.api_common import search_contacts, get_initial_data_for_access
 from routes.api_statistics import get_statistics
@@ -22,6 +22,11 @@ api_actions = {
     'get_single_expense': get_single_expense,
     'update_expense': update_expense,
     'delete_expense': delete_expense,
+    'add_income': add_income,
+    'get_incomes': get_incomes,
+    'update_income': update_income,
+    'delete_income': delete_income,
+    'get_client_deals': get_client_deals,
     
     # Access actions
     'my_permissions': get_my_permissions,
@@ -50,18 +55,15 @@ def router():
     # Вызов функции из словаря по 'action'
     if action in api_actions:
         handler = api_actions[action]
-        # Для handle_access_rights, который обрабатывает и GET, и POST
-        if action == 'access_rights':
-            return handler()
-        # Для остальных просто вызываем
         return handler()
     
     # Если action указан, но не найден в словаре
     if action:
         return jsonify({'error': f'Action "{action}" not found'}), 404
     
-    # Если action не указан и это GET-запрос, отдаем главную страницу
-    return render_template('finance_index.html')
+    # Если action не указан и это GET-запрос, возвращаем ошибку.
+    # Прямой доступ к приложению запрещен.
+    return "<h1>Access Denied</h1><p>This application can only be accessed from within Bitrix24.</p>", 403
 
 
 # --- Запуск приложения ---
