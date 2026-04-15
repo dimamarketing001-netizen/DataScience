@@ -23,7 +23,6 @@ BX24.ready(() => {
     const appContainer = document.getElementById('app-container');
     const screens = document.querySelectorAll('.app-screen');
     const mainMenu = document.getElementById('main-menu');
-    // --- ИСПРАВЛЕНИЕ: Селектор теперь ищет карточки только в главном меню ---
     const menuCards = document.querySelectorAll('#main-menu .menu-card');
     const backButtons = document.querySelectorAll('.back-button');
     
@@ -159,7 +158,15 @@ BX24.ready(() => {
             console.log("Current user data received:", App.currentUser);
             try {
                 const departmentId = (App.currentUser.UF_DEPARTMENT && App.currentUser.UF_DEPARTMENT.length > 0) ? App.currentUser.UF_DEPARTMENT[0] : '';
-                const permRes = await fetch(`/?action=my_permissions&user_id=${App.currentUser.ID}&department_id=${departmentId}`);
+                
+                // --- ИСПРАВЛЕНИЕ: Формируем полный URL ---
+                const url = new URL(window.location.href);
+                url.searchParams.set('action', 'my_permissions');
+                url.searchParams.set('user_id', App.currentUser.ID);
+                url.searchParams.set('department_id', departmentId);
+
+                const permRes = await fetch(url);
+                
                 if (!permRes.ok) {
                     const errorText = await permRes.text();
                     throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
@@ -180,7 +187,6 @@ BX24.ready(() => {
     }
 
     // --- НАВИГАЦИЯ ---
-    // Используем более общий селектор для навигации, чтобы он работал и для вложенных карточек
     document.addEventListener('click', (event) => {
         const card = event.target.closest('.menu-card');
         if (!card) return;
