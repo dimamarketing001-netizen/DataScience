@@ -19,10 +19,11 @@ App.cashbox.expenses = {
         const addExpenseBtn = expenseForm.querySelector('button[type="submit"]');
         const updateExpenseBtn = editExpenseForm.querySelector('button[type="submit"]');
 
-        if (!App.userPermissions.tabs.cashbox.save) {
+        // --- ИСПРАВЛЕНИЕ: Проверяем правильные, гранулярные права ---
+        if (!App.userPermissions.tabs.cashbox.expense.save) {
             addExpenseBtn.classList.add('access-restricted');
         }
-        if (!App.userPermissions.tabs.cashbox.edit) {
+        if (!App.userPermissions.tabs.cashbox.expense.edit) {
             updateExpenseBtn.classList.add('access-restricted');
         }
 
@@ -82,7 +83,6 @@ App.cashbox.expenses = {
             }
         }
         
-        // Сделаем функцию доступной извне для перезагрузки после удаления
         this.loadExpensesTable = loadExpensesTable;
 
         function applyFilters() {

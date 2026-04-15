@@ -10,8 +10,8 @@ App.cashbox.incomes = {
         const incomeForm = document.getElementById('income-form');
         const addIncomeBtn = incomeForm.querySelector('button[type="submit"]');
 
-        // --- Применение прав ---
-        if (!App.userPermissions.tabs.cashbox.save) {
+        // --- ИСПРАВЛЕНИЕ: Проверяем правильные, гранулярные права ---
+        if (!App.userPermissions.tabs.cashbox.income.save) {
             addIncomeBtn.classList.add('access-restricted');
         }
 
@@ -89,6 +89,9 @@ App.cashbox.incomes = {
                 App.hideLoader();
             }
         }
+        
+        // Сделаем функцию доступной извне для перезагрузки после удаления
+        this.loadIncomesTable = loadIncomesTable;
         
         // Первоначальная загрузка
         loadIncomesTable();
