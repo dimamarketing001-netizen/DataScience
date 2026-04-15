@@ -1,9 +1,8 @@
 // Главный файл модуля "Касса", выполняет роль контроллера
-
-// --- ИСПРАВЛЕНИЕ: Определяем пространство имен ДО того, как другие скрипты попытаются его использовать
 App.cashbox = {};
 
-App.cashbox.init = function() {
+// --- ИСПРАВЛЕНИЕ: Инициализация должна соответствовать вызову в app.js ---
+App.initializeCashbox = function() {
     console.log("Initializing Cashbox main controller...");
 
     // --- Элементы UI ---
@@ -20,6 +19,9 @@ App.cashbox.init = function() {
     let itemToDelete = { id: null, type: null };
     let expenseModuleInitialized = false;
     let incomeModuleInitialized = false;
+
+    // --- ОТЛАДКА: Выводим в консоль объект прав для кассы ---
+    console.log("CASHBOX PERMISSIONS CHECK:", JSON.stringify(App.userPermissions.tabs.cashbox, null, 2));
 
     // --- Применение прав доступа к карточкам ---
     if (!App.userPermissions.tabs.cashbox.income.view) {
