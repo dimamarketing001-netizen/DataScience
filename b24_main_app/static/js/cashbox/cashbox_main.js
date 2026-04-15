@@ -1,7 +1,6 @@
 // Главный файл модуля "Касса", выполняет роль контроллера
 App.cashbox = {};
 
-// --- ИСПРАВЛЕНИЕ: Инициализация должна соответствовать вызову в app.js ---
 App.initializeCashbox = function() {
     console.log("Initializing Cashbox main controller...");
 
@@ -20,10 +19,10 @@ App.initializeCashbox = function() {
     let expenseModuleInitialized = false;
     let incomeModuleInitialized = false;
 
-    // --- ОТЛАДКА: Выводим в консоль объект прав для кассы ---
+    // --- ОТЛАДКА и ПРИМЕНЕНИЕ ПРАВ ---
+    // Этот код теперь выполняется в правильный момент, когда App.userPermissions уже загружены
     console.log("CASHBOX PERMISSIONS CHECK:", JSON.stringify(App.userPermissions.tabs.cashbox, null, 2));
 
-    // --- Применение прав доступа к карточкам ---
     if (!App.userPermissions.tabs.cashbox.income.view) {
         incomeCard.classList.add('access-restricted');
     }
