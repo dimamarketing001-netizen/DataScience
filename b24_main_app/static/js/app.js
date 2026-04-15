@@ -23,7 +23,8 @@ BX24.ready(() => {
     const appContainer = document.getElementById('app-container');
     const screens = document.querySelectorAll('.app-screen');
     const mainMenu = document.getElementById('main-menu');
-    const menuCards = document.querySelectorAll('.menu-card');
+    // --- ИСПРАВЛЕНИЕ: Селектор теперь ищет карточки только в главном меню ---
+    const menuCards = document.querySelectorAll('#main-menu .menu-card');
     const backButtons = document.querySelectorAll('.back-button');
     
     // --- Элементы системы уведомлений ---
@@ -41,15 +42,13 @@ BX24.ready(() => {
     // --- СИСТЕМА УВЕДОМЛЕНИЙ ---
     App.Notify.success = (message) => {
         notificationIcon.className = 'notification-popup-icon success-icon';
-        notificationTitle.style.display = 'none'; // No title for success
+        notificationTitle.style.display = 'none';
         notificationText.innerHTML = message;
-        notificationButtons.style.display = 'none'; // No buttons for success
-
+        notificationButtons.style.display = 'none';
         notificationOverlay.classList.add('show');
-
         setTimeout(() => {
             notificationOverlay.classList.remove('show');
-        }, 1000); // Исчезает через 1 секунду
+        }, 1000);
     };
 
     App.Notify.error = (title, message) => {
@@ -59,21 +58,16 @@ BX24.ready(() => {
             notificationTitle.textContent = title;
             notificationText.innerHTML = message;
             notificationButtons.style.display = 'flex';
-
             notificationOverlay.classList.add('show');
-
-            // Получаем свежую ссылку на кнопку и пересоздаем ее
             let notificationOkBtn = document.getElementById('notification-ok-btn');
             const newOkBtn = notificationOkBtn.cloneNode(true);
             notificationOkBtn.parentNode.replaceChild(newOkBtn, notificationOkBtn);
-            
             newOkBtn.onclick = () => {
                 notificationOverlay.classList.remove('show');
                 resolve();
             };
         });
     };
-
 
     // --- ГЛОБАЛЬНЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
     App.showLoader = () => loaderOverlay.style.display = 'flex';
@@ -98,7 +92,6 @@ BX24.ready(() => {
     App.showCustomConfirm = ({ title = 'Подтвердите действие', text = 'Вы уверены?', data = null, confirmButtonText = 'Подтвердить', confirmButtonClass = 'ui-btn-primary' }) => {
         return new Promise(resolve => {
             confirmationModalTitle.textContent = title;
-            
             let contentHtml = `<p>${text}</p>`;
             if (data) {
                 contentHtml += '<ul style="list-style: none; padding: 0; text-align: left;">';
@@ -110,24 +103,15 @@ BX24.ready(() => {
                 contentHtml += '</ul>';
             }
             confirmationModalText.innerHTML = contentHtml;
-
-            // *** ИСПРАВЛЕНИЕ: Получаем кнопки из DOM прямо здесь ***
             let confirmActionBtn = document.getElementById('confirm-action-btn');
             let cancelActionBtn = document.getElementById('cancel-action-btn');
-
             confirmActionBtn.textContent = confirmButtonText;
             confirmActionBtn.className = `ui-btn btn-fixed-width ${confirmButtonClass}`;
-            
             confirmationModal.style.display = 'flex';
-            
-            // Клонируем узлы, чтобы безопасно удалить и добавить обработчики
             const newConfirmBtn = confirmActionBtn.cloneNode(true);
             confirmActionBtn.parentNode.replaceChild(newConfirmBtn, confirmActionBtn);
-
             const newCancelBtn = cancelActionBtn.cloneNode(true);
             cancelActionBtn.parentNode.replaceChild(newCancelBtn, cancelActionBtn);
-
-            // Навешиваем события на новые (актуальные) кнопки
             newConfirmBtn.onclick = () => {
                 confirmationModal.style.display = 'none';
                 resolve(true);
@@ -141,19 +125,14 @@ BX24.ready(() => {
 
     // --- ЛОГИКА ДОСТУПОВ И АВТОРИЗАЦИИ ---
     function applyPermissions(permissions) {
-        // Проверяем, есть ли доступ хотя бы к одной вкладке
         const hasAnyAccess = Object.values(permissions.tabs).some(tab => tab.view);
-
         if (!hasAnyAccess) {
             App.showScreen(document.getElementById('no-access-screen'));
             appContainer.style.display = 'block';
-            App.hideLoader();
             return false;
         }
-
         menuCards.forEach(card => {
             const tabName = card.dataset.tab;
-            // Убедимся, что права для этой вкладки существуют
             if (permissions.tabs[tabName]) {
                 if (permissions.tabs[tabName].view) {
                     card.classList.remove('ui-disabled-card');
@@ -161,11 +140,9 @@ BX24.ready(() => {
                     card.classList.add('ui-disabled-card');
                 }
             } else {
-                // Если для вкладки вообще нет прав, блокируем ее
                 card.classList.add('ui-disabled-card');
             }
         });
-        
         return true;
     }
 
@@ -180,19 +157,15 @@ BX24.ready(() => {
             }
             App.currentUser = res.data();
             console.log("Current user data received:", App.currentUser);
-
             try {
                 const departmentId = (App.currentUser.UF_DEPARTMENT && App.currentUser.UF_DEPARTMENT.length > 0) ? App.currentUser.UF_DEPARTMENT[0] : '';
-                const permRes = await fetch(`?action=my_permissions&user_id=${App.currentUser.ID}&department_id=${departmentId}`);
-                
+                const permRes = await fetch(`/?action=my_permissions&user_id=${App.currentUser.ID}&department_id=${departmentId}`);
                 if (!permRes.ok) {
                     const errorText = await permRes.text();
                     throw new Error(`Failed to fetch permissions: ${permRes.status} ${permRes.statusText} - ${errorText}`);
                 }
-
                 App.userPermissions = await permRes.json();
                 console.log("User permissions received:", App.userPermissions);
-
                 if (applyPermissions(App.userPermissions)) {
                     appContainer.style.display = 'block';
                     App.showScreen(mainMenu);
@@ -207,12 +180,15 @@ BX24.ready(() => {
     }
 
     // --- НАВИГАЦИЯ ---
-    menuCards.forEach(card => {
-        card.addEventListener('click', () => {
-            const tab = card.dataset.tab;
+    // Используем более общий селектор для навигации, чтобы он работал и для вложенных карточек
+    document.addEventListener('click', (event) => {
+        const card = event.target.closest('.menu-card');
+        if (!card) return;
+
+        const tab = card.dataset.tab;
+        if (tab) {
             const screen = document.getElementById(`${tab}-screen`);
             if (screen) {
-                // Вызываем инициализаторы модулей, если они еще не были вызваны
                 if (tab === 'cashbox' && !App.cashboxInitialized) {
                     if (App.initializeCashbox) App.initializeCashbox();
                     App.cashboxInitialized = true;
@@ -227,8 +203,9 @@ BX24.ready(() => {
                 }
                 App.showScreen(screen);
             }
-        });
+        }
     });
+
     backButtons.forEach(button => button.addEventListener('click', () => App.showScreen(mainMenu)));
 
     // --- ЗАПУСК ПРИЛОЖЕНИЯ ---
