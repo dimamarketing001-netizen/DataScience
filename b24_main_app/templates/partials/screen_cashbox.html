@@ -1,0 +1,19 @@
+<!-- ЭКРАН: КАССА -->
+<div id="cashbox-screen" class="app-screen" data-tab="cashbox">
+    <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
+
+    <!-- Меню выбора: Приход/Расход -->
+    <div id="cashbox-choice-menu" class="main-menu">
+        <div id="goto-add-income" class="menu-card" data-cashbox-tab="income">
+            <div class="menu-card-icon">📈</div>
+            <div class="menu-card-title">Добавить приход</div>
+        </div>
+        <div id="goto-add-expense" class="menu-card" data-cashbox-tab="expense">
+            <div class="menu-card-icon">📉</div>
+            <div class="menu-card-title">Добавить расход</div>
+        </div>
+    </div>
+
+    {% include 'cashbox/incomes_module.html' %}
+    {% include 'cashbox/expenses_module.html' %}
+</div>

@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
 # --- Словарь API-действий ---
-# Ключ - это 'action' из URL, значение - функция-обработчик
+# Ключ - это 'action' из URL, значение - функция-обработчикa
 api_actions = {
     # Cashbox actions
     'cashbox_initial_data': get_cashbox_initial_data,

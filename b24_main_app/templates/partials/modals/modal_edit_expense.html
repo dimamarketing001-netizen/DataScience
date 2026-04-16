@@ -1,0 +1,86 @@
+<!-- Модальное окно редактирования расхода -->
+<div id="edit-expense-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 500px;">
+        <div class="ui-form-title"><div class="ui-form-title-text">Редактировать расход</div></div>
+        <form id="edit-expense-form" class="ui-form">
+            <input type="hidden" id="edit-expense-id">
+            <div class="ui-form-row">
+                <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
+                <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="text" id="edit-expense-date" class="ui-ctl-element" required></div></div>
+            </div>
+            <div class="ui-form-row">
+                <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма</div></div>
+                <div class="ui-form-content"><div class="ui-ctl ui-ctl-textbox ui-ctl-w100"><input type="number" id="edit-expense-amount" class="ui-ctl-element" required></div></div>
+            </div>
+            <div class="ui-form-row">
+                <div class="ui-form-label"><div class="ui-ctl-label-text">Категория</div></div>
+                <div class="ui-form-content">
+                    <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                        <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                        <select id="edit-expense-category" class="ui-ctl-element" required>
+                            <option value="">Выберите категорию...</option>
+                            <option value="office">Офис и Операционные расходы</option>
+                            <option value="employees">Сотрудники</option>
+                            <option value="marketing">Маркетинг и Лиды</option>
+                            <option value="clients">Расходы по Клиентам</option>
+                            <option value="taxes">Налоги и Банк</option>
+                            <option value="it">IT и Оборудование</option>
+                            <option value="transfers">Внутренние переводы</option>
+                            <option value="other">Прочее</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="edit-employee-fields" class="dynamic-field" style="display: none;">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Сотрудник</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-employee" class="ui-ctl-element"></select></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Тип выплаты</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-payment-type" class="ui-ctl-element"><option value="fix">Фикса/ЗП</option><option value="motivation">Мотивация/Премия</option></select></div></div>
+                </div>
+            </div>
+            <div id="edit-marketing-fields" class="dynamic-field" style="display: none;">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Подрядчик</div></div>
+                    <div class="ui-form-content"><div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"><div class="ui-ctl-after ui-ctl-icon-angle"></div><select id="edit-expense-contractor" class="ui-ctl-element"></select></div></div>
+                </div>
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Количество лидов</div></div>
+                    <div class="ui-form-content" style="display: flex; gap: 10px;">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="number" id="edit-expense-paid-leads" class="ui-ctl-element" placeholder="Платные лиды">
+                        </div>
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="number" id="edit-expense-free-leads" class="ui-ctl-element" placeholder="Бесплатные лиды">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="edit-client-fields" class="dynamic-field" style="display: none;">
+                <div class="ui-form-row">
+                    <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
+                    <div class="ui-form-content client-search-wrapper">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
+                            <input type="text" id="edit-expense-client-search" class="ui-ctl-element" placeholder="Начните вводить имя клиента для поиска...">
+                        </div>
+                        <div id="edit-client-search-results" class="client-search-results"></div>
+                        <input type="hidden" id="edit-selected-client-id">
+                    </div>
+                </div>
+            </div>
+            <div class="ui-form-row">
+                <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
+                <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="edit-expense-comment" class="ui-ctl-element"></textarea></div></div>
+            </div>
+            <div class="ui-form-row ui-form-row-actions">
+                <div class="ui-form-label"></div>
+                <div class="ui-form-content">
+                    <button type="submit" class="ui-btn ui-btn-primary" data-action="save">Сохранить изменения</button>
+                    <button type="button" id="cancel-edit-btn" class="ui-btn ui-btn-light-border">Отмена</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
