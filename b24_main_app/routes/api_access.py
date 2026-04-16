@@ -25,12 +25,12 @@ def get_my_permissions():
         cursor = conn.cursor(dictionary=True)
 
         try:
-            # Новая, более детальная структура прав по умолчанию
+            # --- ИСПРАВЛЕНИЕ: Добавлено 'edit': False для income ---
             final_permissions = {
                 "tabs": {
                     "cashbox": {
                         "view": False,
-                        "income": {"view": False, "save": False, "delete": False},
+                        "income": {"view": False, "save": False, "edit": False, "delete": False},
                         "expense": {"view": False, "save": False, "edit": False, "delete": False}
                     },
                     "statistics": {"view": False},
@@ -90,7 +90,6 @@ def get_my_permissions():
         return jsonify({'error': str(e)}), 500
 
 def handle_access_rights():
-    # ... (Этот код не требует изменений, т.к. он просто сохраняет переданный JSON)
     conn = get_db_connection()
     if not conn: return jsonify({'error': 'DB connection failed'}), 500
     cursor = conn.cursor(dictionary=True)
