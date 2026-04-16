@@ -223,17 +223,17 @@ def add_income_service(data):
                     try:
                         cur2 = conn2.cursor()
                         cur2.execute(
-                            "UPDATE incomes SET b24_invoice_id=%s, b24_file_id=%s WHERE id=%s",
+                            "UPDATE incomes SET b24_invoice_id=%s, b24_file_id=%s, b24_file_url=%s WHERE id=%s",
                             (
                                 str(invoice_result.get('invoice_id', '')),
-                                str(invoice_result.get('b24_file_id', '')) if invoice_result.get(
-                                    'b24_file_id') else None,
+                                invoice_result.get('b24_file_id'),
+                                invoice_result.get('b24_file_url'),
                                 new_income_id
                             )
                         )
-                        conn2.commit()
                         current_app.logger.info(
-                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}, file_id={invoice_result.get('b24_file_id')} to DB")
+                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}, file_id={invoice_result.get('b24_file_id')}, file_url saved={bool(invoice_result.get('b24_file_url'))}")
+                        conn2.commit()
                     except Exception as db_err:
                         current_app.logger.warning(f"add_income_service: failed to save invoice/file ids: {db_err}")
                     finally:
@@ -293,10 +293,9 @@ def get_incomes_service(args):
         income['deal_name'] = income.get('deal_type_name') or '—'
         income['added_by_user_name'] = _get_b24_entity_name('user', income['added_by_user_id'])
         income['income_date'] = income['income_date'].isoformat() if income['income_date'] else None
-        # b24_invoice_id и b24_file_id уже есть в SELECT * — просто убеждаемся что они строки
         income['b24_invoice_id'] = str(income['b24_invoice_id']) if income.get('b24_invoice_id') else None
         income['b24_file_id'] = str(income['b24_file_id']) if income.get('b24_file_id') else None
-
+        income['b24_file_url'] = income.get('b24_file_url') or None
     return {
         "incomes": incomes,
         "total_records": total_records,
@@ -523,9 +522,21 @@ def create_b24_invoice_service(income_data, file_data=None):
     # Поле файла возвращает ID файла (integer) после успешной загрузки
     file_field_value = item_result.get('UF_CRM_SMART_INVOICE_1776360197269') or \
                        item_result.get('ufCrmSmartInvoice1776360197269')
-    # Приводим к строке если не None и не 0
-    b24_file_id = str(file_field_value) if file_field_value and file_field_value != 0 else None
-    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}, b24_file_id={b24_file_id}")
+
+    b24_file_id = None
+    b24_file_url = None
+
+    if isinstance(file_field_value, dict):
+        # Б24 вернул объект: {'id': 142346, 'url': '...', 'urlMachine': '...'}
+        b24_file_id = str(file_field_value.get('id', '')) or None
+        # urlMachine работает через REST без токена сессии браузера
+        b24_file_url = file_field_value.get('urlMachine') or file_field_value.get('url') or None
+    elif file_field_value and file_field_value != 0:
+        # Вернул просто ID числом
+        b24_file_id = str(file_field_value)
+
+    current_app.logger.info(
+        f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}, b24_file_id={b24_file_id}, b24_file_url={b24_file_url[:80] if b24_file_url else None}")
 
     # --- Шаг 3: Добавляем строку товара ---
     product_params = {
@@ -548,6 +559,7 @@ def create_b24_invoice_service(income_data, file_data=None):
             'success': True,
             'invoice_id': new_invoice_id,
             'b24_file_id': b24_file_id,
+            'b24_file_url': b24_file_url,
             'product_added': False,
             'file_uploaded': file_b64_for_field is not None
         }
@@ -557,6 +569,7 @@ def create_b24_invoice_service(income_data, file_data=None):
         'success': True,
         'invoice_id': new_invoice_id,
         'b24_file_id': b24_file_id,
+        'b24_file_url': b24_file_url,
         'product_added': True,
         'file_uploaded': file_b64_for_field is not None
     }

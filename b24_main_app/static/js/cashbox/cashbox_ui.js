@@ -106,42 +106,31 @@ App.cashbox.ui = {
             // --- Столбец "Документ" ---
             const docCell = row.insertCell();
             docCell.className = 'actions-column';
-            if (income.b24_invoice_id && income.b24_file_id) {
-                // Ссылка открывает файл через BX24.openPath внутри Битрикс24
-                const docLink = document.createElement('span');
-                docLink.className = 'action-icon';
+            if (income.b24_file_url) {
+                // urlMachine — прямой REST URL, работает без авторизации браузера
+                const docLink = document.createElement('a');
+                docLink.href = income.b24_file_url;
+                docLink.target = '_blank';
+                docLink.rel = 'noopener noreferrer';
                 docLink.title = 'Открыть документ';
-                docLink.style.cursor = 'pointer';
+                docLink.style.textDecoration = 'none';
+                docLink.style.display = 'inline-flex';
+                docLink.style.alignItems = 'center';
+                docLink.style.gap = '4px';
+                docLink.style.color = '#2fc6f6';
+                docLink.style.fontSize = '13px';
                 docLink.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round" style="color:#2fc6f6;">
+                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>
                         <line x1="16" y1="13" x2="8" y2="13"></line>
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
                     </svg>
+                    Открыть
                 `;
-                // Открываем файл через BX24.openPath — файл откроется внутри Б24 как из карточки счёта
-                docLink.addEventListener('click', () => {
-                    const fileUrl = `/bitrix/services/main/ajax.php?action=crm.controller.item.getFile` +
-                        `&SITE_ID=s1` +
-                        `&entityTypeId=31` +
-                        `&id=${income.b24_invoice_id}` +
-                        `&fieldName=UF_CRM_SMART_INVOICE_1776360197269` +
-                        `&fileId=${income.b24_file_id}`;
-
-                    // BX24.openPath открывает URL внутри iframe Битрикс24
-                    if (typeof BX24 !== 'undefined' && BX24.openPath) {
-                        BX24.openPath(fileUrl, (result) => {
-                            console.log('BX24.openPath result:', result);
-                        });
-                    } else {
-                        // Fallback — открыть в новой вкладке
-                        window.open(fileUrl, '_blank');
-                    }
-                });
                 docCell.appendChild(docLink);
             } else {
                 docCell.textContent = '—';
