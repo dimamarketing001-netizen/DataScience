@@ -24,6 +24,7 @@
 
             this.currentSearchQuery = '';
             this.allFoundContacts = []; // Храним все найденные и дедуплицированные контакты
+            this.onClientSelected = options.onClientSelected || null;
 
             // Проверка наличия всех необходимых элементов
             if (!this.searchInput || !this.searchResultsContainer || !this.selectedClientIdInput) {
@@ -190,7 +191,12 @@
                     // При выборе клиента заполняем input и скрытое поле ID
                     this.selectedClientIdInput.value = contact.ID;
                     this.searchInput.value = displayInfo;
-                    this.searchResultsContainer.style.display = 'none'; // Скрываем результаты после выбора
+                    this.searchResultsContainer.style.display = 'none';
+
+                    // Вызываем callback если он передан, передаём ID клиента и сам input-элемент
+                    if (typeof this.onClientSelected === 'function') {
+                        this.onClientSelected(contact.ID, this.searchInput);
+                    }
                 });
                 this.searchResultsContainer.appendChild(item);
             });
@@ -234,20 +240,3 @@
     App.ClientSearchHandler = ClientSearchHandler;
 
 })();
-
-// Инициализируем поиск клиентов, когда Bitrix24 API будет готов
-BX24.ready(function() {
-    // Для формы добавления расхода
-    new App.ClientSearchHandler({
-        searchInput: document.getElementById('expense-client-search'),
-        searchResultsContainer: document.getElementById('client-search-results'),
-        selectedClientIdInput: document.getElementById('selected-client-id')
-    });
-
-    // Для формы редактирования расхода
-    new App.ClientSearchHandler({
-        searchInput: document.getElementById('edit-expense-client-search'),
-        searchResultsContainer: document.getElementById('edit-client-search-results'),
-        selectedClientIdInput: document.getElementById('edit-selected-client-id')
-    });
-});
