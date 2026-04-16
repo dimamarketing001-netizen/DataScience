@@ -98,8 +98,37 @@ App.cashbox.ui = {
             row.insertCell().textContent = income.id;
             row.insertCell().textContent = income.income_date;
             row.insertCell().textContent = parseFloat(income.amount).toFixed(2);
-            row.insertCell().textContent = income.contact_name || '—';
-            row.insertCell().textContent = income.deal_name || '—';
+            // Контакт — кликабельная ссылка
+            const contactCell = row.insertCell();
+            if (income.contact_id && income.contact_name) {
+                const contactLink = document.createElement('a');
+                contactLink.href = `${App.b24Domain}/crm/contact/details/${income.contact_id}/`;
+                contactLink.target = '_blank';
+                contactLink.rel = 'noopener noreferrer';
+                contactLink.textContent = income.contact_name;
+                contactLink.style.cssText = 'color:#2fc6f6;text-decoration:none;';
+                contactLink.onmouseover = () => contactLink.style.textDecoration = 'underline';
+                contactLink.onmouseout = () => contactLink.style.textDecoration = 'none';
+                contactCell.appendChild(contactLink);
+            } else {
+                contactCell.textContent = '—';
+            }
+
+            // Сделка — кликабельная ссылка
+            const dealCell = row.insertCell();
+            if (income.deal_id && income.deal_name && income.deal_name !== '—') {
+                const dealLink = document.createElement('a');
+                dealLink.href = `${App.b24Domain}/crm/deal/details/${income.deal_id}/`;
+                dealLink.target = '_blank';
+                dealLink.rel = 'noopener noreferrer';
+                dealLink.textContent = income.deal_name;
+                dealLink.style.cssText = 'color:#2fc6f6;text-decoration:none;';
+                dealLink.onmouseover = () => dealLink.style.textDecoration = 'underline';
+                dealLink.onmouseout = () => dealLink.style.textDecoration = 'none';
+                dealCell.appendChild(dealLink);
+            } else {
+                dealCell.textContent = income.deal_name || '—';
+            }
             row.insertCell().textContent = income.comment || '—';
             row.insertCell().textContent = income.added_by_user_name || 'Неизвестно';
 

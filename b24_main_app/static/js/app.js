@@ -156,6 +156,10 @@ BX24.ready(() => {
             }
             App.currentUser = res.data();
             console.log("Current user data received:", App.currentUser);
+            // Определяем домен Б24 для построения ссылок
+            // BX24.getDomain() возвращает домен без протокола
+            App.b24Domain = 'https://' + BX24.getDomain();
+            console.log("B24 domain:", App.b24Domain);
             try {
                 const departmentId = (App.currentUser.UF_DEPARTMENT && App.currentUser.UF_DEPARTMENT.length > 0) ? App.currentUser.UF_DEPARTMENT[0] : '';
                 

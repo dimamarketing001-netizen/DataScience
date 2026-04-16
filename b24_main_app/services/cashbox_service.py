@@ -296,6 +296,9 @@ def get_incomes_service(args):
         income['b24_invoice_id'] = str(income['b24_invoice_id']) if income.get('b24_invoice_id') else None
         income['b24_file_id'] = str(income['b24_file_id']) if income.get('b24_file_id') else None
         income['b24_file_url'] = income.get('b24_file_url') or None
+        # contact_id и deal_id уже есть в SELECT * — явно приводим к строке для JS
+        income['contact_id'] = str(income['contact_id']) if income.get('contact_id') else None
+        income['deal_id'] = str(income['deal_id']) if income.get('deal_id') else None
     return {
         "incomes": incomes,
         "total_records": total_records,
@@ -362,21 +365,51 @@ def update_income_service(data):
         conn.close()
 
 def delete_income_service(income_id):
-    """Сервисная функция для удаления прихода."""
+    """Сервисная функция для удаления прихода и связанного счёта в Б24."""
+    if not income_id:
+        raise ValueError('Income ID is required')
+
     conn = get_db_connection()
-    cursor = conn.cursor()
+    if not conn:
+        raise Exception('DB connection failed')
+    cursor = conn.cursor(dictionary=True)
+
     try:
+        # Сначала получаем b24_invoice_id чтобы удалить счёт
+        cursor.execute("SELECT b24_invoice_id FROM incomes WHERE id = %s", (income_id,))
+        income = cursor.fetchone()
+        b24_invoice_id = income.get('b24_invoice_id') if income else None
+        current_app.logger.info(f"delete_income_service: income_id={income_id}, b24_invoice_id={b24_invoice_id}")
+
+        # Удаляем из БД
         cursor.execute("DELETE FROM incomes WHERE id = %s", (income_id,))
         conn.commit()
-        current_app.logger.info(f"Income with ID {income_id} deleted.")
-        return {'success': cursor.rowcount > 0}
+        deleted = cursor.rowcount > 0
+        current_app.logger.info(f"delete_income_service: DB delete ok, rows_deleted={deleted}")
     except Exception as e:
         conn.rollback()
-        current_app.logger.error(f"Error deleting income {income_id}: {e}")
+        current_app.logger.error(f"delete_income_service: DB error: {e}")
         raise
     finally:
         cursor.close()
         conn.close()
+
+    # Удаляем счёт из Б24 если он был создан
+    invoice_deleted = False
+    if b24_invoice_id and deleted:
+        try:
+            invoice_result = delete_b24_invoice_service(b24_invoice_id)
+            invoice_deleted = invoice_result.get('success', False)
+            current_app.logger.info(f"delete_income_service: B24 invoice delete result={invoice_result}")
+        except Exception as e:
+            # Запись из БД уже удалена — не откатываем, просто логируем
+            current_app.logger.error(f"delete_income_service: B24 invoice delete failed: {e}")
+
+    return {
+        'success': deleted,
+        'invoice_deleted': invoice_deleted,
+        'b24_invoice_id': b24_invoice_id
+    }
 
 def get_client_deals_service(contact_id):
     """Получает список сделок для указанного контакта, используя их тип в качестве названия."""
@@ -573,3 +606,24 @@ def create_b24_invoice_service(income_data, file_data=None):
         'product_added': True,
         'file_uploaded': file_b64_for_field is not None
     }
+
+def delete_b24_invoice_service(invoice_id):
+    """Удаляет смарт-счёт из Битрикс24."""
+    if not invoice_id:
+        return {'success': False, 'error': 'invoice_id не передан'}
+
+    SMART_INVOICE_ENTITY_TYPE_ID = 31
+
+    params = {
+        'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+        'id': invoice_id
+    }
+
+    current_app.logger.info(f"delete_b24_invoice: deleting invoice_id={invoice_id}")
+    result = b24_call_method('crm.item.delete', params)
+    current_app.logger.info(f"delete_b24_invoice: response={result}")
+
+    if result and result.get('result'):
+        return {'success': True}
+    else:
+        return {'success': False, 'error': str(result)}
