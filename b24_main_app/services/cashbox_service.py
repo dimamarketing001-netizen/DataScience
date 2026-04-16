@@ -447,11 +447,8 @@ def create_b24_invoice_service(income_data, file_data=None):
             file_content_b64 = base64.b64encode(file_data['content']).decode('utf-8')
             filename = file_data.get('filename', 'document.pdf')
 
-            # Формат для поля типа "Файл" в crm.item.add:
-            # {"fileData": ["имя_файла", "base64_содержимое"]}
-            file_b64_for_field = {
-                "fileData": [filename, file_content_b64]
-            }
+            # Битрикс24 принимает файл в UF-поле в формате массива массивов
+            file_b64_for_field = [filename, file_content_b64]
 
             current_app.logger.info(
                 f"INVOICE STEP 1: file prepared for field '{FILE_CUSTOM_FIELD}', "
@@ -497,7 +494,9 @@ def create_b24_invoice_service(income_data, file_data=None):
         raise Exception(f"INVOICE STEP 2 FAILED: no invoice ID in response: {invoice_res}")
 
     new_invoice_id = item_result['id']
-    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}")
+    file_field_value = item_result.get('UF_CRM_SMART_INVOICE_1776360197269') or item_result.get(
+        'ufCrmSmartInvoice1776360197269')
+    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}, file_field_value={file_field_value}")
 
     # --- Шаг 3: Добавляем строку товара ---
     product_params = {
