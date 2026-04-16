@@ -416,9 +416,6 @@ def create_b24_invoice_service(income_data, file_data=None):
     MY_COMPANY_ID = 8
     FINAL_INVOICE_STAGE_ID = 'DT31_2:P'
     PAYMENT_DATE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776220509400"
-    # ID папки на диске Б24 для хранения файлов приходов (папка "Приходы" в корне диска компании)
-    # Если папки нет — файл загружается в корень диска (folder_id=0 означает корень)
-    B24_FOLDER_ID = 0
 
     deal_id = income_data.get('deal_id')
     contact_id = income_data.get('contact_id')
@@ -439,34 +436,32 @@ def create_b24_invoice_service(income_data, file_data=None):
 
     title = f"Приход #{income_db_id} | {deal_type_name} | {date_for_api} | {float(amount):.2f} руб."
 
-    # --- Шаг 1: Загружаем файл на диск Б24 ---
-    uploaded_file_id = None
+    # --- Шаг 1: Подготавливаем файл для передачи в поле счёта ---
+    # Поле типа "Файл" в смарт-процессе принимает base64 напрямую в crm.item.add
+    FILE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776360197269"
+    file_b64_for_field = None
+
     if file_data and file_data.get('content'):
         try:
             import base64
             file_content_b64 = base64.b64encode(file_data['content']).decode('utf-8')
             filename = file_data.get('filename', 'document.pdf')
 
-            upload_params = {
-                'id': B24_FOLDER_ID,
-                'data': {'NAME': filename},
-                'fileContent': [filename, file_content_b64]
+            # Формат для поля типа "Файл" в crm.item.add:
+            # {"fileData": ["имя_файла", "base64_содержимое"]}
+            file_b64_for_field = {
+                "fileData": [filename, file_content_b64]
             }
 
             current_app.logger.info(
-                f"INVOICE STEP 1: uploading file '{filename}' size={len(file_data['content'])} bytes to disk folder_id={B24_FOLDER_ID}")
-            upload_res = b24_call_method('disk.folder.uploadfile', upload_params)
-            current_app.logger.info(f"INVOICE STEP 1 response: {upload_res}")
-
-            if upload_res and upload_res.get('result') and upload_res['result'].get('ID'):
-                uploaded_file_id = upload_res['result']['ID']
-                current_app.logger.info(f"INVOICE STEP 1 OK: file uploaded, disk_file_id={uploaded_file_id}")
-            else:
-                current_app.logger.warning(f"INVOICE STEP 1 WARN: unexpected response, file not uploaded: {upload_res}")
+                f"INVOICE STEP 1: file prepared for field '{FILE_CUSTOM_FIELD}', "
+                f"name='{filename}', size={len(file_data['content'])} bytes"
+            )
         except Exception as e:
             current_app.logger.warning(f"INVOICE STEP 1 ERROR: {e}", exc_info=True)
+            file_b64_for_field = None
     else:
-        current_app.logger.info("INVOICE STEP 1: no file_data, skipping upload")
+        current_app.logger.info("INVOICE STEP 1: no file_data")
 
     # --- Шаг 2: Создаём смарт-счёт ---
     invoice_fields = {
@@ -478,8 +473,11 @@ def create_b24_invoice_service(income_data, file_data=None):
         PAYMENT_DATE_CUSTOM_FIELD: date_for_api,
         'stageId': FINAL_INVOICE_STAGE_ID
     }
-    if uploaded_file_id:
-        invoice_fields['fileIds'] = [uploaded_file_id]
+
+    # Прикрепляем файл напрямую в пользовательское поле типа "Файл"
+    if file_b64_for_field:
+        invoice_fields[FILE_CUSTOM_FIELD] = file_b64_for_field
+        current_app.logger.info(f"INVOICE STEP 2: file attached to field {FILE_CUSTOM_FIELD}")
 
     invoice_params = {
         'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
@@ -522,7 +520,7 @@ def create_b24_invoice_service(income_data, file_data=None):
             'success': True,
             'invoice_id': new_invoice_id,
             'product_added': False,
-            'file_uploaded': uploaded_file_id is not None
+            'file_uploaded': file_b64_for_field is not None
         }
 
     current_app.logger.info(f"INVOICE STEP 3 OK: product added to invoice #{new_invoice_id}")
@@ -530,5 +528,5 @@ def create_b24_invoice_service(income_data, file_data=None):
         'success': True,
         'invoice_id': new_invoice_id,
         'product_added': True,
-        'file_uploaded': uploaded_file_id is not None
+        'file_uploaded': file_b64_for_field is not None
     }
