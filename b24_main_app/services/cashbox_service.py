@@ -333,15 +333,22 @@ def get_client_deals_service(contact_id):
     result = response['result']['result']
     deals = result.get('deals', [])
     deal_type_info = result.get('deal_types', [])
-    
+
+    # Логируем что реально вернул crm.dealtype.list
+    current_app.logger.info(f"deal_type_info raw: {deal_type_info}")
+
     type_map = {item['ID']: item['NAME'] for item in deal_type_info}
+
+    current_app.logger.info(f"type_map built: {type_map}")
 
     formatted_deals = []
     for deal in deals:
         type_id = deal.get('TYPE_ID')
+        # Логируем каждую сделку и её TYPE_ID
+        current_app.logger.info(f"Deal ID={deal['ID']}, TYPE_ID='{type_id}', lookup result='{type_map.get(type_id)}'")
         deal_name = type_map.get(type_id, f"Сделка #{deal['ID']}")
         formatted_deals.append({'id': deal['ID'], 'name': deal_name})
 
     current_app.logger.info(f"Found {len(formatted_deals)} deals for contact_id {contact_id}")
-    
+
     return formatted_deals
