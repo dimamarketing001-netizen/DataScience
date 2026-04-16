@@ -125,15 +125,20 @@ App.cashbox.ui = {
     },
 
     openEditIncomeModal: function(income) {
-        const { editIncomeModal } = this.elements;
+        const { editIncomeModal, editIncomeDealWrapper, editIncomeDealSelect } = this.elements;
+
+        // Сбрасываем блок сделок перед открытием, чтобы не было старых данных
+        editIncomeDealWrapper.style.display = 'none';
+        editIncomeDealSelect.innerHTML = '';
+
         document.getElementById('edit-income-id').value = income.id;
         document.getElementById('edit-income-amount').value = income.amount;
-        document.getElementById('edit-income-comment').value = income.comment;
+        document.getElementById('edit-income-comment').value = income.comment || '';
         document.getElementById('edit-income-client-search').value = income.contact_name || '';
         document.getElementById('edit-income-selected-client-id').value = income.contact_id || '';
-        
+
         flatpickr("#edit-income-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: income.income_date });
-        
+
         editIncomeModal.style.display = 'flex';
     },
 

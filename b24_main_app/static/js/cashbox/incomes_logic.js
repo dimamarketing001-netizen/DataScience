@@ -36,7 +36,7 @@ App.cashbox.incomes = {
         });
 
         async function handleClientSelection(clientId, searchInput) {
-            const isEdit = searchInput.id.includes('edit');
+            const isEdit = searchInput && searchInput.id ? searchInput.id.includes('edit') : false;
             const dealSelect = document.getElementById(isEdit ? 'edit-income-deal-select' : 'income-deal-select');
             const dealWrapper = document.getElementById(isEdit ? 'edit-income-deal-wrapper' : 'income-deal-wrapper');
 
@@ -124,10 +124,22 @@ App.cashbox.incomes = {
                 App.Notify.error('Ошибка', 'Не удалось найти данные для редактирования.');
                 return;
             }
+
+            // Открываем модалку и заполняем базовые поля
             App.cashbox.ui.openEditIncomeModal(income);
+
+            // Если у прихода есть клиент — загружаем его сделки
             if (income.contact_id) {
-                await handleClientSelection(income.contact_id, document.getElementById('edit-income-client-search'));
-                document.getElementById('edit-income-deal-select').value = income.deal_id;
+                // Передаём edit-input чтобы handleClientSelection знал что это форма редактирования
+                await handleClientSelection(
+                    income.contact_id,
+                    document.getElementById('edit-income-client-search')
+                );
+
+                // Явный String() — deal_id из MySQL приходит как число, а option.value всегда строка
+                if (income.deal_id) {
+                    document.getElementById('edit-income-deal-select').value = String(income.deal_id);
+                }
             }
         }
 
