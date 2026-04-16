@@ -91,7 +91,9 @@ def init_db():
         # Для уже существующей БД — добавляем столбцы если их нет
         for col_sql in [
             "ALTER TABLE `incomes` ADD COLUMN `deal_type_id` varchar(100) DEFAULT NULL",
-            "ALTER TABLE `incomes` ADD COLUMN `deal_type_name` varchar(255) DEFAULT NULL"
+            "ALTER TABLE `incomes` ADD COLUMN `deal_type_name` varchar(255) DEFAULT NULL",
+            "ALTER TABLE `incomes` ADD COLUMN `b24_invoice_id` varchar(50) DEFAULT NULL",
+            "ALTER TABLE `incomes` ADD COLUMN `b24_file_id` varchar(50) DEFAULT NULL"
         ]:
             try:
                 cursor.execute(col_sql)

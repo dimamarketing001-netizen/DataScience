@@ -177,11 +177,11 @@ def add_income_service(data):
         raise Exception('Не удалось подключиться к базе данных')
     cursor = conn.cursor()
     query = """
-        INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, added_by_user_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """
+            INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, \
+                                 added_by_user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
+            """
     try:
-        current_app.logger.info("add_income_service: executing INSERT...")
         cursor.execute(query, (
             data['date'], data['amount'], data.get('contact_id'),
             data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
@@ -205,16 +205,40 @@ def add_income_service(data):
         try:
             invoice_result = create_b24_invoice_service(
                 income_data={
-                    'deal_id':        data.get('deal_id'),
-                    'contact_id':     data.get('contact_id'),
-                    'amount':         data.get('amount'),
-                    'date':           data.get('date'),
+                    'deal_id': data.get('deal_id'),
+                    'contact_id': data.get('contact_id'),
+                    'amount': data.get('amount'),
+                    'date': data.get('date'),
                     'deal_type_name': data.get('deal_type_name', ''),
-                    'income_db_id':   new_income_id
+                    'income_db_id': new_income_id
                 },
                 file_data=data.get('file_data')
             )
             current_app.logger.info(f"add_income_service: invoice result={invoice_result}")
+
+            # Сохраняем b24_invoice_id и b24_file_id в БД
+            if invoice_result.get('success'):
+                conn2 = get_db_connection()
+                if conn2:
+                    try:
+                        cur2 = conn2.cursor()
+                        cur2.execute(
+                            "UPDATE incomes SET b24_invoice_id=%s, b24_file_id=%s WHERE id=%s",
+                            (
+                                str(invoice_result.get('invoice_id', '')),
+                                str(invoice_result.get('b24_file_id', '')) if invoice_result.get(
+                                    'b24_file_id') else None,
+                                new_income_id
+                            )
+                        )
+                        conn2.commit()
+                        current_app.logger.info(
+                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}, file_id={invoice_result.get('b24_file_id')} to DB")
+                    except Exception as db_err:
+                        current_app.logger.warning(f"add_income_service: failed to save invoice/file ids: {db_err}")
+                    finally:
+                        cur2.close()
+                        conn2.close()
         except Exception as e:
             current_app.logger.error(f"add_income_service: invoice FAILED: {e}", exc_info=True)
             invoice_result = {'success': False, 'error': str(e)}
@@ -266,10 +290,12 @@ def get_incomes_service(args):
 
     for income in incomes:
         income['contact_name'] = _get_b24_entity_name('contact', income['contact_id'])
-        # Берём название типа сделки прямо из БД — без запроса в Битрикс24
         income['deal_name'] = income.get('deal_type_name') or '—'
         income['added_by_user_name'] = _get_b24_entity_name('user', income['added_by_user_id'])
         income['income_date'] = income['income_date'].isoformat() if income['income_date'] else None
+        # b24_invoice_id и b24_file_id уже есть в SELECT * — просто убеждаемся что они строки
+        income['b24_invoice_id'] = str(income['b24_invoice_id']) if income.get('b24_invoice_id') else None
+        income['b24_file_id'] = str(income['b24_file_id']) if income.get('b24_file_id') else None
 
     return {
         "incomes": incomes,
@@ -494,9 +520,12 @@ def create_b24_invoice_service(income_data, file_data=None):
         raise Exception(f"INVOICE STEP 2 FAILED: no invoice ID in response: {invoice_res}")
 
     new_invoice_id = item_result['id']
-    file_field_value = item_result.get('UF_CRM_SMART_INVOICE_1776360197269') or item_result.get(
-        'ufCrmSmartInvoice1776360197269')
-    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}, file_field_value={file_field_value}")
+    # Поле файла возвращает ID файла (integer) после успешной загрузки
+    file_field_value = item_result.get('UF_CRM_SMART_INVOICE_1776360197269') or \
+                       item_result.get('ufCrmSmartInvoice1776360197269')
+    # Приводим к строке если не None и не 0
+    b24_file_id = str(file_field_value) if file_field_value and file_field_value != 0 else None
+    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}, b24_file_id={b24_file_id}")
 
     # --- Шаг 3: Добавляем строку товара ---
     product_params = {
@@ -518,6 +547,7 @@ def create_b24_invoice_service(income_data, file_data=None):
         return {
             'success': True,
             'invoice_id': new_invoice_id,
+            'b24_file_id': b24_file_id,
             'product_added': False,
             'file_uploaded': file_b64_for_field is not None
         }
@@ -526,6 +556,7 @@ def create_b24_invoice_service(income_data, file_data=None):
     return {
         'success': True,
         'invoice_id': new_invoice_id,
+        'b24_file_id': b24_file_id,
         'product_added': True,
         'file_uploaded': file_b64_for_field is not None
     }
