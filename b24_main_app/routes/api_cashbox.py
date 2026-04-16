@@ -11,6 +11,7 @@ from services.cashbox_service import (
     # Новые сервисы для приходов
     add_income_service,
     get_incomes_service,
+    get_single_income_service, # <--- Добавлено
     update_income_service,
     delete_income_service,
     get_client_deals_service
@@ -93,6 +94,17 @@ def get_incomes():
     try:
         data = get_incomes_service(request.args)
         return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def get_single_income():
+    """Контроллер для получения одного прихода по ID."""
+    try:
+        income_id = request.args.get('id')
+        income = get_single_income_service(income_id)
+        if income:
+            return jsonify(income)
+        return jsonify({'error': 'Income not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

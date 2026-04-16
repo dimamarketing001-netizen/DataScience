@@ -3,46 +3,63 @@ App.cashbox.incomes = {
     init: async function() {
         console.log("Initializing Incomes logic...");
 
-        // --- Состояние модуля ---
         let currentPage = 1;
+        let currentIncomes = []; // Кэш для редактирования
 
-        // --- Элементы UI ---
         const incomeForm = document.getElementById('income-form');
         const addIncomeBtn = incomeForm.querySelector('button[type="submit"]');
+        const editIncomeForm = document.getElementById('edit-income-form');
+        const cancelEditBtn = document.getElementById('cancel-edit-income-btn');
+        const updateIncomeBtn = editIncomeForm.querySelector('button[type="submit"]');
 
-        // --- ИСПРАВЛЕНИЕ: Проверяем правильные, гранулярные права ---
         if (!App.userPermissions.tabs.cashbox.income.save) {
             addIncomeBtn.classList.add('access-restricted');
         }
+        if (!App.userPermissions.tabs.cashbox.income.edit) {
+            updateIncomeBtn.classList.add('access-restricted');
+        }
 
-        // --- Инициализация ---
         flatpickr("#income-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
-        
+
         new App.ClientSearchHandler({
             searchInput: document.getElementById('income-client-search'),
             searchResultsContainer: document.getElementById('income-client-search-results'),
             selectedClientIdInput: document.getElementById('income-selected-client-id'),
-            onClientSelected: async (clientId) => {
-                if (!clientId) {
-                    App.cashbox.ui.renderDealSelect([]);
-                    return;
-                }
-                try {
-                    App.showLoader();
-                    const deals = await App.cashbox.api.getClientDeals(clientId);
-                    App.cashbox.ui.renderDealSelect(deals);
-                } catch (e) {
-                    App.Notify.error('Ошибка', `Не удалось загрузить сделки клиента: ${e.message}`);
-                } finally {
-                    App.hideLoader();
-                }
-            }
+            onClientSelected: handleClientSelection
+        });
+        
+        new App.ClientSearchHandler({
+            searchInput: document.getElementById('edit-income-client-search'),
+            searchResultsContainer: document.getElementById('edit-income-client-search-results'),
+            selectedClientIdInput: document.getElementById('edit-income-selected-client-id'),
+            onClientSelected: handleClientSelection
         });
 
-        // --- Обработчики ---
+        async function handleClientSelection(clientId, searchInput) {
+            const isEdit = searchInput.id.includes('edit');
+            const dealSelect = document.getElementById(isEdit ? 'edit-income-deal-select' : 'income-deal-select');
+            const dealWrapper = document.getElementById(isEdit ? 'edit-income-deal-wrapper' : 'income-deal-wrapper');
+
+            if (!clientId) {
+                App.cashbox.ui.renderDealSelect([], dealSelect, dealWrapper);
+                return;
+            }
+            try {
+                App.showLoader();
+                const deals = await App.cashbox.api.getClientDeals(clientId);
+                App.cashbox.ui.renderDealSelect(deals, dealSelect, dealWrapper);
+            } catch (e) {
+                App.Notify.error('Ошибка', `Не удалось загрузить сделки клиента: ${e.message}`);
+            } finally {
+                App.hideLoader();
+            }
+        }
+
         incomeForm.addEventListener('submit', handleAddIncome);
-        
-        // --- Функции ---
+        editIncomeForm.addEventListener('submit', handleUpdateIncome);
+        cancelEditBtn.addEventListener('click', () => App.cashbox.ui.closeEditIncomeModal());
+        document.getElementById('incomes-table-body').addEventListener('click', handleTableClick);
+
         async function handleAddIncome(event) {
             event.preventDefault();
             if (addIncomeBtn.classList.contains('access-restricted')) return;
@@ -66,7 +83,7 @@ App.cashbox.incomes = {
                 await App.cashbox.api.addIncome(formData);
                 App.Notify.success("Приход успешно сохранен!");
                 incomeForm.reset();
-                App.cashbox.ui.renderDealSelect([]);
+                App.cashbox.ui.renderDealSelect([], document.getElementById('income-deal-select'), document.getElementById('income-deal-wrapper'));
                 loadIncomesTable();
             } catch (error) {
                 await App.Notify.error('Ошибка сохранения', error.message);
@@ -81,8 +98,8 @@ App.cashbox.incomes = {
             try {
                 const params = { limit: 25, offset: (page - 1) * 25 };
                 const data = await App.cashbox.api.getIncomes(params);
-                App.cashbox.ui.renderIncomesTable(data.incomes, (id) => App.cashbox.openDeleteConfirmModal(id, 'income'));
-                // TODO: Добавить пагинацию для приходов, если нужно
+                currentIncomes = data.incomes; // Кэшируем данные
+                App.cashbox.ui.renderIncomesTable(currentIncomes);
             } catch (error) {
                 await App.Notify.error('Ошибка', `Ошибка загрузки приходов: ${error.message}`);
             } finally {
@@ -90,10 +107,56 @@ App.cashbox.incomes = {
             }
         }
         
-        // Сделаем функцию доступной извне для перезагрузки после удаления
         this.loadIncomesTable = loadIncomesTable;
+
+        function handleTableClick(event) {
+            const target = event.target;
+            if (target.classList.contains('edit-income-btn')) {
+                openEditIncomeModal(target.dataset.id);
+            } else if (target.classList.contains('delete-income-btn')) {
+                App.cashbox.openDeleteConfirmModal(target.dataset.id, 'income');
+            }
+        }
+
+        async function openEditIncomeModal(incomeId) {
+            const income = currentIncomes.find(inc => inc.id == incomeId);
+            if (!income) {
+                App.Notify.error('Ошибка', 'Не удалось найти данные для редактирования.');
+                return;
+            }
+            App.cashbox.ui.openEditIncomeModal(income);
+            if (income.contact_id) {
+                await handleClientSelection(income.contact_id, document.getElementById('edit-income-client-search'));
+                document.getElementById('edit-income-deal-select').value = income.deal_id;
+            }
+        }
+
+        async function handleUpdateIncome(event) {
+            event.preventDefault();
+            if (updateIncomeBtn.classList.contains('access-restricted')) return;
+
+            const formData = {
+                id: document.getElementById('edit-income-id').value,
+                date: document.getElementById('edit-income-date').value,
+                amount: parseFloat(document.getElementById('edit-income-amount').value),
+                contact_id: document.getElementById('edit-income-selected-client-id').value,
+                deal_id: document.getElementById('edit-income-deal-select').value,
+                comment: document.getElementById('edit-income-comment').value,
+            };
+
+            App.showLoader();
+            try {
+                await App.cashbox.api.updateIncome(formData);
+                App.Notify.success('Приход успешно обновлен!');
+                App.cashbox.ui.closeEditIncomeModal();
+                loadIncomesTable(currentPage);
+            } catch (error) {
+                await App.Notify.error('Ошибка обновления', error.message);
+            } finally {
+                App.hideLoader();
+            }
+        }
         
-        // Первоначальная загрузка
         loadIncomesTable();
     }
 };

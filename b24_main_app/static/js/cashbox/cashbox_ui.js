@@ -37,6 +37,7 @@ App.cashbox.ui = {
         incomesTableBody: document.getElementById('incomes-table-body'),
         incomeDealWrapper: document.getElementById('income-deal-wrapper'),
         incomeDealSelect: document.getElementById('income-deal-select'),
+        editIncomeModal: document.getElementById('edit-income-modal'),
     },
 
     // --- Функции рендеринга и управления UI ---
@@ -77,30 +78,9 @@ App.cashbox.ui = {
                 <span class="${deleteIconClass}" data-id="${expense.id}" title="Удалить">🗑️</span>
             `;
         });
-
-        expensesTableBody.querySelectorAll('.edit-icon').forEach(icon => {
-            icon.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('access-restricted')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                }
-                onEdit(e.currentTarget.dataset.id);
-            });
-        });
-        expensesTableBody.querySelectorAll('.delete-icon').forEach(icon => {
-            icon.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('access-restricted')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                }
-                onDelete(e.currentTarget.dataset.id);
-            });
-        });
     },
 
-    renderIncomesTable: function(incomes, onDelete) {
+    renderIncomesTable: function(incomes) {
         const { incomesTableBody } = this.elements;
         incomesTableBody.innerHTML = '';
         if (!incomes || incomes.length === 0) {
@@ -108,6 +88,7 @@ App.cashbox.ui = {
             return;
         }
 
+        const canEdit = App.userPermissions.tabs.cashbox.income.edit;
         const canDelete = App.userPermissions.tabs.cashbox.income.delete;
 
         incomes.forEach(income => {
@@ -122,31 +103,40 @@ App.cashbox.ui = {
             
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
-            const deleteIconClass = canDelete ? 'action-icon delete-icon' : 'action-icon delete-icon access-restricted';
-            actionsCell.innerHTML = `<span class="${deleteIconClass}" data-id="${income.id}" title="Удалить">🗑️</span>`;
-        });
-
-        incomesTableBody.querySelectorAll('.delete-icon').forEach(icon => {
-            icon.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('access-restricted')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                }
-                onDelete(e.currentTarget.dataset.id);
-            });
+            const editIconClass = canEdit ? 'action-icon edit-income-btn' : 'action-icon edit-income-btn access-restricted';
+            const deleteIconClass = canDelete ? 'action-icon delete-income-btn' : 'action-icon delete-income-btn access-restricted';
+            actionsCell.innerHTML = `
+                <span class="${editIconClass}" data-id="${income.id}" title="Редактировать">✏️</span>
+                <span class="${deleteIconClass}" data-id="${income.id}" title="Удалить">🗑️</span>
+            `;
         });
     },
 
-    renderDealSelect: function(deals) {
-        const { incomeDealWrapper, incomeDealSelect } = this.elements;
+    renderDealSelect: function(deals, selectElement, wrapperElement) {
         if (deals && deals.length > 0) {
-            App.populateSelect(incomeDealSelect, deals, 'Выберите сделку...');
-            incomeDealWrapper.style.display = '';
+            App.populateSelect(selectElement, deals, 'Выберите сделку...');
+            wrapperElement.style.display = '';
         } else {
-            incomeDealWrapper.style.display = 'none';
-            incomeDealSelect.innerHTML = '';
+            wrapperElement.style.display = 'none';
+            selectElement.innerHTML = '';
         }
+    },
+
+    openEditIncomeModal: function(income) {
+        const { editIncomeModal } = this.elements;
+        document.getElementById('edit-income-id').value = income.id;
+        document.getElementById('edit-income-amount').value = income.amount;
+        document.getElementById('edit-income-comment').value = income.comment;
+        document.getElementById('edit-income-client-search').value = income.contact_name || '';
+        document.getElementById('edit-income-selected-client-id').value = income.contact_id || '';
+        
+        flatpickr("#edit-income-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: income.income_date });
+        
+        editIncomeModal.style.display = 'flex';
+    },
+
+    closeEditIncomeModal: function() {
+        this.elements.editIncomeModal.style.display = 'none';
     },
 
     updatePaginationControls: function(totalRecords, limit, offset) {

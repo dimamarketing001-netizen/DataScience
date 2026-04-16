@@ -242,9 +242,34 @@ def get_incomes_service(args):
     }
 
 def update_income_service(data):
-    # (Пока не реализуем, но оставляем заглушку)
-    current_app.logger.info("Update income service called, but not implemented yet.")
-    return {'success': True, 'message': 'Update not implemented'}
+    """Сервисная функция для обновления прихода."""
+    income_id = data.get('id')
+    if not income_id: raise ValueError('Income ID is required')
+
+    conn = get_db_connection()
+    if not conn: raise Exception('DB connection failed')
+    cursor = conn.cursor()
+
+    query = """UPDATE incomes SET 
+               income_date = %s, amount = %s, contact_id = %s, 
+               deal_id = %s, comment = %s
+               WHERE id = %s"""
+    values = (
+        data.get('date'), data.get('amount'), data.get('contact_id'),
+        data.get('deal_id'), data.get('comment'), income_id
+    )
+
+    try:
+        cursor.execute(query, values)
+        conn.commit()
+        current_app.logger.info(f"Income with ID {income_id} updated.")
+        return {'success': True}
+    except mysql.connector.Error as err:
+        conn.rollback()
+        raise err
+    finally:
+        cursor.close()
+        conn.close()
 
 def delete_income_service(income_id):
     """Сервисная функция для удаления прихода."""

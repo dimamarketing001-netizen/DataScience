@@ -38,9 +38,20 @@ App.cashbox.api = {
         return App.api.request('get_incomes', params);
     },
 
+    getSingleIncome: function(id) {
+        return App.api.request('get_single_income', { id });
+    },
+
     addIncome: function(data) {
         return App.api.request('add_income', {}, {
             method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    updateIncome: function(data) {
+        return App.api.request('update_income', {}, {
+            method: 'PUT',
             body: JSON.stringify(data)
         });
     },
