@@ -44,28 +44,28 @@ api_actions = {
 # --- Главный маршрутизатор ---
 @app.route('/', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def router():
+    app.logger.info(f"ROUTER: method={request.method}, action={request.args.get('action')}, content_type={request.content_type}, is_json={request.is_json}, has_action_in_args={'action' in request.args}")
+
     # POST без action - это стандартный вход из Битрикс24
     if request.method == 'POST' and 'action' not in request.args and not request.is_json:
+        app.logger.info("ROUTER: rendering finance_index.html (B24 entry)")
         return render_template('finance_index.html')
 
     action = request.args.get('action')
-    
-    # Логирование входящего запроса
-    app.logger.info(f"Incoming request: method={request.method}, action={action}, args={request.args}")
-    
-    # Вызов функции из словаря по 'action'
+
+    app.logger.info(f"ROUTER: dispatching action='{action}'")
+
     if action in api_actions:
         handler = api_actions[action]
+        app.logger.info(f"ROUTER: calling handler={handler.__name__}")
         return handler()
-    
-    # Если action указан, но не найден в словаре
-    if action:
-        return jsonify({'error': f'Action "{action}" not found'}), 404
-    
-    # Если action не указан и это GET-запрос, возвращаем ошибку.
-    # Прямой доступ к приложению запрещен.
-    return "<h1>Access Denied</h1><p>This application can only be accessed from within Bitrix24.</p>", 403
 
+    if action:
+        app.logger.warning(f"ROUTER: action '{action}' not found in api_actions")
+        app.logger.warning(f"ROUTER: available actions={list(api_actions.keys())}")
+        return jsonify({'error': f'Action "{action}" not found'}), 404
+
+    return "<h1>Access Denied</h1><p>This application can only be accessed from within Bitrix24.</p>", 403
 
 # --- Запуск приложения ---
 if __name__ == '__main__':

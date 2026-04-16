@@ -166,10 +166,23 @@ App.cashbox.incomes = {
             App.showLoader();
             try {
                 // Отправляем через fetch напрямую (не через App.cashbox.api.addIncome — там JSON)
+                console.log('handleAddIncome: sending FormData...');
+                console.log('handleAddIncome: fd entries:');
+                for (let [key, value] of fd.entries()) {
+                    if (value instanceof File) {
+                        console.log(`  ${key}: File(name=${value.name}, size=${value.size}, type=${value.type})`);
+                    } else {
+                        console.log(`  ${key}: ${value}`);
+                    }
+                }
+
                 const response = await fetch('/?action=add_income', {
                     method: 'POST',
-                    body: fd  // НЕ устанавливаем Content-Type — браузер сам ставит boundary
+                    body: fd
                 });
+
+                console.log('handleAddIncome: response status=', response.status, response.statusText);
+                console.log('handleAddIncome: response content-type=', response.headers.get('content-type'));
                 if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.error || `HTTP ${response.status}`);
