@@ -80,7 +80,7 @@ App.cashbox.ui = {
         });
     },
 
-    renderIncomesTable: function(incomes) {
+    renderIncomesTable: function(incomes, onEdit, onDelete) {
         const { incomesTableBody } = this.elements;
         incomesTableBody.innerHTML = '';
         if (!incomes || incomes.length === 0) {
