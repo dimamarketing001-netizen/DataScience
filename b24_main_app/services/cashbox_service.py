@@ -170,14 +170,18 @@ def delete_expense_service(expense_id):
 
 def add_income_service(data):
     """Сервисная функция для добавления нового прихода в БД."""
+    current_app.logger.info(f"add_income_service START: date={data.get('date')}, amount={data.get('amount')}, contact_id={data.get('contact_id')}, deal_id={data.get('deal_id')}")
+
     conn = get_db_connection()
+    if not conn:
+        raise Exception('Не удалось подключиться к базе данных')
     cursor = conn.cursor()
     query = """
-            INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, \
-                                 added_by_user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
-            """
+        INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, added_by_user_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
     try:
+        current_app.logger.info("add_income_service: executing INSERT...")
         cursor.execute(query, (
             data['date'], data['amount'], data.get('contact_id'),
             data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
@@ -185,35 +189,37 @@ def add_income_service(data):
         ))
         conn.commit()
         new_income_id = cursor.lastrowid
-        current_app.logger.info(f"Income added with ID: {new_income_id}")
+        current_app.logger.info(f"add_income_service: INSERT OK, new_income_id={new_income_id}")
     except Exception as e:
         conn.rollback()
-        current_app.logger.error(f"Error adding income: {e}")
+        current_app.logger.error(f"add_income_service: INSERT FAILED: {e}", exc_info=True)
         raise
     finally:
         cursor.close()
         conn.close()
 
-    # --- Создаём смарт-счёт в Б24 после успешного сохранения в БД ---
+    # --- Создаём смарт-счёт в Б24 ---
     invoice_result = None
     if data.get('deal_id') and data.get('contact_id'):
+        current_app.logger.info(f"add_income_service: starting invoice creation for deal_id={data.get('deal_id')}")
         try:
             invoice_result = create_b24_invoice_service(
                 income_data={
-                    'deal_id': data.get('deal_id'),
-                    'contact_id': data.get('contact_id'),
-                    'amount': data.get('amount'),
-                    'date': data.get('date'),
+                    'deal_id':        data.get('deal_id'),
+                    'contact_id':     data.get('contact_id'),
+                    'amount':         data.get('amount'),
+                    'date':           data.get('date'),
                     'deal_type_name': data.get('deal_type_name', ''),
-                    'income_db_id': new_income_id
+                    'income_db_id':   new_income_id
                 },
-                file_data=data.get('file_data')  # {'filename': ..., 'content': bytes, 'mimetype': ...}
+                file_data=data.get('file_data')
             )
-            current_app.logger.info(f"Invoice created for income #{new_income_id}: {invoice_result}")
+            current_app.logger.info(f"add_income_service: invoice result={invoice_result}")
         except Exception as e:
-            # Приход уже сохранён в БД — не откатываем, просто логируем ошибку счёта
-            current_app.logger.error(f"Income #{new_income_id} saved, but invoice creation failed: {e}")
+            current_app.logger.error(f"add_income_service: invoice FAILED: {e}", exc_info=True)
             invoice_result = {'success': False, 'error': str(e)}
+    else:
+        current_app.logger.info("add_income_service: skipping invoice — no deal_id or contact_id")
 
     return {
         'success': True,
@@ -433,7 +439,7 @@ def create_b24_invoice_service(income_data, file_data=None):
 
     title = f"Приход #{income_db_id} | {deal_type_name} | {date_for_api} | {float(amount):.2f} руб."
 
-    # --- Шаг 1: Загружаем файл на диск Б24 (если передан) ---
+    # --- Шаг 1: Загружаем файл на диск Б24 ---
     uploaded_file_id = None
     if file_data and file_data.get('content'):
         try:
@@ -443,23 +449,24 @@ def create_b24_invoice_service(income_data, file_data=None):
 
             upload_params = {
                 'id': B24_FOLDER_ID,
-                'data': {
-                    'NAME': filename
-                },
+                'data': {'NAME': filename},
                 'fileContent': [filename, file_content_b64]
             }
 
-            current_app.logger.info(f"Загрузка файла '{filename}' на диск Б24...")
+            current_app.logger.info(
+                f"INVOICE STEP 1: uploading file '{filename}' size={len(file_data['content'])} bytes to disk folder_id={B24_FOLDER_ID}")
             upload_res = b24_call_method('disk.folder.uploadfile', upload_params)
+            current_app.logger.info(f"INVOICE STEP 1 response: {upload_res}")
 
             if upload_res and upload_res.get('result') and upload_res['result'].get('ID'):
                 uploaded_file_id = upload_res['result']['ID']
-                current_app.logger.info(f"Файл загружен на диск Б24, ID={uploaded_file_id}")
+                current_app.logger.info(f"INVOICE STEP 1 OK: file uploaded, disk_file_id={uploaded_file_id}")
             else:
-                current_app.logger.warning(f"Не удалось загрузить файл на диск Б24: {upload_res}")
+                current_app.logger.warning(f"INVOICE STEP 1 WARN: unexpected response, file not uploaded: {upload_res}")
         except Exception as e:
-            current_app.logger.warning(f"Ошибка при загрузке файла на диск Б24: {e}")
-            # Не прерываем — счёт создадим без файла
+            current_app.logger.warning(f"INVOICE STEP 1 ERROR: {e}", exc_info=True)
+    else:
+        current_app.logger.info("INVOICE STEP 1: no file_data, skipping upload")
 
     # --- Шаг 2: Создаём смарт-счёт ---
     invoice_fields = {
@@ -471,8 +478,6 @@ def create_b24_invoice_service(income_data, file_data=None):
         PAYMENT_DATE_CUSTOM_FIELD: date_for_api,
         'stageId': FINAL_INVOICE_STAGE_ID
     }
-
-    # Прикрепляем файл к счёту если загрузили
     if uploaded_file_id:
         invoice_fields['fileIds'] = [uploaded_file_id]
 
@@ -482,18 +487,19 @@ def create_b24_invoice_service(income_data, file_data=None):
         'useOriginalUfNames': 'Y'
     }
 
-    current_app.logger.info(f"Создание смарт-счёта: {invoice_params}")
+    current_app.logger.info(f"INVOICE STEP 2: crm.item.add params={invoice_params}")
     invoice_res = b24_call_method('crm.item.add', invoice_params)
+    current_app.logger.info(f"INVOICE STEP 2 response: {invoice_res}")
 
     if not invoice_res or 'result' not in invoice_res:
-        raise Exception(f"crm.item.add неожиданный ответ: {invoice_res}")
+        raise Exception(f"INVOICE STEP 2 FAILED: crm.item.add bad response: {invoice_res}")
 
     item_result = invoice_res.get('result', {}).get('item')
     if not item_result or not item_result.get('id'):
-        raise Exception(f"crm.item.add не вернул ID счёта: {invoice_res}")
+        raise Exception(f"INVOICE STEP 2 FAILED: no invoice ID in response: {invoice_res}")
 
     new_invoice_id = item_result['id']
-    current_app.logger.info(f"Смарт-счёт #{new_invoice_id} создан.")
+    current_app.logger.info(f"INVOICE STEP 2 OK: invoice_id={new_invoice_id}")
 
     # --- Шаг 3: Добавляем строку товара ---
     product_params = {
@@ -506,9 +512,12 @@ def create_b24_invoice_service(income_data, file_data=None):
         }
     }
 
+    current_app.logger.info(f"INVOICE STEP 3: crm.item.productrow.add params={product_params}")
     product_res = b24_call_method('crm.item.productrow.add', product_params)
+    current_app.logger.info(f"INVOICE STEP 3 response: {product_res}")
+
     if not product_res or 'error' in product_res:
-        current_app.logger.warning(f"Счёт #{new_invoice_id} создан, товар не добавлен: {product_res}")
+        current_app.logger.warning(f"INVOICE STEP 3 WARN: product not added: {product_res}")
         return {
             'success': True,
             'invoice_id': new_invoice_id,
@@ -516,7 +525,7 @@ def create_b24_invoice_service(income_data, file_data=None):
             'file_uploaded': uploaded_file_id is not None
         }
 
-    current_app.logger.info(f"Товар добавлен в счёт #{new_invoice_id}.")
+    current_app.logger.info(f"INVOICE STEP 3 OK: product added to invoice #{new_invoice_id}")
     return {
         'success': True,
         'invoice_id': new_invoice_id,

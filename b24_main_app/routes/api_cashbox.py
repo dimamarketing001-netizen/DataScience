@@ -82,33 +82,46 @@ def delete_expense():
 
 def add_income():
     """Контроллер для добавления нового прихода."""
+    from flask import current_app
     try:
+        current_app.logger.info(f"add_income: content_type={request.content_type}")
+        current_app.logger.info(f"add_income: form keys={list(request.form.keys())}")
+        current_app.logger.info(f"add_income: files keys={list(request.files.keys())}")
+
         # Принимаем multipart/form-data (файл + поля формы)
         data = {
-            'date':            request.form.get('date'),
-            'amount':          request.form.get('amount'),
-            'contact_id':      request.form.get('contact_id'),
-            'deal_id':         request.form.get('deal_id'),
-            'deal_type_id':    request.form.get('deal_type_id'),
-            'deal_type_name':  request.form.get('deal_type_name'),
-            'comment':         request.form.get('comment'),
+            'date':             request.form.get('date'),
+            'amount':           request.form.get('amount'),
+            'contact_id':       request.form.get('contact_id'),
+            'deal_id':          request.form.get('deal_id'),
+            'deal_type_id':     request.form.get('deal_type_id'),
+            'deal_type_name':   request.form.get('deal_type_name'),
+            'comment':          request.form.get('comment'),
             'added_by_user_id': request.form.get('added_by_user_id'),
         }
+
+        current_app.logger.info(f"add_income: parsed data={data}")
 
         # Обрабатываем файл если передан
         file = request.files.get('income_file')
         if file and file.filename:
+            file_bytes = file.read()
+            current_app.logger.info(f"add_income: file received name={file.filename}, size={len(file_bytes)}, mime={file.mimetype}")
             data['file_data'] = {
                 'filename': file.filename,
-                'content':  file.read(),
+                'content':  file_bytes,
                 'mimetype': file.mimetype
             }
         else:
+            current_app.logger.info("add_income: no file received")
             data['file_data'] = None
 
         result = add_income_service(data)
+        current_app.logger.info(f"add_income: success result={result}")
         return jsonify(result)
+
     except Exception as e:
+        current_app.logger.error(f"add_income EXCEPTION: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def get_incomes():
