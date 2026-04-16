@@ -8,13 +8,13 @@ from services.cashbox_service import (
     get_single_expense_service,
     update_expense_service,
     delete_expense_service,
-    # Новые сервисы для приходов
     add_income_service,
     get_incomes_service,
-    get_single_income_service, # <--- Добавлено
+    get_single_income_service,
     update_income_service,
     delete_income_service,
-    get_client_deals_service
+    get_client_deals_service,
+    create_b24_invoice_service
 )
 
 # Blueprint остается, но теперь он вызывает сервисные функции

@@ -85,8 +85,20 @@ App.cashbox.incomes = {
 
             App.showLoader();
             try {
-                await App.cashbox.api.addIncome(formData);
-                App.Notify.success("Приход успешно сохранен!");
+                const result = await App.cashbox.api.addIncome(formData);
+
+                // Формируем сообщение с результатом создания счёта
+                let successMsg = "Приход успешно сохранен!";
+                if (result.invoice) {
+                    if (result.invoice.success) {
+                        successMsg += ` Счёт #${result.invoice.invoice_id} создан в Б24.`;
+                    } else {
+                        // Приход сохранён, но счёт не создался — предупреждаем
+                        successMsg += ` ⚠️ Счёт в Б24 не создан: ${result.invoice.error || 'неизвестная ошибка'}`;
+                    }
+                }
+
+                App.Notify.success(successMsg);
                 incomeForm.reset();
                 App.cashbox.ui.renderDealSelect([], document.getElementById('income-deal-select'), document.getElementById('income-deal-wrapper'));
                 loadIncomesTable();
