@@ -38,6 +38,8 @@ App.cashbox.ui = {
         incomeDealWrapper: document.getElementById('income-deal-wrapper'),
         incomeDealSelect: document.getElementById('income-deal-select'),
         editIncomeModal: document.getElementById('edit-income-modal'),
+        editIncomeDealSelect: document.getElementById('edit-income-deal-select'),
+        editIncomeDealWrapper: document.getElementById('edit-income-deal-wrapper'),
     },
 
     // --- Функции рендеринга и управления UI ---
