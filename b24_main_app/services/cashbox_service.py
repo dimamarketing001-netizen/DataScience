@@ -319,14 +319,11 @@ def get_client_deals_service(contact_id):
     batch_payload = {
         'halt': 0,
         'cmd': {
-            'deals': f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=0&select[]=ID,TYPE_ID",
-            'deal_types': "crm.dealcategory.get?ID=0" # Предполагаем, что типы для категории 0
+            'deals': f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=0&select[]=ID&select[]=TYPE_ID",
+            'deal_types': "crm.dealtype.list"
         }
     }
     
-    # Если нужно получить все типы, а не только для категории 0
-    # 'deal_types': "crm.dealtype.list"
-
     response = b24_call_method('batch', batch_payload)
     
     if not response or not response.get('result', {}).get('result'):
@@ -335,17 +332,13 @@ def get_client_deals_service(contact_id):
 
     result = response['result']['result']
     deals = result.get('deals', [])
-    
-    # Создаем словарь для быстрого поиска названия типа
-    deal_type_info = result.get('deal_types', {}).get('dealTypes', []) # Для crm.dealcategory.get
-    # deal_type_info = result.get('deal_types', []) # Для crm.dealtype.list
+    deal_type_info = result.get('deal_types', [])
     
     type_map = {item['ID']: item['NAME'] for item in deal_type_info}
 
     formatted_deals = []
     for deal in deals:
         type_id = deal.get('TYPE_ID')
-        # Используем название типа, если оно есть, иначе - ID сделки
         deal_name = type_map.get(type_id, f"Сделка #{deal['ID']}")
         formatted_deals.append({'id': deal['ID'], 'name': deal_name})
 
