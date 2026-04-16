@@ -829,3 +829,99 @@ body {
 .income-file-remove:hover {
     background: #fde;
 }
+/* ===== ПРОСМОТРЩИК ФАЙЛОВ ===== */
+.file-viewer-modal-content {
+    width: 90vw;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 8px;
+}
+
+.file-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e5eaef;
+    flex-shrink: 0;
+    background: #fff;
+}
+
+.file-viewer-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 50px);
+}
+
+.file-viewer-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #9aabb8;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+}
+
+.file-viewer-close:hover {
+    color: #e74c3c;
+    background: #fde;
+}
+
+.file-viewer-content {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a2e;
+    min-height: 300px;
+    max-height: calc(90vh - 120px);
+}
+
+.file-viewer-content img {
+    max-width: 100%;
+    max-height: calc(90vh - 130px);
+    object-fit: contain;
+    display: block;
+}
+
+.file-viewer-content iframe {
+    width: 100%;
+    height: calc(90vh - 130px);
+    border: none;
+    background: #fff;
+}
+
+.file-viewer-content .file-viewer-loading {
+    color: #fff;
+    font-size: 14px;
+    padding: 40px;
+}
+
+.file-viewer-content .file-viewer-error {
+    color: #ff6b6b;
+    font-size: 14px;
+    padding: 40px;
+    text-align: center;
+}
+
+.file-viewer-footer {
+    padding: 10px 20px;
+    border-top: 1px solid #e5eaef;
+    background: #fff;
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}

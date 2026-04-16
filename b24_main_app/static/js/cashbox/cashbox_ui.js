@@ -107,18 +107,9 @@ App.cashbox.ui = {
             const docCell = row.insertCell();
             docCell.className = 'actions-column';
             if (income.b24_file_url) {
-                // urlMachine — прямой REST URL, работает без авторизации браузера
-                const docLink = document.createElement('a');
-                docLink.href = income.b24_file_url;
-                docLink.target = '_blank';
-                docLink.rel = 'noopener noreferrer';
+                const docLink = document.createElement('span');
                 docLink.title = 'Открыть документ';
-                docLink.style.textDecoration = 'none';
-                docLink.style.display = 'inline-flex';
-                docLink.style.alignItems = 'center';
-                docLink.style.gap = '4px';
-                docLink.style.color = '#2fc6f6';
-                docLink.style.fontSize = '13px';
+                docLink.style.cssText = 'display:inline-flex;align-items:center;gap:4px;color:#2fc6f6;font-size:13px;cursor:pointer;';
                 docLink.innerHTML = `
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
@@ -131,6 +122,9 @@ App.cashbox.ui = {
                     </svg>
                     Открыть
                 `;
+                docLink.addEventListener('click', () => {
+                    App.cashbox.ui.openFileViewer(income.b24_file_url, income.b24_file_id);
+                });
                 docCell.appendChild(docLink);
             } else {
                 docCell.textContent = '—';
@@ -325,5 +319,60 @@ App.cashbox.ui = {
 
     closeDeleteConfirmModal: function() {
         this.elements.deleteConfirmModal.style.display = 'none';
+    },
+
+    openFileViewer: function(fileUrl, fileId) {
+        const modal = document.getElementById('file-viewer-modal');
+        const content = document.getElementById('file-viewer-content');
+        const title = document.getElementById('file-viewer-title');
+        const downloadLink = document.getElementById('file-viewer-download');
+
+        // Сбрасываем контент
+        content.innerHTML = '<div class="file-viewer-loading">⏳ Загрузка...</div>';
+        modal.style.display = 'flex';
+
+        // Ссылка для скачивания
+        downloadLink.href = fileUrl;
+
+        // Определяем тип файла по расширению из URL или по fileId
+        // urlMachine не содержит расширения — пробуем загрузить как изображение
+        // и если не получится — показываем iframe
+        const img = new Image();
+        img.style.cssText = 'max-width:100%;max-height:calc(90vh - 130px);object-fit:contain;display:block;';
+
+        img.onload = function() {
+            // Это изображение — показываем img
+            content.innerHTML = '';
+            content.appendChild(img);
+            title.textContent = 'Просмотр изображения';
+        };
+
+        img.onerror = function() {
+            // Не изображение — показываем через iframe (PDF и др.)
+            content.innerHTML = '';
+            const frame = document.createElement('iframe');
+            frame.src = fileUrl;
+            frame.style.cssText = 'width:100%;height:calc(90vh - 130px);border:none;background:#fff;';
+            frame.title = 'Документ';
+
+            // Если iframe тоже не загрузится — показываем ссылку
+            frame.onerror = function() {
+                content.innerHTML = `
+                    <div class="file-viewer-error">
+                        <p>Не удалось открыть файл в просмотрщике.</p>
+                        <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;">
+                            ⬇️ Скачать файл
+                        </a>
+                    </div>
+                `;
+            };
+
+            content.appendChild(frame);
+            title.textContent = 'Просмотр документа';
+        };
+
+        // Запускаем попытку загрузить как изображение
+        img.src = fileUrl;
+        title.textContent = 'Загрузка...';
     }
 };
