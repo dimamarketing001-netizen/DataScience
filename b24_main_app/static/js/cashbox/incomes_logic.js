@@ -169,8 +169,6 @@ App.cashbox.incomes = {
                 const fileBase64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => {
-                        // reader.result = "data:image/png;base64,iVBORw0K..."
-                        // Берём только base64 часть после запятой
                         const base64 = reader.result.split(',')[1];
                         resolve(base64);
                     };
@@ -188,32 +186,15 @@ App.cashbox.incomes = {
                     comment:          document.getElementById('income-comment').value,
                     added_by_user_id: App.currentUser.ID,
                     file_data: {
-                        filename: selectedFile.name,
-                        mimetype: selectedFile.type,
+                        filename:    selectedFile.name,
+                        mimetype:    selectedFile.type,
                         content_b64: fileBase64
                     }
                 };
 
-                console.log('handleAddIncome: sending JSON payload (file as base64)...');
-                console.log('handleAddIncome: file info:', selectedFile.name, selectedFile.size, selectedFile.type);
-
-                const response = await fetch('/?action=add_income', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                console.log('handleAddIncome: response status=', response.status, response.statusText);
-                console.log('handleAddIncome: response content-type=', response.headers.get('content-type'));
-
-                if (!response.ok) {
-                    const errText = await response.text();
-                    console.error('handleAddIncome: error response body:', errText);
-                    throw new Error(`HTTP ${response.status}: ${errText}`);
-                }
-
-                const result = await response.json();
-                console.log('handleAddIncome: result=', result);
+                // Используем App.cashbox.api.addIncome — он идёт через App.api.request
+                // который формирует правильный URL без leading slash
+                const result = await App.cashbox.api.addIncome(payload);
 
                 let successMsg = "Приход успешно сохранен!";
                 if (result.invoice) {
