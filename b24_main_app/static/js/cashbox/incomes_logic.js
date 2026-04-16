@@ -165,29 +165,55 @@ App.cashbox.incomes = {
 
             App.showLoader();
             try {
-                // Отправляем через fetch напрямую (не через App.cashbox.api.addIncome — там JSON)
-                console.log('handleAddIncome: sending FormData...');
-                console.log('handleAddIncome: fd entries:');
-                for (let [key, value] of fd.entries()) {
-                    if (value instanceof File) {
-                        console.log(`  ${key}: File(name=${value.name}, size=${value.size}, type=${value.type})`);
-                    } else {
-                        console.log(`  ${key}: ${value}`);
+                // Конвертируем файл в base64 для передачи через JSON
+                const fileBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        // reader.result = "data:image/png;base64,iVBORw0K..."
+                        // Берём только base64 часть после запятой
+                        const base64 = reader.result.split(',')[1];
+                        resolve(base64);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(selectedFile);
+                });
+
+                const payload = {
+                    date:             document.getElementById('income-date').value,
+                    amount:           parseFloat(document.getElementById('income-amount').value),
+                    contact_id:       document.getElementById('income-selected-client-id').value,
+                    deal_id:          dealSelect.value,
+                    deal_type_id:     selectedOption ? selectedOption.dataset.typeId || '' : '',
+                    deal_type_name:   selectedOption ? selectedOption.dataset.typeName || '' : '',
+                    comment:          document.getElementById('income-comment').value,
+                    added_by_user_id: App.currentUser.ID,
+                    file_data: {
+                        filename: selectedFile.name,
+                        mimetype: selectedFile.type,
+                        content_b64: fileBase64
                     }
-                }
+                };
+
+                console.log('handleAddIncome: sending JSON payload (file as base64)...');
+                console.log('handleAddIncome: file info:', selectedFile.name, selectedFile.size, selectedFile.type);
 
                 const response = await fetch('/?action=add_income', {
                     method: 'POST',
-                    body: fd
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
 
                 console.log('handleAddIncome: response status=', response.status, response.statusText);
                 console.log('handleAddIncome: response content-type=', response.headers.get('content-type'));
+
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || `HTTP ${response.status}`);
+                    const errText = await response.text();
+                    console.error('handleAddIncome: error response body:', errText);
+                    throw new Error(`HTTP ${response.status}: ${errText}`);
                 }
+
                 const result = await response.json();
+                console.log('handleAddIncome: result=', result);
 
                 let successMsg = "Приход успешно сохранен!";
                 if (result.invoice) {
