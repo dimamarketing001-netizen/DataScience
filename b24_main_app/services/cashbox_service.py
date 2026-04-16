@@ -311,16 +311,44 @@ def delete_income_service(income_id):
         conn.close()
 
 def get_client_deals_service(contact_id):
-    """Получает список сделок для указанного контакта."""
+    """Получает список сделок для указанного контакта, используя их тип в качестве названия."""
     if not contact_id:
         return []
+
+    # Пакетный запрос: получаем сделки и справочник типов сделок
+    batch_payload = {
+        'halt': 0,
+        'cmd': {
+            'deals': f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=0&select[]=ID,TYPE_ID",
+            'deal_types': "crm.dealcategory.get?ID=0" # Предполагаем, что типы для категории 0
+        }
+    }
     
-    deals = fetch_paginated_data('crm.deal.list', {
-        'filter': {'CONTACT_ID': contact_id, 'CATEGORY_ID': 0},
-        'select': ['ID', 'TITLE']
-    })
+    # Если нужно получить все типы, а не только для категории 0
+    # 'deal_types': "crm.dealtype.list"
+
+    response = b24_call_method('batch', batch_payload)
     
-    formatted_deals = [{'id': deal['ID'], 'name': deal['TITLE']} for deal in deals]
+    if not response or not response.get('result', {}).get('result'):
+        current_app.logger.error("Failed to fetch deals or deal types from Bitrix24.")
+        return []
+
+    result = response['result']['result']
+    deals = result.get('deals', [])
+    
+    # Создаем словарь для быстрого поиска названия типа
+    deal_type_info = result.get('deal_types', {}).get('dealTypes', []) # Для crm.dealcategory.get
+    # deal_type_info = result.get('deal_types', []) # Для crm.dealtype.list
+    
+    type_map = {item['ID']: item['NAME'] for item in deal_type_info}
+
+    formatted_deals = []
+    for deal in deals:
+        type_id = deal.get('TYPE_ID')
+        # Используем название типа, если оно есть, иначе - ID сделки
+        deal_name = type_map.get(type_id, f"Сделка #{deal['ID']}")
+        formatted_deals.append({'id': deal['ID'], 'name': deal_name})
+
     current_app.logger.info(f"Found {len(formatted_deals)} deals for contact_id {contact_id}")
     
     return formatted_deals
