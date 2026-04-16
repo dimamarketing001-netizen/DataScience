@@ -83,7 +83,29 @@ def delete_expense():
 def add_income():
     """Контроллер для добавления нового прихода."""
     try:
-        data = request.get_json()
+        # Принимаем multipart/form-data (файл + поля формы)
+        data = {
+            'date':            request.form.get('date'),
+            'amount':          request.form.get('amount'),
+            'contact_id':      request.form.get('contact_id'),
+            'deal_id':         request.form.get('deal_id'),
+            'deal_type_id':    request.form.get('deal_type_id'),
+            'deal_type_name':  request.form.get('deal_type_name'),
+            'comment':         request.form.get('comment'),
+            'added_by_user_id': request.form.get('added_by_user_id'),
+        }
+
+        # Обрабатываем файл если передан
+        file = request.files.get('income_file')
+        if file and file.filename:
+            data['file_data'] = {
+                'filename': file.filename,
+                'content':  file.read(),
+                'mimetype': file.mimetype
+            }
+        else:
+            data['file_data'] = None
+
         result = add_income_service(data)
         return jsonify(result)
     except Exception as e:

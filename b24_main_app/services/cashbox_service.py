@@ -198,14 +198,17 @@ def add_income_service(data):
     invoice_result = None
     if data.get('deal_id') and data.get('contact_id'):
         try:
-            invoice_result = create_b24_invoice_service({
-                'deal_id': data.get('deal_id'),
-                'contact_id': data.get('contact_id'),
-                'amount': data.get('amount'),
-                'date': data.get('date'),
-                'deal_type_name': data.get('deal_type_name', ''),
-                'income_db_id': new_income_id
-            })
+            invoice_result = create_b24_invoice_service(
+                income_data={
+                    'deal_id': data.get('deal_id'),
+                    'contact_id': data.get('contact_id'),
+                    'amount': data.get('amount'),
+                    'date': data.get('date'),
+                    'deal_type_name': data.get('deal_type_name', ''),
+                    'income_db_id': new_income_id
+                },
+                file_data=data.get('file_data')  # {'filename': ..., 'content': bytes, 'mimetype': ...}
+            )
             current_app.logger.info(f"Invoice created for income #{new_income_id}: {invoice_result}")
         except Exception as e:
             # Приход уже сохранён в БД — не откатываем, просто логируем ошибку счёта
@@ -391,79 +394,111 @@ def get_client_deals_service(contact_id):
     return formatted_deals
 
 
-def create_b24_invoice_service(income_data):
+def create_b24_invoice_service(income_data, file_data=None):
     """
-    Создаёт смарт-счёт в Битрикс24 и привязывает его к сделке.
-    Вызывается после успешного сохранения прихода в БД.
+    Создаёт смарт-счёт в Битрикс24, привязывает к сделке и прикрепляет файл.
 
-    income_data должен содержать:
-        - deal_id: ID сделки (например 2086)
-        - contact_id: ID контакта
-        - amount: сумма
-        - date: дата прихода (YYYY-MM-DD)
-        - deal_type_name: название типа сделки (БФЛ)
-        - income_db_id: ID записи в нашей БД (для title счёта)
+    income_data:
+        - deal_id, contact_id, amount, date, deal_type_name, income_db_id
+    file_data (опционально):
+        - filename: имя файла
+        - content: bytes содержимое файла
+        - mimetype: MIME тип
     """
 
-    # --- Константы смарт-счетов Битрикс24 ---
     SMART_INVOICE_ENTITY_TYPE_ID = 31
     MY_COMPANY_ID = 8
     FINAL_INVOICE_STAGE_ID = 'DT31_2:P'
     PAYMENT_DATE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776220509400"
+    # ID папки на диске Б24 для хранения файлов приходов (папка "Приходы" в корне диска компании)
+    # Если папки нет — файл загружается в корень диска (folder_id=0 означает корень)
+    B24_FOLDER_ID = 0
 
     deal_id = income_data.get('deal_id')
     contact_id = income_data.get('contact_id')
     amount = income_data.get('amount')
-    date = income_data.get('date')  # YYYY-MM-DD
+    date = income_data.get('date')
     deal_type_name = income_data.get('deal_type_name', '')
     income_db_id = income_data.get('income_db_id', '')
 
     if not deal_id or not contact_id or not amount or not date:
-        raise ValueError(
-            f"create_b24_invoice_service: недостаточно данных. deal_id={deal_id}, contact_id={contact_id}, amount={amount}, date={date}")
+        raise ValueError(f"Недостаточно данных для создания счёта: deal_id={deal_id}, contact_id={contact_id}")
 
-    # Дата для API Битрикс24: из YYYY-MM-DD в DD.MM.YYYY
+    # Дата из YYYY-MM-DD в DD.MM.YYYY
     try:
         date_obj = datetime.strptime(date, '%Y-%m-%d')
         date_for_api = date_obj.strftime('%d.%m.%Y')
     except ValueError:
-        date_for_api = date  # Если формат уже другой — оставляем как есть
+        date_for_api = date
 
-    # Заголовок счёта
     title = f"Приход #{income_db_id} | {deal_type_name} | {date_for_api} | {float(amount):.2f} руб."
 
-    # --- Шаг 1: Создаём смарт-счёт ---
+    # --- Шаг 1: Загружаем файл на диск Б24 (если передан) ---
+    uploaded_file_id = None
+    if file_data and file_data.get('content'):
+        try:
+            import base64
+            file_content_b64 = base64.b64encode(file_data['content']).decode('utf-8')
+            filename = file_data.get('filename', 'document.pdf')
+
+            upload_params = {
+                'id': B24_FOLDER_ID,
+                'data': {
+                    'NAME': filename
+                },
+                'fileContent': [filename, file_content_b64]
+            }
+
+            current_app.logger.info(f"Загрузка файла '{filename}' на диск Б24...")
+            upload_res = b24_call_method('disk.folder.uploadfile', upload_params)
+
+            if upload_res and upload_res.get('result') and upload_res['result'].get('ID'):
+                uploaded_file_id = upload_res['result']['ID']
+                current_app.logger.info(f"Файл загружен на диск Б24, ID={uploaded_file_id}")
+            else:
+                current_app.logger.warning(f"Не удалось загрузить файл на диск Б24: {upload_res}")
+        except Exception as e:
+            current_app.logger.warning(f"Ошибка при загрузке файла на диск Б24: {e}")
+            # Не прерываем — счёт создадим без файла
+
+    # --- Шаг 2: Создаём смарт-счёт ---
+    invoice_fields = {
+        'title': title,
+        'parentId2': deal_id,
+        'contactIds': [contact_id],
+        'mycompanyId': MY_COMPANY_ID,
+        'opportunity': float(amount),
+        PAYMENT_DATE_CUSTOM_FIELD: date_for_api,
+        'stageId': FINAL_INVOICE_STAGE_ID
+    }
+
+    # Прикрепляем файл к счёту если загрузили
+    if uploaded_file_id:
+        invoice_fields['fileIds'] = [uploaded_file_id]
+
     invoice_params = {
         'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
-        'fields': {
-            'title': title,
-            'parentId2': deal_id,  # Привязка к сделке
-            'contactIds': [contact_id],  # Привязка к контакту
-            'mycompanyId': MY_COMPANY_ID,  # Наша компания
-            'opportunity': float(amount),  # Сумма
-            PAYMENT_DATE_CUSTOM_FIELD: date_for_api,  # Дата оплаты (кастомное поле)
-            'stageId': FINAL_INVOICE_STAGE_ID  # Стадия "Оплачен"
-        },
+        'fields': invoice_fields,
         'useOriginalUfNames': 'Y'
     }
 
-    current_app.logger.info(f"Создание смарт-счёта в Б24: {invoice_params}")
+    current_app.logger.info(f"Создание смарт-счёта: {invoice_params}")
     invoice_res = b24_call_method('crm.item.add', invoice_params)
 
     if not invoice_res or 'result' not in invoice_res:
-        raise Exception(f"crm.item.add вернул неожиданный ответ: {invoice_res}")
+        raise Exception(f"crm.item.add неожиданный ответ: {invoice_res}")
 
     item_result = invoice_res.get('result', {}).get('item')
     if not item_result or not item_result.get('id'):
-        raise Exception(f"crm.item.add не вернул ID счёта. Ответ: {invoice_res}")
+        raise Exception(f"crm.item.add не вернул ID счёта: {invoice_res}")
 
     new_invoice_id = item_result['id']
-    current_app.logger.info(f"Смарт-счёт #{new_invoice_id} создан успешно.")
+    current_app.logger.info(f"Смарт-счёт #{new_invoice_id} создан.")
 
-    # --- Шаг 2: Добавляем строку товара в счёт ---
+    # --- Шаг 3: Добавляем строку товара ---
     product_params = {
         'fields': {
-            'ownerType': 'SI',  # SI = Smart Invoice
+            'ownerType': 'SI',
             'ownerId': new_invoice_id,
             'productName': f"Оплата {deal_type_name} от {date_for_api}",
             'price': float(amount),
@@ -471,22 +506,20 @@ def create_b24_invoice_service(income_data):
         }
     }
 
-    current_app.logger.info(f"Добавление товара в счёт #{new_invoice_id}: {product_params}")
     product_res = b24_call_method('crm.item.productrow.add', product_params)
-
     if not product_res or 'error' in product_res:
-        # Счёт создан, но товар не добавлен — логируем, не падаем
-        current_app.logger.warning(f"Счёт #{new_invoice_id} создан, но товар не добавлен: {product_res}")
+        current_app.logger.warning(f"Счёт #{new_invoice_id} создан, товар не добавлен: {product_res}")
         return {
             'success': True,
             'invoice_id': new_invoice_id,
             'product_added': False,
-            'warning': f"Товар не добавлен: {product_res}"
+            'file_uploaded': uploaded_file_id is not None
         }
 
-    current_app.logger.info(f"Товар добавлен в счёт #{new_invoice_id} успешно.")
+    current_app.logger.info(f"Товар добавлен в счёт #{new_invoice_id}.")
     return {
         'success': True,
         'invoice_id': new_invoice_id,
-        'product_added': True
+        'product_added': True,
+        'file_uploaded': uploaded_file_id is not None
     }

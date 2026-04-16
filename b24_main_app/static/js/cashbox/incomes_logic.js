@@ -21,6 +21,71 @@ App.cashbox.incomes = {
 
         flatpickr("#income-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: "today" });
 
+        // --- Drag & Drop для файла ---
+        const dropZone = document.getElementById('income-drop-zone');
+        const fileInput = document.getElementById('income-file-input');
+        const dropZoneContent = document.getElementById('income-drop-zone-content');
+        const filePreview = document.getElementById('income-file-preview');
+        const fileNameSpan = document.getElementById('income-file-name');
+        const fileRemoveBtn = document.getElementById('income-file-remove');
+        let selectedFile = null;
+
+        function setSelectedFile(file) {
+            const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+            if (!allowed.includes(file.type) && !file.type.startsWith('image/')) {
+                App.Notify.error('Неверный тип файла', 'Разрешены только PDF и изображения (JPG, PNG, GIF).');
+                return;
+            }
+            selectedFile = file;
+            fileNameSpan.textContent = file.name;
+            dropZoneContent.style.display = 'none';
+            filePreview.style.display = 'flex';
+            dropZone.classList.add('has-file');
+        }
+
+        function clearSelectedFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileNameSpan.textContent = '';
+            dropZoneContent.style.display = 'flex';
+            filePreview.style.display = 'none';
+            dropZone.classList.remove('has-file');
+        }
+
+        // Клик по зоне открывает выбор файла
+        dropZone.addEventListener('click', () => {
+            if (!selectedFile) fileInput.click();
+        });
+
+        // Выбор через диалог
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files && fileInput.files[0]) {
+                setSelectedFile(fileInput.files[0]);
+            }
+        });
+
+        // Drag & drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                setSelectedFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Удалить файл
+        fileRemoveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearSelectedFile();
+        });
+
         new App.ClientSearchHandler({
             searchInput: document.getElementById('income-client-search'),
             searchResultsContainer: document.getElementById('income-client-search-results'),
@@ -67,41 +132,72 @@ App.cashbox.incomes = {
             const dealSelect = document.getElementById('income-deal-select');
             const selectedOption = dealSelect.options[dealSelect.selectedIndex];
 
-            const formData = {
-                date: document.getElementById('income-date').value,
-                amount: parseFloat(document.getElementById('income-amount').value),
-                contact_id: document.getElementById('income-selected-client-id').value,
-                deal_id: dealSelect.value,                                          // 2086
-                deal_type_id: selectedOption ? selectedOption.dataset.typeId || '' : '',   // SALE
-                deal_type_name: selectedOption ? selectedOption.dataset.typeName || '' : '', // БФЛ
-                comment: document.getElementById('income-comment').value,
-                added_by_user_id: App.currentUser.ID
-            };
+            const date = document.getElementById('income-date').value;
+            const amount = document.getElementById('income-amount').value;
+            const contact_id = document.getElementById('income-selected-client-id').value;
+            const comment = document.getElementById('income-comment').value;
 
-            if (!formData.contact_id) {
+            // --- Валидация ---
+            if (!contact_id) {
                 await App.Notify.error('Ошибка валидации', 'Необходимо выбрать клиента.');
                 return;
             }
+            if (!dealSelect.value) {
+                await App.Notify.error('Ошибка валидации', 'Необходимо выбрать сделку.');
+                return;
+            }
+            if (!selectedFile) {
+                await App.Notify.error('Ошибка валидации', 'Необходимо прикрепить файл (PDF или изображение).');
+                return;
+            }
+
+            // --- Собираем FormData (multipart — для передачи файла) ---
+            const fd = new FormData();
+            fd.append('date', date);
+            fd.append('amount', amount);
+            fd.append('contact_id', contact_id);
+            fd.append('deal_id', dealSelect.value);
+            fd.append('deal_type_id', selectedOption ? selectedOption.dataset.typeId || '' : '');
+            fd.append('deal_type_name', selectedOption ? selectedOption.dataset.typeName || '' : '');
+            fd.append('comment', comment);
+            fd.append('added_by_user_id', App.currentUser.ID);
+            fd.append('income_file', selectedFile, selectedFile.name);
 
             App.showLoader();
             try {
-                const result = await App.cashbox.api.addIncome(formData);
+                // Отправляем через fetch напрямую (не через App.cashbox.api.addIncome — там JSON)
+                const response = await fetch('/?action=add_income', {
+                    method: 'POST',
+                    body: fd  // НЕ устанавливаем Content-Type — браузер сам ставит boundary
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || `HTTP ${response.status}`);
+                }
+                const result = await response.json();
 
-                // Формируем сообщение с результатом создания счёта
                 let successMsg = "Приход успешно сохранен!";
                 if (result.invoice) {
                     if (result.invoice.success) {
                         successMsg += ` Счёт #${result.invoice.invoice_id} создан в Б24.`;
+                        if (result.invoice.file_uploaded) {
+                            successMsg += ` Файл прикреплён.`;
+                        }
                     } else {
-                        // Приход сохранён, но счёт не создался — предупреждаем
-                        successMsg += ` ⚠️ Счёт в Б24 не создан: ${result.invoice.error || 'неизвестная ошибка'}`;
+                        successMsg += ` ⚠️ Счёт в Б24 не создан: ${result.invoice.error || 'ошибка'}`;
                     }
                 }
 
                 App.Notify.success(successMsg);
                 incomeForm.reset();
-                App.cashbox.ui.renderDealSelect([], document.getElementById('income-deal-select'), document.getElementById('income-deal-wrapper'));
+                clearSelectedFile();
+                App.cashbox.ui.renderDealSelect(
+                    [],
+                    document.getElementById('income-deal-select'),
+                    document.getElementById('income-deal-wrapper')
+                );
                 loadIncomesTable();
+
             } catch (error) {
                 await App.Notify.error('Ошибка сохранения', error.message);
             } finally {

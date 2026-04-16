@@ -734,3 +734,87 @@ body {
 .app-screen.active {
     display: block;
 }
+/* ===== ПОЛЕ ЗАГРУЗКИ ФАЙЛА (ПРИХОДЫ) ===== */
+.income-drop-zone {
+    border: 2px dashed #b8c4d0;
+    border-radius: 6px;
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: #f8fafc;
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+}
+
+.income-drop-zone:hover,
+.income-drop-zone.drag-over {
+    border-color: #2fc6f6;
+    background: #eaf7fd;
+}
+
+.income-drop-zone.has-file {
+    border-color: #5cb85c;
+    background: #f0fff0;
+    cursor: default;
+}
+
+.income-drop-zone-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    pointer-events: none;
+}
+
+.income-drop-zone-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.income-drop-zone-text {
+    font-size: 13px;
+    color: #535c69;
+}
+
+.income-drop-zone-link {
+    color: #2fc6f6;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.income-drop-zone-hint {
+    font-size: 11px;
+    color: #9aabb8;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.income-file-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.income-file-name {
+    font-size: 13px;
+    color: #333;
+    word-break: break-all;
+    flex: 1;
+}
+
+.income-file-remove {
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.income-file-remove:hover {
+    background: #fde;
+}

@@ -30,6 +30,25 @@
                     </div>
                 </div>
             </div>
+            <div id="income-file-wrapper" class="ui-form-row">
+                <div class="ui-form-label">
+                    <div class="ui-ctl-label-text">Файл <span style="color: red;">*</span></div>
+                </div>
+                <div class="ui-form-content">
+                    <div id="income-drop-zone" class="income-drop-zone">
+                        <input type="file" id="income-file-input" accept=".pdf,image/*" style="display:none;">
+                        <div id="income-drop-zone-content" class="income-drop-zone-content">
+                            <span class="income-drop-zone-icon">📎</span>
+                            <span class="income-drop-zone-text">Перетащите файл сюда или <span class="income-drop-zone-link">нажмите для выбора</span></span>
+                            <span class="income-drop-zone-hint">PDF или изображение (JPG, PNG, GIF)</span>
+                        </div>
+                        <div id="income-file-preview" class="income-file-preview" style="display:none;">
+                            <span id="income-file-name" class="income-file-name"></span>
+                            <span id="income-file-remove" class="income-file-remove" title="Удалить файл">✕</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="ui-form-row">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
                 <div class="ui-form-content"><div class="ui-ctl ui-ctl-textarea ui-ctl-w100"><textarea id="income-comment" class="ui-ctl-element"></textarea></div></div>
