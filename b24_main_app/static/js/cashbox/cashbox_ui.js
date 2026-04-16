@@ -115,8 +115,20 @@ App.cashbox.ui = {
     },
 
     renderDealSelect: function(deals, selectElement, wrapperElement) {
+        if (!selectElement || !wrapperElement) {
+            console.error('renderDealSelect: selectElement или wrapperElement не найден!');
+            return;
+        }
         if (deals && deals.length > 0) {
-            App.populateSelect(selectElement, deals, 'Выберите сделку...');
+            selectElement.innerHTML = '<option value="">Выберите сделку...</option>';
+            deals.forEach(deal => {
+                const option = document.createElement('option');
+                option.value = deal.id;               // 2086
+                option.textContent = deal.name;       // БФЛ
+                option.dataset.typeId = deal.type_id; // SALE
+                option.dataset.typeName = deal.name;  // БФЛ
+                selectElement.appendChild(option);
+            });
             wrapperElement.style.display = '';
         } else {
             wrapperElement.style.display = 'none';

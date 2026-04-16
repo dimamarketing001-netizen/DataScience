@@ -172,14 +172,17 @@ def add_income_service(data):
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
-        INSERT INTO incomes (income_date, amount, contact_id, deal_id, comment, added_by_user_id)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """
+            INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, \
+                                 added_by_user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
+            """
     try:
         cursor.execute(query, (
-            data['date'], data['amount'], data.get('contact_id'), 
-            data.get('deal_id'), data.get('comment'), data.get('added_by_user_id')
+            data['date'], data['amount'], data.get('contact_id'),
+            data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
+            data.get('comment'), data.get('added_by_user_id')
         ))
+
         conn.commit()
         current_app.logger.info(f"Income added with ID: {cursor.lastrowid}")
         return {'success': True, 'id': cursor.lastrowid}
@@ -227,13 +230,14 @@ def get_incomes_service(args):
     
     cursor.close()
     conn.close()
-    
+
     for income in incomes:
         income['contact_name'] = _get_b24_entity_name('contact', income['contact_id'])
-        income['deal_name'] = _get_b24_entity_name('deal', income['deal_id'])
+        # Берём название типа сделки прямо из БД — без запроса в Битрикс24
+        income['deal_name'] = income.get('deal_type_name') or '—'
         income['added_by_user_name'] = _get_b24_entity_name('user', income['added_by_user_id'])
         income['income_date'] = income['income_date'].isoformat() if income['income_date'] else None
-    
+
     return {
         "incomes": incomes,
         "total_records": total_records,
@@ -272,13 +276,19 @@ def update_income_service(data):
     if not conn: raise Exception('DB connection failed')
     cursor = conn.cursor()
 
-    query = """UPDATE incomes SET 
-               income_date = %s, amount = %s, contact_id = %s, 
-               deal_id = %s, comment = %s
+    query = """UPDATE incomes \
+               SET income_date    = %s, \
+                   amount         = %s, \
+                   contact_id     = %s, \
+                   deal_id        = %s, \
+                   deal_type_id   = %s, \
+                   deal_type_name = %s, \
+                   comment        = %s
                WHERE id = %s"""
     values = (
         data.get('date'), data.get('amount'), data.get('contact_id'),
-        data.get('deal_id'), data.get('comment'), income_id
+        data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
+        data.get('comment'), income_id
     )
 
     try:
@@ -344,9 +354,13 @@ def get_client_deals_service(contact_id):
     formatted_deals = []
     for deal in deals:
         type_id = deal.get('TYPE_ID')
-        current_app.logger.info(f"Deal ID={deal['ID']}, TYPE_ID='{type_id}', lookup result='{type_map.get(type_id)}'")
         deal_name = type_map.get(type_id, f"Тип неизвестен ({type_id})")
-        formatted_deals.append({'id': deal['ID'], 'name': deal_name})
+        current_app.logger.info(f"Deal ID={deal['ID']}, TYPE_ID='{type_id}', name='{deal_name}'")
+        formatted_deals.append({
+            'id': deal['ID'],  # 2086
+            'type_id': type_id,  # SALE
+            'name': deal_name  # БФЛ
+        })
 
     current_app.logger.info(f"Found {len(formatted_deals)} deals for contact_id {contact_id}")
 

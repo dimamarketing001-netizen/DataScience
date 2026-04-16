@@ -64,11 +64,16 @@ App.cashbox.incomes = {
             event.preventDefault();
             if (addIncomeBtn.classList.contains('access-restricted')) return;
 
+            const dealSelect = document.getElementById('income-deal-select');
+            const selectedOption = dealSelect.options[dealSelect.selectedIndex];
+
             const formData = {
                 date: document.getElementById('income-date').value,
                 amount: parseFloat(document.getElementById('income-amount').value),
                 contact_id: document.getElementById('income-selected-client-id').value,
-                deal_id: document.getElementById('income-deal-select').value,
+                deal_id: dealSelect.value,                                          // 2086
+                deal_type_id: selectedOption ? selectedOption.dataset.typeId || '' : '',   // SALE
+                deal_type_name: selectedOption ? selectedOption.dataset.typeName || '' : '', // БФЛ
                 comment: document.getElementById('income-comment').value,
                 added_by_user_id: App.currentUser.ID
             };
@@ -147,12 +152,17 @@ App.cashbox.incomes = {
             event.preventDefault();
             if (updateIncomeBtn.classList.contains('access-restricted')) return;
 
+            const editDealSelect = document.getElementById('edit-income-deal-select');
+            const selectedEditOption = editDealSelect.options[editDealSelect.selectedIndex];
+
             const formData = {
                 id: document.getElementById('edit-income-id').value,
                 date: document.getElementById('edit-income-date').value,
                 amount: parseFloat(document.getElementById('edit-income-amount').value),
                 contact_id: document.getElementById('edit-income-selected-client-id').value,
-                deal_id: document.getElementById('edit-income-deal-select').value,
+                deal_id: editDealSelect.value,                                                    // 2086
+                deal_type_id: selectedEditOption ? selectedEditOption.dataset.typeId || '' : '',         // SALE
+                deal_type_name: selectedEditOption ? selectedEditOption.dataset.typeName || '' : '',     // БФЛ
                 comment: document.getElementById('edit-income-comment').value,
             };
 

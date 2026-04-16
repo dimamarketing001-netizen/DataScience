@@ -45,19 +45,62 @@ def init_db():
 
         # --- Инициализация таблицы приходов ---
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS `incomes` (
-              `id` int(11) NOT NULL AUTO_INCREMENT,
-              `income_date` date NOT NULL,
-              `amount` decimal(10, 2) NOT NULL,
-              `contact_id` varchar(50) DEFAULT NULL,
-              `deal_id` varchar(50) DEFAULT NULL,
-              `comment` text,
-              `added_by_user_id` varchar(50) DEFAULT NULL,
-              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB
-        """)
+                       CREATE TABLE IF NOT EXISTS `incomes`
+                       (
+                           `id`
+                           int
+                       (
+                           11
+                       ) NOT NULL AUTO_INCREMENT,
+                           `income_date` date NOT NULL,
+                           `amount` decimal
+                       (
+                           10,
+                           2
+                       ) NOT NULL,
+                           `contact_id` varchar
+                       (
+                           50
+                       ) DEFAULT NULL,
+                           `deal_id` varchar
+                       (
+                           50
+                       ) DEFAULT NULL,
+                           `deal_type_id` varchar
+                       (
+                           100
+                       ) DEFAULT NULL,
+                           `deal_type_name` varchar
+                       (
+                           255
+                       ) DEFAULT NULL,
+                           `comment` text,
+                           `added_by_user_id` varchar
+                       (
+                           50
+                       ) DEFAULT NULL,
+                           `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                           PRIMARY KEY
+                       (
+                           `id`
+                       )
+                           ) ENGINE=InnoDB
+                       """)
         logger.info("Table 'incomes' is ready.")
+
+        # Для уже существующей БД — добавляем столбцы если их нет
+        for col_sql in [
+            "ALTER TABLE `incomes` ADD COLUMN `deal_type_id` varchar(100) DEFAULT NULL",
+            "ALTER TABLE `incomes` ADD COLUMN `deal_type_name` varchar(255) DEFAULT NULL"
+        ]:
+            try:
+                cursor.execute(col_sql)
+                logger.info(f"Column added: {col_sql}")
+            except mysql.connector.Error as e:
+                if e.errno == 1060:  # Duplicate column — уже есть, пропускаем
+                    pass
+                else:
+                    raise
 
         # --- Инициализация таблицы прав доступа ---
         cursor.execute("""
