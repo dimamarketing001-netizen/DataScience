@@ -241,6 +241,28 @@ def get_incomes_service(args):
         "offset": offset
     }
 
+def get_single_income_service(income_id):
+    """Сервисная функция для получения одного прихода по ID."""
+    if not income_id: raise ValueError('Income ID is required')
+    
+    conn = get_db_connection()
+    if not conn: raise Exception('DB connection failed')
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("SELECT * FROM incomes WHERE id = %s", (income_id,))
+        income = cursor.fetchone()
+        if income:
+            income['income_date'] = income['income_date'].isoformat() if income['income_date'] else None
+            income['contact_name'] = _get_b24_entity_name('contact', income['contact_id'])
+            return income
+        return None
+    except mysql.connector.Error as err:
+        raise err
+    finally:
+        cursor.close()
+        conn.close()
+
 def update_income_service(data):
     """Сервисная функция для обновления прихода."""
     income_id = data.get('id')
