@@ -264,8 +264,17 @@ App.cashbox.incomes = {
                     }
                 }
                 if (result.stage) {
+                    const stageNames = {
+                        'C14:WON':           'Оплачено',
+                        'C16:WON':           'Оплачено',
+                        'C18:WON':           'Оплачено',
+                        'C14:FINAL_INVOICE': 'Частичная оплата',
+                        'C16:FINAL_INVOICE': 'Частичная оплата',
+                        'C18:FINAL_INVOICE': 'Частичная оплата',
+                    };
                     if (result.stage.success) {
-                        successMsg += ` Стадия сделки → ${result.stage.stage_id}.`;
+                        const stageName = stageNames[result.stage.stage_id] || result.stage.stage_id;
+                        successMsg += ` Стадия сделки → "${stageName}".`;
                     } else {
                         successMsg += ` ⚠️ Стадия не обновлена: ${result.stage.error || 'ошибка'}`;
                     }
@@ -423,13 +432,29 @@ App.cashbox.incomes = {
                 let msg = 'Приход успешно обновлён!';
                 if (result.invoice) {
                     if (result.invoice.success) {
-                        if (result.invoice.invoice_recreated || result.invoice_recreated) {
+                        if (result.invoice_recreated || result.invoice.invoice_recreated) {
                             msg += ' Счёт в Б24 пересоздан.';
                         } else if (result.invoice.file_updated) {
                             msg += ' Файл в счёте обновлён.';
                         }
                     } else if (result.invoice.error) {
                         msg += ` ⚠️ Ошибка счёта: ${result.invoice.error}`;
+                    }
+                }
+                if (result.stage) {
+                    const stageNames = {
+                        'C14:WON':           'Оплачено',
+                        'C16:WON':           'Оплачено',
+                        'C18:WON':           'Оплачено',
+                        'C14:FINAL_INVOICE': 'Частичная оплата',
+                        'C16:FINAL_INVOICE': 'Частичная оплата',
+                        'C18:FINAL_INVOICE': 'Частичная оплата',
+                    };
+                    if (result.stage.success) {
+                        const stageName = stageNames[result.stage.stage_id] || result.stage.stage_id;
+                        msg += ` Стадия сделки → "${stageName}".`;
+                    } else {
+                        msg += ` ⚠️ Стадия не обновлена: ${result.stage.error || 'ошибка'}`;
                     }
                 }
 

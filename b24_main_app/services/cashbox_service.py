@@ -168,7 +168,11 @@ def delete_expense_service(expense_id):
 
 # --- Новая логика для ПРИХОДОВ ---
 def _update_deal_stage_by_amount(deal_id, category_id, income_amount, deal_opportunity):
-    """Обновляет стадию сделки в зависимости от суммы прихода."""
+    """
+    Обновляет стадию сделки в зависимости от суммы всех счетов по сделке + новый приход.
+    Получает все смарт-счета привязанные к сделке, суммирует их + income_amount,
+    сравнивает с суммой сделки (opportunity).
+    """
     STAGE_MAP = {
         14: {'partial': 'C14:FINAL_INVOICE', 'full': 'C14:WON'},
         16: {'partial': 'C16:FINAL_INVOICE', 'full': 'C16:WON'},
@@ -179,25 +183,51 @@ def _update_deal_stage_by_amount(deal_id, category_id, income_amount, deal_oppor
         return None
 
     try:
-        amount     = float(income_amount or 0)
+        amount      = float(income_amount or 0)
         opportunity = float(deal_opportunity or 0)
 
-        if opportunity > 0 and amount >= opportunity:
+        # --- Получаем все существующие смарт-счета по этой сделке ---
+        SMART_INVOICE_ENTITY_TYPE_ID = 31
+        existing_invoices = fetch_paginated_data('crm.item.list', {
+            'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+            'filter': {'parentId2': deal_id},
+            'select': ['id', 'opportunity']
+        })
+
+        existing_sum = 0.0
+        for inv in existing_invoices:
+            existing_sum += float(inv.get('opportunity') or 0)
+
+        total_sum = existing_sum + amount
+
+        current_app.logger.info(
+            f"_update_deal_stage: deal_id={deal_id}, cat={category_id}, "
+            f"new_amount={amount}, existing_invoices_sum={existing_sum}, "
+            f"total_sum={total_sum}, opportunity={opportunity}"
+        )
+
+        if opportunity > 0 and total_sum >= opportunity:
             stage_id = STAGE_MAP[category_id]['full']
         else:
             stage_id = STAGE_MAP[category_id]['partial']
 
         current_app.logger.info(
-            f"_update_deal_stage: deal_id={deal_id}, cat={category_id}, "
-            f"amount={amount}, opportunity={opportunity}, stage={stage_id}"
+            f"_update_deal_stage: selected stage={stage_id}"
         )
 
         result = b24_call_method('crm.deal.update', {
             'id': deal_id,
             'fields': {'STAGE_ID': stage_id}
         })
-        current_app.logger.info(f"_update_deal_stage: B24 result={result}")
-        return {'success': True, 'stage_id': stage_id}
+        current_app.logger.info(f"_update_deal_stage: B24 crm.deal.update result={result}")
+
+        return {
+            'success':      True,
+            'stage_id':     stage_id,
+            'total_sum':    total_sum,
+            'existing_sum': existing_sum,
+            'opportunity':  opportunity
+        }
 
     except Exception as e:
         current_app.logger.error(f"_update_deal_stage: failed: {e}", exc_info=True)
