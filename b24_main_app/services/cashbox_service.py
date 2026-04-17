@@ -166,71 +166,109 @@ def delete_expense_service(expense_id):
         cursor.close()
         conn.close()
 
-# --- Новая логика для ПРИХОДОВ ---
-def _update_deal_stage_by_amount(deal_id, category_id, income_amount, deal_opportunity):
+def _recalculate_deal_stage(deal_id, category_id, exclude_income_id=None):
     """
-    Обновляет стадию сделки в зависимости от суммы всех счетов по сделке + новый приход.
-    Получает все смарт-счета привязанные к сделке, суммирует их + income_amount,
-    сравнивает с суммой сделки (opportunity).
+    Пересчитывает стадию сделки на основе суммы ПОДТВЕРЖДЁННЫХ приходов.
+
+    При подтверждении:
+        exclude_income_id=None — текущий приход уже помечен is_confirmed=1 в БД,
+        поэтому просто берём все подтверждённые записи по сделке.
+
+    При отмене подтверждения:
+        exclude_income_id=<id> — исключаем текущий приход из подсчёта
+        (он ещё не обновлён в БД на момент вызова, либо уже обновлён —
+        вызываем ПОСЛЕ обновления БД, поэтому exclude не нужен,
+        но оставляем параметр для гибкости).
+
+    Стадии:
+        confirmed_sum >= opportunity  → WON   (Оплачено)
+        confirmed_sum > 0             → FINAL_INVOICE (Частичная оплата)
+        confirmed_sum == 0            → NEW
     """
     STAGE_MAP = {
-        14: {'partial': 'C14:FINAL_INVOICE', 'full': 'C14:WON'},
-        16: {'partial': 'C16:FINAL_INVOICE', 'full': 'C16:WON'},
-        18: {'partial': 'C18:FINAL_INVOICE', 'full': 'C18:WON'},
+        14: {'won': 'C14:WON', 'partial': 'C14:FINAL_INVOICE', 'new': 'DC14:NEW'},
+        16: {'won': 'C16:WON', 'partial': 'C16:FINAL_INVOICE', 'new': 'DC16:NEW'},
+        18: {'won': 'C18:WON', 'partial': 'C18:FINAL_INVOICE', 'new': 'DC18:NEW'},
     }
 
     if category_id not in STAGE_MAP:
+        current_app.logger.info(f"_recalculate_deal_stage: category_id={category_id} not in map, skip")
         return None
 
     try:
-        amount      = float(income_amount or 0)
-        opportunity = float(deal_opportunity or 0)
+        # --- Получаем сумму сделки из Б24 ---
+        deal_res = b24_call_method('crm.deal.get', {'id': deal_id})
+        if not deal_res or not deal_res.get('result'):
+            raise Exception(f"crm.deal.get failed for deal_id={deal_id}")
 
-        # --- Получаем все существующие смарт-счета по этой сделке ---
-        SMART_INVOICE_ENTITY_TYPE_ID = 31
-        existing_invoices = fetch_paginated_data('crm.item.list', {
-            'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
-            'filter': {'parentId2': deal_id},
-            'select': ['id', 'opportunity']
-        })
-
-        existing_sum = 0.0
-        for inv in existing_invoices:
-            existing_sum += float(inv.get('opportunity') or 0)
-
-        total_sum = existing_sum + amount
-
+        deal        = deal_res['result']
+        opportunity = float(deal.get('OPPORTUNITY') or 0)
         current_app.logger.info(
-            f"_update_deal_stage: deal_id={deal_id}, cat={category_id}, "
-            f"new_amount={amount}, existing_invoices_sum={existing_sum}, "
-            f"total_sum={total_sum}, opportunity={opportunity}"
+            f"_recalculate_deal_stage: deal_id={deal_id}, cat={category_id}, "
+            f"opportunity={opportunity}, exclude_income_id={exclude_income_id}"
         )
 
-        if opportunity > 0 and total_sum >= opportunity:
-            stage_id = STAGE_MAP[category_id]['full']
+        # --- Берём сумму всех ПОДТВЕРЖДЁННЫХ приходов по этой сделке из нашей БД ---
+        conn = get_db_connection()
+        if not conn:
+            raise Exception('DB connection failed')
+        cursor = conn.cursor(dictionary=True)
+        try:
+            if exclude_income_id:
+                cursor.execute(
+                    "SELECT COALESCE(SUM(amount), 0) as confirmed_sum "
+                    "FROM incomes WHERE deal_id = %s AND is_confirmed = 1 AND id != %s",
+                    (deal_id, exclude_income_id)
+                )
+            else:
+                cursor.execute(
+                    "SELECT COALESCE(SUM(amount), 0) as confirmed_sum "
+                    "FROM incomes WHERE deal_id = %s AND is_confirmed = 1",
+                    (deal_id,)
+                )
+            row           = cursor.fetchone()
+            confirmed_sum = float(row['confirmed_sum'] if row else 0)
+        finally:
+            cursor.close()
+            conn.close()
+
+        current_app.logger.info(
+            f"_recalculate_deal_stage: confirmed_sum={confirmed_sum}, opportunity={opportunity}"
+        )
+
+        # --- Определяем стадию ---
+        stages = STAGE_MAP[category_id]
+        if opportunity > 0 and confirmed_sum >= opportunity:
+            stage_id   = stages['won']
+            stage_name = 'Оплачено'
+        elif confirmed_sum > 0:
+            stage_id   = stages['partial']
+            stage_name = 'Частичная оплата'
         else:
-            stage_id = STAGE_MAP[category_id]['partial']
+            stage_id   = stages['new']
+            stage_name = 'Новый'
 
         current_app.logger.info(
-            f"_update_deal_stage: selected stage={stage_id}"
+            f"_recalculate_deal_stage: → stage_id={stage_id}, stage_name={stage_name}"
         )
 
+        # --- Обновляем стадию в Б24 ---
         result = b24_call_method('crm.deal.update', {
-            'id': deal_id,
+            'id':     deal_id,
             'fields': {'STAGE_ID': stage_id}
         })
-        current_app.logger.info(f"_update_deal_stage: B24 crm.deal.update result={result}")
+        current_app.logger.info(f"_recalculate_deal_stage: crm.deal.update result={result}")
 
         return {
-            'success':      True,
-            'stage_id':     stage_id,
-            'total_sum':    total_sum,
-            'existing_sum': existing_sum,
-            'opportunity':  opportunity
+            'success':       True,
+            'stage_id':      stage_id,
+            'stage_name':    stage_name,
+            'confirmed_sum': confirmed_sum,
+            'opportunity':   opportunity
         }
 
     except Exception as e:
-        current_app.logger.error(f"_update_deal_stage: failed: {e}", exc_info=True)
+        current_app.logger.error(f"_recalculate_deal_stage: failed: {e}", exc_info=True)
         return {'success': False, 'error': str(e)}
 
 def add_income_service(data):
@@ -269,9 +307,6 @@ def add_income_service(data):
     # --- Создаём смарт-счёт в Б24 ---
     invoice_result = None
     if data.get('deal_id') and data.get('contact_id'):
-        current_app.logger.info(
-            f"add_income_service: starting invoice for deal_id={data.get('deal_id')}"
-        )
         try:
             invoice_result = create_b24_invoice_service(
                 income_data={
@@ -301,13 +336,8 @@ def add_income_service(data):
                             )
                         )
                         conn2.commit()
-                        current_app.logger.info(
-                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}"
-                        )
                     except Exception as db_err:
-                        current_app.logger.warning(
-                            f"add_income_service: failed to save invoice ids: {db_err}"
-                        )
+                        current_app.logger.warning(f"add_income_service: failed to save invoice ids: {db_err}")
                     finally:
                         cur2.close()
                         conn2.close()
@@ -317,26 +347,11 @@ def add_income_service(data):
     else:
         current_app.logger.info("add_income_service: skipping invoice — no deal_id or contact_id")
 
-    # --- Обновляем стадию сделки для обязательных платежей ---
-    stage_result = None
-    category_id  = data.get('category_id')
-    deal_id      = data.get('deal_id')
-
-    if category_id and int(category_id) in (14, 16, 18) and deal_id:
-        deal_opportunity = data.get('deal_opportunity', 0)
-        stage_result = _update_deal_stage_by_amount(
-            deal_id      = deal_id,
-            category_id  = int(category_id),
-            income_amount = data.get('amount'),
-            deal_opportunity = deal_opportunity
-        )
-        current_app.logger.info(f"add_income_service: stage update result={stage_result}")
-
+    # Стадию НЕ меняем при создании — только при подтверждении
     return {
-        'success':  True,
-        'id':       new_income_id,
-        'invoice':  invoice_result,
-        'stage':    stage_result
+        'success': True,
+        'id':      new_income_id,
+        'invoice': invoice_result
     }
 
 def get_incomes_service(args):
@@ -709,10 +724,9 @@ def update_income_service(data, file_data=None):
         current_app.logger.info(f"update_income_service: stage update={stage_result}")
 
     return {
-        'success':          True,
+        'success': True,
         'invoice_recreated': deal_changed,
-        'invoice':          invoice_result,
-        'stage':            stage_result
+        'invoice': invoice_result
     }
 
 def delete_income_service(income_id):
@@ -1014,14 +1028,18 @@ def delete_b24_invoice_service(invoice_id):
     return {'success': True}
 
 def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_user_id=None):
-    """Подтверждает или отменяет подтверждение прихода, меняя статус счёта в Б24."""
+    """
+    Подтверждает или отменяет подтверждение прихода.
+    - Меняет статус счёта в Б24
+    - Пересчитывает стадию сделки для обязательных платежей (cat 14/16/18)
+    """
     if not income_id:
         raise ValueError('Income ID is required')
 
     SMART_INVOICE_ENTITY_TYPE_ID = 31
-    CONFIRMED_STAGE_ID   = 'DT31_2:P'
-    UNCONFIRMED_STAGE_ID = 'DT31_2:N'
-    FILE_CUSTOM_FIELD    = 'ufCrm_SMART_INVOICE_1776360197269'
+    CONFIRMED_STAGE_ID           = 'DT31_2:P'
+    UNCONFIRMED_STAGE_ID         = 'DT31_2:N'
+    FILE_CUSTOM_FIELD            = 'ufCrm_SMART_INVOICE_1776360197269'
 
     conn = get_db_connection()
     if not conn:
@@ -1029,13 +1047,19 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
     cursor = conn.cursor(dictionary=True)
 
     try:
-        cursor.execute("SELECT b24_invoice_id FROM incomes WHERE id = %s", (income_id,))
+        cursor.execute(
+            "SELECT b24_invoice_id, deal_id, amount FROM incomes WHERE id = %s",
+            (income_id,)
+        )
         income = cursor.fetchone()
         if not income:
             raise ValueError(f'Income {income_id} not found')
 
         b24_invoice_id = income.get('b24_invoice_id')
+        deal_id        = str(income['deal_id']) if income.get('deal_id') else None
+        income_amount  = float(income.get('amount') or 0)
 
+        # Обновляем статус подтверждения в БД
         if confirm:
             cursor.execute(
                 "UPDATE incomes SET is_confirmed = 1, confirmed_by_user_id = %s WHERE id = %s",
@@ -1050,7 +1074,7 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
         conn.commit()
         current_app.logger.info(
             f"toggle_income_confirmation: income_id={income_id}, confirm={confirm}, "
-            f"confirmed_by={confirmed_by_user_id}, DB updated"
+            f"confirmed_by={confirmed_by_user_id}, deal_id={deal_id}, DB updated"
         )
     except Exception as e:
         conn.rollback()
@@ -1059,33 +1083,28 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
         cursor.close()
         conn.close()
 
-    # Обновляем статус смарт-счёта в Б24
+    # --- Обновляем статус смарт-счёта в Б24 ---
     b24_result = None
     if b24_invoice_id:
         target_stage = CONFIRMED_STAGE_ID if confirm else UNCONFIRMED_STAGE_ID
         params = {
             'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
-            'id': b24_invoice_id,
-            'fields': {'stageId': target_stage}
+            'id':           b24_invoice_id,
+            'fields':       {'stageId': target_stage}
         }
         current_app.logger.info(
-            f"toggle_income_confirmation: updating B24 invoice {b24_invoice_id} → stageId={target_stage}"
+            f"toggle_income_confirmation: updating B24 invoice {b24_invoice_id} → {target_stage}"
         )
         b24_result = b24_call_method('crm.item.update', params)
         current_app.logger.info(f"toggle_income_confirmation: B24 result={b24_result}")
 
-        # --- Забираем актуальный file_url из ответа Б24 и обновляем в БД ---
+        # Обновляем file_url из ответа Б24
         try:
             updated_item = b24_result.get('result', {}).get('item', {}) if b24_result else {}
-            file_field = updated_item.get(FILE_CUSTOM_FIELD)
-            current_app.logger.info(
-                f"toggle_income_confirmation: file_field from update response={file_field}"
-            )
-
+            file_field   = updated_item.get(FILE_CUSTOM_FIELD)
             if isinstance(file_field, dict):
                 new_file_id  = str(file_field.get('id', '')) or None
                 new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
-
                 if new_file_id or new_file_url:
                     conn_upd = get_db_connection()
                     if conn_upd:
@@ -1097,19 +1116,61 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
                             )
                             conn_upd.commit()
                             current_app.logger.info(
-                                f"toggle_income_confirmation: updated file_url in DB: "
-                                f"file_id={new_file_id}, url_set={bool(new_file_url)}"
+                                f"toggle_income_confirmation: file_url updated in DB"
                             )
                         finally:
                             cur_upd.close()
                             conn_upd.close()
         except Exception as e:
             current_app.logger.warning(
-                f"toggle_income_confirmation: failed to update file_url from B24 response: {e}"
+                f"toggle_income_confirmation: failed to update file_url: {e}"
             )
 
+    # --- Пересчитываем стадию сделки для обязательных платежей ---
+    stage_result = None
+    if deal_id:
+        # Определяем category_id сделки из нашей БД
+        try:
+            conn_cat = get_db_connection()
+            if conn_cat:
+                cursor_cat = conn_cat.cursor(dictionary=True)
+                try:
+                    # Получаем category_id сделки из Б24
+                    deal_res = b24_call_method('crm.deal.get', {'id': deal_id})
+                    if deal_res and deal_res.get('result'):
+                        category_id = int(deal_res['result'].get('CATEGORY_ID') or 0)
+                        current_app.logger.info(
+                            f"toggle_income_confirmation: deal_id={deal_id}, category_id={category_id}"
+                        )
+
+                        if category_id in (14, 16, 18):
+                            # При отмене — исключаем текущий приход из подсчёта
+                            # (БД уже обновлена: is_confirmed=0, поэтому exclude не нужен)
+                            stage_result = _recalculate_deal_stage(
+                                deal_id     = deal_id,
+                                category_id = category_id,
+                                exclude_income_id = None  # БД уже актуальна
+                            )
+                            current_app.logger.info(
+                                f"toggle_income_confirmation: stage_result={stage_result}"
+                            )
+                        else:
+                            current_app.logger.info(
+                                f"toggle_income_confirmation: category_id={category_id} "
+                                f"not in (14,16,18), skip stage update"
+                            )
+                finally:
+                    cursor_cat.close()
+                    conn_cat.close()
+        except Exception as e:
+            current_app.logger.error(
+                f"toggle_income_confirmation: stage recalculation failed: {e}", exc_info=True
+            )
+            stage_result = {'success': False, 'error': str(e)}
+
     return {
-        'success': True,
+        'success':      True,
         'is_confirmed': confirm,
-        'b24_updated': b24_result is not None and 'error' not in (b24_result or {})
+        'b24_updated':  b24_result is not None and 'error' not in (b24_result or {}),
+        'stage':        stage_result
     }

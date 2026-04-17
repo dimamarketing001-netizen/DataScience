@@ -350,12 +350,36 @@ App.cashbox.incomes = {
 
             newCancelBtn.onclick = () => { modal.style.display = 'none'; };
 
+            const stageNames = {
+                'C14:WON':           'Оплачено',
+                'C16:WON':           'Оплачено',
+                'C18:WON':           'Оплачено',
+                'C14:FINAL_INVOICE': 'Частичная оплата',
+                'C16:FINAL_INVOICE': 'Частичная оплата',
+                'C18:FINAL_INVOICE': 'Частичная оплата',
+                'DC14:NEW':          'Новая',
+                'DC16:NEW':          'Новая',
+                'DC18:NEW':          'Новая',
+            };
+
             newYesBtn.onclick = async () => {
                 modal.style.display = 'none';
                 App.showLoader();
                 try {
-                    await App.cashbox.api.toggleIncomeConfirmation(incomeId, willConfirm);
-                    App.Notify.success(willConfirm ? 'Платёж подтверждён!' : 'Подтверждение отменено.');
+                    const result = await App.cashbox.api.toggleIncomeConfirmation(incomeId, willConfirm);
+
+                    let msg = willConfirm ? 'Платёж подтверждён!' : 'Подтверждение отменено.';
+
+                    if (result.stage) {
+                        if (result.stage.success) {
+                            const stageName = stageNames[result.stage.stage_id] || result.stage.stage_id;
+                            msg += ` Стадия сделки → "${stageName}".`;
+                        } else if (result.stage.error) {
+                            msg += ` ⚠️ Стадия не обновлена: ${result.stage.error}`;
+                        }
+                    }
+
+                    App.Notify.success(msg);
                     loadIncomesTable(currentPage);
                 } catch (e) {
                     await App.Notify.error('Ошибка', e.message);
