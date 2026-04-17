@@ -143,9 +143,29 @@ def get_single_income():
 
 def update_income():
     """Контроллер для обновления прихода."""
+    from flask import current_app
     try:
         data = request.get_json()
-        result = update_income_service(data)
+
+        # Обрабатываем новый файл если передан
+        file_data = None
+        file_data_raw = data.get('file_data')
+        if file_data_raw and file_data_raw.get('content_b64'):
+            import base64
+            try:
+                file_bytes = base64.b64decode(file_data_raw['content_b64'])
+                file_data = {
+                    'filename': file_data_raw.get('filename', 'document.pdf'),
+                    'content':  file_bytes,
+                    'mimetype': file_data_raw.get('mimetype', 'application/octet-stream')
+                }
+                current_app.logger.info(
+                    f"update_income: new file decoded: name={file_data['filename']}, size={len(file_bytes)} bytes"
+                )
+            except Exception as e:
+                current_app.logger.warning(f"update_income: file decode failed: {e}")
+
+        result = update_income_service(data, file_data=file_data)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -175,9 +195,10 @@ def toggle_income_confirmation():
     from flask import current_app
     try:
         data = request.get_json()
-        income_id = data.get('id')
-        confirm = data.get('confirm')  # True или False
-        result = toggle_income_confirmation_service(income_id, confirm)
+        income_id           = data.get('id')
+        confirm             = data.get('confirm')
+        confirmed_by_user_id = data.get('confirmed_by_user_id')
+        result = toggle_income_confirmation_service(income_id, confirm, confirmed_by_user_id)
         return jsonify(result)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -255,10 +255,10 @@ def get_incomes_service(args):
     """Сервисная функция для получения списка приходов с фильтрацией и пагинацией."""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    
+
     base_query = "FROM incomes i"
     count_query = "SELECT COUNT(*) as total " + base_query
-    data_query = "SELECT i.* " + base_query
+    data_query  = "SELECT i.* " + base_query
 
     filters = []
     filter_params = []
@@ -274,39 +274,46 @@ def get_incomes_service(args):
         filter_params.append(int(args['is_confirmed']))
 
     if filters:
-        data_query += " WHERE " + " AND ".join(filters)
-        count_query += " WHERE " + " AND ".join(filters)
+        where = " WHERE " + " AND ".join(filters)
+        data_query  += where
+        count_query += where
 
     cursor.execute(count_query, tuple(filter_params))
     total_records = cursor.fetchone()['total']
 
-    limit = args.get('limit', 25, type=int)
-    offset = args.get('offset', 0, type=int)
+    limit  = args.get('limit',  25, type=int)
+    offset = args.get('offset',  0, type=int)
     data_query += " ORDER BY i.income_date DESC, i.id DESC LIMIT %s OFFSET %s"
     filter_params.extend([limit, offset])
-    
+
     cursor.execute(data_query, tuple(filter_params))
     incomes = cursor.fetchall()
-    
+
     cursor.close()
     conn.close()
 
     for income in incomes:
-        income['contact_name'] = _get_b24_entity_name('contact', income['contact_id'])
-        income['deal_name'] = income.get('deal_type_name') or '—'
-        income['added_by_user_name'] = _get_b24_entity_name('user', income['added_by_user_id'])
-        income['income_date'] = income['income_date'].isoformat() if income['income_date'] else None
-        income['b24_invoice_id'] = str(income['b24_invoice_id']) if income.get('b24_invoice_id') else None
-        income['b24_file_id'] = str(income['b24_file_id']) if income.get('b24_file_id') else None
-        income['b24_file_url'] = income.get('b24_file_url') or None
-        income['is_confirmed'] = bool(income.get('is_confirmed', 0))
-        income['contact_id'] = str(income['contact_id']) if income.get('contact_id') else None
-        income['deal_id'] = str(income['deal_id']) if income.get('deal_id') else None
+        income['contact_name']         = _get_b24_entity_name('contact', income['contact_id'])
+        income['deal_name']            = income.get('deal_type_name') or '—'
+        income['added_by_user_name']   = _get_b24_entity_name('user', income['added_by_user_id'])
+        # Имя подтвердившего
+        income['confirmed_by_user_name'] = _get_b24_entity_name('user', income['confirmed_by_user_id']) \
+                                           if income.get('confirmed_by_user_id') else None
+        income['income_date']          = income['income_date'].isoformat() if income['income_date'] else None
+        income['is_confirmed']         = bool(income.get('is_confirmed', 0))
+        income['b24_invoice_id']       = str(income['b24_invoice_id'])  if income.get('b24_invoice_id')  else None
+        income['b24_file_id']          = str(income['b24_file_id'])     if income.get('b24_file_id')     else None
+        income['b24_file_url']         = income.get('b24_file_url')     or None
+        income['contact_id']           = str(income['contact_id'])      if income.get('contact_id')      else None
+        income['deal_id']              = str(income['deal_id'])         if income.get('deal_id')         else None
+        income['confirmed_by_user_id'] = str(income['confirmed_by_user_id']) \
+                                         if income.get('confirmed_by_user_id') else None
+
     return {
-        "incomes": incomes,
+        "incomes":       incomes,
         "total_records": total_records,
-        "limit": limit,
-        "offset": offset
+        "limit":         limit,
+        "offset":        offset
     }
 
 def get_single_income_service(income_id):
@@ -331,9 +338,9 @@ def get_single_income_service(income_id):
         cursor.close()
         conn.close()
 
-def update_income_service(data):
-    """Сервисная функция для обновления прихода.
-    Если изменился deal_id или contact_id — удаляет старый счёт в Б24 и создаёт новый.
+def update_income_service(data, file_data=None):
+    """Обновление прихода. Если изменился deal/contact — пересоздаёт счёт.
+    Если передан file_data — заменяет файл в счёте Б24.
     """
     income_id = data.get('id')
     if not income_id:
@@ -345,7 +352,6 @@ def update_income_service(data):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Получаем текущие данные прихода до обновления
         cursor.execute(
             "SELECT deal_id, contact_id, b24_invoice_id, amount, income_date, deal_type_name FROM incomes WHERE id = %s",
             (income_id,)
@@ -354,22 +360,20 @@ def update_income_service(data):
         if not old_income:
             raise ValueError(f'Income {income_id} not found')
 
-        old_deal_id    = str(old_income['deal_id'])    if old_income.get('deal_id')    else None
-        old_contact_id = str(old_income['contact_id']) if old_income.get('contact_id') else None
+        old_deal_id    = str(old_income['deal_id'])        if old_income.get('deal_id')        else None
+        old_contact_id = str(old_income['contact_id'])     if old_income.get('contact_id')     else None
         old_invoice_id = str(old_income['b24_invoice_id']) if old_income.get('b24_invoice_id') else None
 
         new_deal_id    = str(data.get('deal_id'))    if data.get('deal_id')    else None
         new_contact_id = str(data.get('contact_id')) if data.get('contact_id') else None
 
-        # Флаг — нужно ли пересоздавать счёт
         deal_changed = (old_deal_id != new_deal_id) or (old_contact_id != new_contact_id)
 
         current_app.logger.info(
             f"update_income_service: id={income_id}, old_deal={old_deal_id}, new_deal={new_deal_id}, "
-            f"old_contact={old_contact_id}, new_contact={new_contact_id}, deal_changed={deal_changed}"
+            f"deal_changed={deal_changed}, has_new_file={file_data is not None}"
         )
 
-        # Обновляем запись в БД
         query = """UPDATE incomes
                    SET income_date    = %s,
                        amount         = %s,
@@ -379,14 +383,12 @@ def update_income_service(data):
                        deal_type_name = %s,
                        comment        = %s
                    WHERE id = %s"""
-        values = (
+        cursor.execute(query, (
             data.get('date'), data.get('amount'), data.get('contact_id'),
             data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
             data.get('comment'), income_id
-        )
-        cursor.execute(query, values)
+        ))
         conn.commit()
-        current_app.logger.info(f"update_income_service: DB updated for income_id={income_id}")
 
     except Exception as e:
         conn.rollback()
@@ -395,18 +397,18 @@ def update_income_service(data):
         cursor.close()
         conn.close()
 
-    # Если сделка/контакт изменились — пересоздаём счёт в Б24
     invoice_result = None
+
     if deal_changed and new_deal_id and new_contact_id:
-        # Шаг 1: Удаляем старый счёт если он был
+        # Удаляем старый счёт
         if old_invoice_id:
             try:
-                del_result = delete_b24_invoice_service(old_invoice_id)
-                current_app.logger.info(f"update_income_service: old invoice {old_invoice_id} deleted: {del_result}")
+                delete_b24_invoice_service(old_invoice_id)
+                current_app.logger.info(f"update_income_service: old invoice {old_invoice_id} deleted")
             except Exception as e:
-                current_app.logger.warning(f"update_income_service: failed to delete old invoice {old_invoice_id}: {e}")
+                current_app.logger.warning(f"update_income_service: failed to delete old invoice: {e}")
 
-        # Шаг 2: Создаём новый счёт
+        # Создаём новый счёт (с новым файлом если есть)
         try:
             invoice_result = create_b24_invoice_service(
                 income_data={
@@ -417,26 +419,23 @@ def update_income_service(data):
                     'deal_type_name': data.get('deal_type_name', ''),
                     'income_db_id':   income_id
                 },
-                file_data=None  # При редактировании файл не переносим
+                file_data=file_data  # передаём новый файл если есть
             )
-            current_app.logger.info(f"update_income_service: new invoice created: {invoice_result}")
-
-            # Сохраняем новый invoice_id в БД
             if invoice_result.get('success'):
                 conn2 = get_db_connection()
                 if conn2:
                     try:
                         cur2 = conn2.cursor()
                         cur2.execute(
-                            "UPDATE incomes SET b24_invoice_id=%s, is_confirmed=0 WHERE id=%s",
-                            (str(invoice_result.get('invoice_id', '')), income_id)
+                            "UPDATE incomes SET b24_invoice_id=%s, b24_file_id=%s, b24_file_url=%s, is_confirmed=0 WHERE id=%s",
+                            (
+                                str(invoice_result.get('invoice_id', '')),
+                                invoice_result.get('b24_file_id'),
+                                invoice_result.get('b24_file_url'),
+                                income_id
+                            )
                         )
                         conn2.commit()
-                        current_app.logger.info(
-                            f"update_income_service: saved new invoice_id={invoice_result.get('invoice_id')}"
-                        )
-                    except Exception as db_err:
-                        current_app.logger.warning(f"update_income_service: failed to save new invoice_id: {db_err}")
                     finally:
                         cur2.close()
                         conn2.close()
@@ -445,17 +444,15 @@ def update_income_service(data):
             invoice_result = {'success': False, 'error': str(e)}
 
     elif deal_changed and old_invoice_id:
-        # Сделку убрали совсем (нет new_deal_id) — просто удаляем старый счёт
+        # Сделку убрали — удаляем счёт
         try:
-            del_result = delete_b24_invoice_service(old_invoice_id)
-            current_app.logger.info(f"update_income_service: invoice removed (no new deal): {del_result}")
-            # Обнуляем invoice_id в БД
+            delete_b24_invoice_service(old_invoice_id)
             conn3 = get_db_connection()
             if conn3:
                 try:
                     cur3 = conn3.cursor()
                     cur3.execute(
-                        "UPDATE incomes SET b24_invoice_id=NULL, is_confirmed=0 WHERE id=%s",
+                        "UPDATE incomes SET b24_invoice_id=NULL, b24_file_id=NULL, b24_file_url=NULL, is_confirmed=0 WHERE id=%s",
                         (income_id,)
                     )
                     conn3.commit()
@@ -463,7 +460,61 @@ def update_income_service(data):
                     cur3.close()
                     conn3.close()
         except Exception as e:
-            current_app.logger.warning(f"update_income_service: failed to delete invoice after deal removal: {e}")
+            current_app.logger.warning(f"update_income_service: failed to delete invoice: {e}")
+
+    elif not deal_changed and file_data and old_invoice_id:
+        # Сделка не менялась, но загружен новый файл — обновляем файл в существующем счёте
+        try:
+            import base64
+            file_content_b64 = base64.b64encode(file_data['content']).decode('utf-8')
+            filename = file_data.get('filename', 'document.pdf')
+            FILE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776360197269"
+            SMART_INVOICE_ENTITY_TYPE_ID = 31
+
+            update_params = {
+                'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+                'id': old_invoice_id,
+                'fields': {
+                    FILE_CUSTOM_FIELD: [filename, file_content_b64]
+                },
+                'useOriginalUfNames': 'Y'
+            }
+            current_app.logger.info(f"update_income_service: updating file in invoice {old_invoice_id}")
+            update_res = b24_call_method('crm.item.update', update_params)
+            current_app.logger.info(f"update_income_service: file update result={update_res}")
+
+            # Получаем обновлённый URL файла
+            get_res = b24_call_method('crm.item.get', {
+                'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+                'id': old_invoice_id
+            })
+            if get_res and get_res.get('result', {}).get('item'):
+                item = get_res['result']['item']
+                file_field = item.get('UF_CRM_SMART_INVOICE_1776360197269') or \
+                             item.get('ufCrmSmartInvoice1776360197269')
+                if isinstance(file_field, dict):
+                    new_file_id  = str(file_field.get('id', '')) or None
+                    new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
+                    conn4 = get_db_connection()
+                    if conn4:
+                        try:
+                            cur4 = conn4.cursor()
+                            cur4.execute(
+                                "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
+                                (new_file_id, new_file_url, income_id)
+                            )
+                            conn4.commit()
+                            current_app.logger.info(
+                                f"update_income_service: new file saved: id={new_file_id}"
+                            )
+                        finally:
+                            cur4.close()
+                            conn4.close()
+
+            invoice_result = {'success': True, 'file_updated': True}
+        except Exception as e:
+            current_app.logger.error(f"update_income_service: file update failed: {e}", exc_info=True)
+            invoice_result = {'success': False, 'error': str(e)}
 
     return {
         'success': True,
@@ -735,14 +786,14 @@ def delete_b24_invoice_service(invoice_id):
     else:
         return {'success': False, 'error': str(result)}
 
-def toggle_income_confirmation_service(income_id, confirm: bool):
+def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_user_id=None):
     """Подтверждает или отменяет подтверждение прихода, меняя статус счёта в Б24."""
     if not income_id:
         raise ValueError('Income ID is required')
 
     SMART_INVOICE_ENTITY_TYPE_ID = 31
-    CONFIRMED_STAGE_ID = 'DT31_2:P'      # Оплачен / Подтверждён
-    UNCONFIRMED_STAGE_ID = 'DT31_2:N'    # Новый / Неподтверждённый
+    CONFIRMED_STAGE_ID   = 'DT31_2:P'
+    UNCONFIRMED_STAGE_ID = 'DT31_2:N'
 
     conn = get_db_connection()
     if not conn:
@@ -757,13 +808,22 @@ def toggle_income_confirmation_service(income_id, confirm: bool):
 
         b24_invoice_id = income.get('b24_invoice_id')
 
-        # Обновляем статус в БД
-        cursor.execute(
-            "UPDATE incomes SET is_confirmed = %s WHERE id = %s",
-            (1 if confirm else 0, income_id)
-        )
+        if confirm:
+            cursor.execute(
+                "UPDATE incomes SET is_confirmed = 1, confirmed_by_user_id = %s WHERE id = %s",
+                (confirmed_by_user_id, income_id)
+            )
+        else:
+            cursor.execute(
+                "UPDATE incomes SET is_confirmed = 0, confirmed_by_user_id = NULL WHERE id = %s",
+                (income_id,)
+            )
+
         conn.commit()
-        current_app.logger.info(f"toggle_income_confirmation: income_id={income_id}, confirm={confirm}, DB updated")
+        current_app.logger.info(
+            f"toggle_income_confirmation: income_id={income_id}, confirm={confirm}, "
+            f"confirmed_by={confirmed_by_user_id}, DB updated"
+        )
     except Exception as e:
         conn.rollback()
         raise
@@ -771,7 +831,7 @@ def toggle_income_confirmation_service(income_id, confirm: bool):
         cursor.close()
         conn.close()
 
-    # Обновляем статус смарт-счёта в Б24 если он есть
+    # Обновляем статус смарт-счёта в Б24
     b24_result = None
     if b24_invoice_id:
         target_stage = CONFIRMED_STAGE_ID if confirm else UNCONFIRMED_STAGE_ID
@@ -780,7 +840,9 @@ def toggle_income_confirmation_service(income_id, confirm: bool):
             'id': b24_invoice_id,
             'fields': {'stageId': target_stage}
         }
-        current_app.logger.info(f"toggle_income_confirmation: updating B24 invoice {b24_invoice_id} → stageId={target_stage}")
+        current_app.logger.info(
+            f"toggle_income_confirmation: updating B24 invoice {b24_invoice_id} → stageId={target_stage}"
+        )
         b24_result = b24_call_method('crm.item.update', params)
         current_app.logger.info(f"toggle_income_confirmation: B24 result={b24_result}")
 

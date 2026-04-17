@@ -86,53 +86,70 @@ App.cashbox.ui = {
         const { incomesTableBody } = this.elements;
         incomesTableBody.innerHTML = '';
         if (!incomes || incomes.length === 0) {
-            incomesTableBody.innerHTML = `<tr><td colspan="8">Нет записей о приходах.</td></tr>`;
+            incomesTableBody.innerHTML = `<tr><td colspan="10">Нет записей о приходах.</td></tr>`;
             return;
         }
 
-        const canEdit = App.userPermissions.tabs.cashbox.income.edit;
-        const canDelete = App.userPermissions.tabs.cashbox.income.delete;
+        const canEdit    = App.userPermissions.tabs.cashbox.income.edit;
+        const canDelete  = App.userPermissions.tabs.cashbox.income.delete;
+        const canConfirm = App.userPermissions.tabs.cashbox.income.confirm;
 
         incomes.forEach(income => {
             const row = incomesTableBody.insertRow();
+            const isConfirmed = income.is_confirmed;
+
+            if (isConfirmed) {
+                row.style.backgroundColor = 'rgba(76, 175, 80, 0.08)';
+            }
+
             row.insertCell().textContent = income.id;
             row.insertCell().textContent = income.income_date;
             row.insertCell().textContent = parseFloat(income.amount).toFixed(2);
-            // Контакт — кликабельная ссылка
+
+            // Клиент
             const contactCell = row.insertCell();
             if (income.contact_id && income.contact_name) {
                 const contactLink = document.createElement('a');
-                contactLink.href = `${App.b24Domain}/crm/contact/details/${income.contact_id}/`;
+                contactLink.href   = `${App.b24Domain}/crm/contact/details/${income.contact_id}/`;
                 contactLink.target = '_blank';
-                contactLink.rel = 'noopener noreferrer';
+                contactLink.rel    = 'noopener noreferrer';
                 contactLink.textContent = income.contact_name;
                 contactLink.style.cssText = 'color:#2fc6f6;text-decoration:none;';
                 contactLink.onmouseover = () => contactLink.style.textDecoration = 'underline';
-                contactLink.onmouseout = () => contactLink.style.textDecoration = 'none';
+                contactLink.onmouseout  = () => contactLink.style.textDecoration = 'none';
                 contactCell.appendChild(contactLink);
             } else {
                 contactCell.textContent = '—';
             }
 
-            // Сделка — кликабельная ссылка
+            // Сделка
             const dealCell = row.insertCell();
             if (income.deal_id && income.deal_name && income.deal_name !== '—') {
                 const dealLink = document.createElement('a');
-                dealLink.href = `${App.b24Domain}/crm/deal/details/${income.deal_id}/`;
+                dealLink.href   = `${App.b24Domain}/crm/deal/details/${income.deal_id}/`;
                 dealLink.target = '_blank';
-                dealLink.rel = 'noopener noreferrer';
+                dealLink.rel    = 'noopener noreferrer';
                 dealLink.textContent = income.deal_name;
                 dealLink.style.cssText = 'color:#2fc6f6;text-decoration:none;';
                 dealLink.onmouseover = () => dealLink.style.textDecoration = 'underline';
-                dealLink.onmouseout = () => dealLink.style.textDecoration = 'none';
+                dealLink.onmouseout  = () => dealLink.style.textDecoration = 'none';
                 dealCell.appendChild(dealLink);
             } else {
                 dealCell.textContent = income.deal_name || '—';
             }
+
             row.insertCell().textContent = income.comment || '—';
             row.insertCell().textContent = income.added_by_user_name || 'Неизвестно';
 
-            // --- Столбец "Документ" ---
+            // --- Подтвердил ---
+            const confirmedByCell = row.insertCell();
+            confirmedByCell.textContent = income.confirmed_by_user_name || '—';
+            if (income.confirmed_by_user_name) {
+                confirmedByCell.style.color = '#4CAF50';
+                confirmedByCell.style.fontWeight = '500';
+            }
+
+            // --- Документ ---
             const docCell = row.insertCell();
             docCell.className = 'actions-column';
             if (income.b24_file_url) {
@@ -159,36 +176,33 @@ App.cashbox.ui = {
                 docCell.textContent = '—';
             }
 
-            // --- Столбец "Действия" ---
+            // --- Действия ---
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
 
-            const isConfirmed = income.is_confirmed;
-
-            // Зелёный фон для подтверждённых
-            if (isConfirmed) {
-                row.style.backgroundColor = 'rgba(76, 175, 80, 0.08)';
-            }
-
-            const canConfirm = App.userPermissions.tabs.cashbox.income.confirm;
-
             const confirmBtn = document.createElement('span');
-            confirmBtn.className = canConfirm ? 'action-icon confirm-income-btn' : 'action-icon confirm-income-btn access-restricted';
-            confirmBtn.dataset.id = income.id;
+            confirmBtn.className = canConfirm
+                ? 'action-icon confirm-income-btn'
+                : 'action-icon confirm-income-btn access-restricted';
+            confirmBtn.dataset.id        = income.id;
             confirmBtn.dataset.confirmed = isConfirmed ? '1' : '0';
-            confirmBtn.title = isConfirmed ? 'Отменить подтверждение' : 'Подтвердить платёж';
+            confirmBtn.title     = isConfirmed ? 'Отменить подтверждение' : 'Подтвердить платёж';
             confirmBtn.textContent = isConfirmed ? '↩️' : '✅';
 
             const editBtn = document.createElement('span');
-            editBtn.className = canEdit ? 'action-icon edit-income-btn' : 'action-icon edit-income-btn access-restricted';
-            editBtn.dataset.id = income.id;
-            editBtn.title = 'Редактировать';
+            editBtn.className   = canEdit
+                ? 'action-icon edit-income-btn'
+                : 'action-icon edit-income-btn access-restricted';
+            editBtn.dataset.id  = income.id;
+            editBtn.title       = 'Редактировать';
             editBtn.textContent = '✏️';
 
             const deleteBtn = document.createElement('span');
-            deleteBtn.className = canDelete ? 'action-icon delete-income-btn' : 'action-icon delete-income-btn access-restricted';
-            deleteBtn.dataset.id = income.id;
-            deleteBtn.title = 'Удалить';
+            deleteBtn.className   = canDelete
+                ? 'action-icon delete-income-btn'
+                : 'action-icon delete-income-btn access-restricted';
+            deleteBtn.dataset.id  = income.id;
+            deleteBtn.title       = 'Удалить';
             deleteBtn.textContent = '🗑️';
 
             actionsCell.appendChild(confirmBtn);
@@ -222,7 +236,6 @@ App.cashbox.ui = {
     openEditIncomeModal: function(income) {
         const { editIncomeModal, editIncomeDealWrapper, editIncomeDealSelect } = this.elements;
 
-        // Сбрасываем блок сделок перед открытием, чтобы не было старых данных
         editIncomeDealWrapper.style.display = 'none';
         editIncomeDealSelect.innerHTML = '';
 
@@ -231,6 +244,27 @@ App.cashbox.ui = {
         document.getElementById('edit-income-comment').value = income.comment || '';
         document.getElementById('edit-income-client-search').value = income.contact_name || '';
         document.getElementById('edit-income-selected-client-id').value = income.contact_id || '';
+
+        // Показываем текущий файл если есть
+        const currentFileBlock = document.getElementById('edit-income-current-file');
+        const currentFileLink  = document.getElementById('edit-income-current-file-link');
+        if (income.b24_file_url) {
+            currentFileBlock.style.display = 'block';
+            currentFileLink.textContent = income.b24_file_id ? `Файл #${income.b24_file_id}` : 'Текущий документ';
+            currentFileLink.onclick = () => App.cashbox.ui.openFileViewer(income.b24_file_url, income.b24_file_id);
+        } else {
+            currentFileBlock.style.display = 'none';
+        }
+
+        // Сбрасываем drop-zone
+        const dropZone        = document.getElementById('edit-income-drop-zone');
+        const dropZoneContent = document.getElementById('edit-income-drop-zone-content');
+        const filePreview     = document.getElementById('edit-income-file-preview');
+        const fileInput       = document.getElementById('edit-income-file-input');
+        dropZone.classList.remove('has-file', 'drag-over');
+        dropZoneContent.style.display = 'flex';
+        filePreview.style.display = 'none';
+        fileInput.value = '';
 
         flatpickr("#edit-income-date", { locale: "ru", dateFormat: "Y-m-d", defaultDate: income.income_date });
 
@@ -377,57 +411,99 @@ App.cashbox.ui = {
     },
 
     openFileViewer: function(fileUrl, fileId) {
-        const modal = document.getElementById('file-viewer-modal');
-        const content = document.getElementById('file-viewer-content');
-        const title = document.getElementById('file-viewer-title');
+        const modal       = document.getElementById('file-viewer-modal');
+        const content     = document.getElementById('file-viewer-content');
+        const title       = document.getElementById('file-viewer-title');
         const downloadLink = document.getElementById('file-viewer-download');
 
-        // Сбрасываем контент
         content.innerHTML = '<div class="file-viewer-loading">⏳ Загрузка...</div>';
         modal.style.display = 'flex';
-
-        // Ссылка для скачивания
         downloadLink.href = fileUrl;
 
-        // Определяем тип файла по расширению из URL или по fileId
-        // urlMachine не содержит расширения — пробуем загрузить как изображение
-        // и если не получится — показываем iframe
-        const img = new Image();
-        img.style.cssText = 'max-width:100%;max-height:calc(90vh - 130px);object-fit:contain;display:block;';
+        // Определяем тип по URL (расширение) или пробуем оба варианта
+        const urlLower = (fileUrl || '').toLowerCase().split('?')[0];
+        const isPdf    = urlLower.endsWith('.pdf');
+        const isImage  = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(urlLower);
 
-        img.onload = function() {
-            // Это изображение — показываем img
+        if (isPdf) {
+            // Сразу показываем PDF через iframe
+            showAsIframe();
+            return;
+        }
+
+        if (isImage) {
+            // Сразу показываем как картинку
+            showAsImage();
+            return;
+        }
+
+        // Тип неизвестен — пробуем сначала как картинку, fallback на iframe
+        showAsImage(true);
+
+        function showAsImage(withFallback = false) {
             content.innerHTML = '';
-            content.appendChild(img);
             title.textContent = 'Просмотр изображения';
-        };
+            const img = document.createElement('img');
+            img.style.cssText = 'max-width:100%;max-height:calc(90vh - 130px);object-fit:contain;display:block;';
+            img.onload = function() {
+                title.textContent = 'Просмотр изображения';
+            };
+            img.onerror = function() {
+                if (withFallback) {
+                    showAsIframe();
+                } else {
+                    showError();
+                }
+            };
+            img.src = fileUrl;
+            content.appendChild(img);
+        }
 
-        img.onerror = function() {
-            // Не изображение — показываем через iframe (PDF и др.)
+        function showAsIframe() {
             content.innerHTML = '';
+            title.textContent = 'Просмотр документа';
+
+            // Для PDF используем Google Docs viewer как fallback если прямой iframe заблокирован
             const frame = document.createElement('iframe');
-            frame.src = fileUrl;
             frame.style.cssText = 'width:100%;height:calc(90vh - 130px);border:none;background:#fff;';
             frame.title = 'Документ';
+            frame.src   = fileUrl;
 
-            // Если iframe тоже не загрузится — показываем ссылку
-            frame.onerror = function() {
-                content.innerHTML = `
-                    <div class="file-viewer-error">
-                        <p>Не удалось открыть файл в просмотрщике.</p>
-                        <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;">
-                            ⬇️ Скачать файл
-                        </a>
-                    </div>
-                `;
-            };
+            // Таймаут — если через 4 секунды iframe не загрузился, предлагаем скачать
+            const timer = setTimeout(() => {
+                if (content.contains(frame)) {
+                    showDownloadFallback();
+                }
+            }, 4000);
+
+            frame.onload = () => clearTimeout(timer);
 
             content.appendChild(frame);
-            title.textContent = 'Просмотр документа';
-        };
+        }
 
-        // Запускаем попытку загрузить как изображение
-        img.src = fileUrl;
-        title.textContent = 'Загрузка...';
-    }
+        function showDownloadFallback() {
+            content.innerHTML = `
+                <div class="file-viewer-error">
+                    <p>Не удалось отобразить файл в браузере.<br>
+                    Это может быть связано с ограничениями сервера Битрикс24.</p>
+                    <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;display:inline-block;">
+                        ⬇️ Скачать файл
+                    </a>
+                </div>
+            `;
+            title.textContent = 'Просмотр недоступен';
+        }
+
+        function showError() {
+            content.innerHTML = `
+                <div class="file-viewer-error">
+                    <p>Не удалось открыть файл.</p>
+                    <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;display:inline-block;">
+                        ⬇️ Скачать файл
+                    </a>
+                </div>
+            `;
+            title.textContent = 'Ошибка';
+        }
+    },
 };

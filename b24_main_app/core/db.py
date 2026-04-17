@@ -97,6 +97,8 @@ def init_db():
             "ALTER TABLE `incomes` ADD COLUMN `b24_file_url` text DEFAULT NULL",
             "ALTER TABLE `incomes` MODIFY COLUMN `b24_file_id` varchar(50) DEFAULT NULL",
             "ALTER TABLE `incomes` ADD COLUMN `is_confirmed` TINYINT(1) DEFAULT 0 NOT NULL",
+            "ALTER TABLE `incomes` ADD COLUMN `confirmed_by_user_id` varchar(50) DEFAULT NULL",
+            "ALTER TABLE `incomes` ADD COLUMN `confirmed_by_user_name` varchar(255) DEFAULT NULL",
         ]:
             try:
                 cursor.execute(col_sql)

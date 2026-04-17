@@ -125,6 +125,50 @@ App.cashbox.incomes = {
             onClientSelected: handleClientSelection
         });
 
+        // --- Drag & Drop для файла в форме РЕДАКТИРОВАНИЯ ---
+        const editDropZone        = document.getElementById('edit-income-drop-zone');
+        const editFileInput       = document.getElementById('edit-income-file-input');
+        const editDropZoneContent = document.getElementById('edit-income-drop-zone-content');
+        const editFilePreview     = document.getElementById('edit-income-file-preview');
+        const editFileNameSpan    = document.getElementById('edit-income-file-name');
+        const editFileRemoveBtn   = document.getElementById('edit-income-file-remove');
+        let   editSelectedFile    = null;
+
+        function setEditSelectedFile(file) {
+            const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+            if (!allowed.includes(file.type) && !file.type.startsWith('image/')) {
+                App.Notify.error('Неверный тип файла', 'Разрешены только PDF и изображения.');
+                return;
+            }
+            editSelectedFile = file;
+            editFileNameSpan.textContent = file.name;
+            editDropZoneContent.style.display = 'none';
+            editFilePreview.style.display = 'flex';
+            editDropZone.classList.add('has-file');
+        }
+
+        function clearEditSelectedFile() {
+            editSelectedFile = null;
+            editFileInput.value = '';
+            editFileNameSpan.textContent = '';
+            editDropZoneContent.style.display = 'flex';
+            editFilePreview.style.display = 'none';
+            editDropZone.classList.remove('has-file');
+        }
+
+        editDropZone.addEventListener('click', () => { if (!editSelectedFile) editFileInput.click(); });
+        editFileInput.addEventListener('change', () => {
+            if (editFileInput.files && editFileInput.files[0]) setEditSelectedFile(editFileInput.files[0]);
+        });
+        editDropZone.addEventListener('dragover',  (e) => { e.preventDefault(); editDropZone.classList.add('drag-over'); });
+        editDropZone.addEventListener('dragleave', ()  => { editDropZone.classList.remove('drag-over'); });
+        editDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            editDropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) setEditSelectedFile(e.dataTransfer.files[0]);
+        });
+        editFileRemoveBtn.addEventListener('click', (e) => { e.stopPropagation(); clearEditSelectedFile(); });
+
         async function handleClientSelection(clientId, searchInput) {
             const isEdit = searchInput && searchInput.id ? searchInput.id.includes('edit') : false;
             const dealSelect = document.getElementById(isEdit ? 'edit-income-deal-select' : 'income-deal-select');
@@ -347,24 +391,54 @@ App.cashbox.incomes = {
             event.preventDefault();
             if (updateIncomeBtn.classList.contains('access-restricted')) return;
 
-            const editDealSelect = document.getElementById('edit-income-deal-select');
-            const selectedEditOption = editDealSelect.options[editDealSelect.selectedIndex];
+            const editDealSelect      = document.getElementById('edit-income-deal-select');
+            const selectedEditOption  = editDealSelect.options[editDealSelect.selectedIndex];
 
             const formData = {
-                id: document.getElementById('edit-income-id').value,
-                date: document.getElementById('edit-income-date').value,
-                amount: parseFloat(document.getElementById('edit-income-amount').value),
-                contact_id: document.getElementById('edit-income-selected-client-id').value,
-                deal_id: editDealSelect.value,                                                    // 2086
-                deal_type_id: selectedEditOption ? selectedEditOption.dataset.typeId || '' : '',         // SALE
-                deal_type_name: selectedEditOption ? selectedEditOption.dataset.typeName || '' : '',     // БФЛ
-                comment: document.getElementById('edit-income-comment').value,
+                id:             document.getElementById('edit-income-id').value,
+                date:           document.getElementById('edit-income-date').value,
+                amount:         parseFloat(document.getElementById('edit-income-amount').value),
+                contact_id:     document.getElementById('edit-income-selected-client-id').value,
+                deal_id:        editDealSelect.value,
+                deal_type_id:   selectedEditOption ? selectedEditOption.dataset.typeId   || '' : '',
+                deal_type_name: selectedEditOption ? selectedEditOption.dataset.typeName || '' : '',
+                comment:        document.getElementById('edit-income-comment').value,
             };
 
             App.showLoader();
             try {
-                await App.cashbox.api.updateIncome(formData);
-                App.Notify.success('Приход успешно обновлен!');
+                // Если выбран новый файл — конвертируем в base64
+                if (editSelectedFile) {
+                    const fileBase64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload  = () => resolve(reader.result.split(',')[1]);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(editSelectedFile);
+                    });
+                    formData.file_data = {
+                        filename:    editSelectedFile.name,
+                        mimetype:    editSelectedFile.type,
+                        content_b64: fileBase64
+                    };
+                }
+
+                const result = await App.cashbox.api.updateIncome(formData);
+
+                let msg = 'Приход успешно обновлён!';
+                if (result.invoice) {
+                    if (result.invoice.success) {
+                        if (result.invoice.invoice_recreated || result.invoice_recreated) {
+                            msg += ' Счёт в Б24 пересоздан.';
+                        } else if (result.invoice.file_updated) {
+                            msg += ' Файл в счёте обновлён.';
+                        }
+                    } else if (result.invoice.error) {
+                        msg += ` ⚠️ Ошибка счёта: ${result.invoice.error}`;
+                    }
+                }
+
+                App.Notify.success(msg);
+                clearEditSelectedFile();
                 App.cashbox.ui.closeEditIncomeModal();
                 loadIncomesTable(currentPage);
             } catch (error) {

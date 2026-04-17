@@ -7,7 +7,6 @@
         <form id="edit-income-form" class="ui-form">
             <input type="hidden" id="edit-income-id">
 
-            <!-- Поле: Дата -->
             <div class="ui-form-row">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Дата</div></div>
                 <div class="ui-form-content">
@@ -17,7 +16,6 @@
                 </div>
             </div>
 
-            <!-- Поле: Сумма -->
             <div class="ui-form-row">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Сумма</div></div>
                 <div class="ui-form-content">
@@ -27,7 +25,6 @@
                 </div>
             </div>
 
-            <!-- Поле: Клиент (поиск) -->
             <div class="ui-form-row">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Клиент</div></div>
                 <div class="ui-form-content client-search-wrapper">
@@ -40,7 +37,6 @@
                 </div>
             </div>
 
-            <!-- Поле: Сделка (скрывается/показывается при выборе клиента) -->
             <div id="edit-income-deal-wrapper" class="ui-form-row" style="display: none;">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Сделка</div></div>
                 <div class="ui-form-content">
@@ -51,7 +47,40 @@
                 </div>
             </div>
 
-            <!-- Поле: Комментарий -->
+            <!-- Файл -->
+            <div class="ui-form-row">
+                <div class="ui-form-label">
+                    <div class="ui-ctl-label-text">Файл</div>
+                </div>
+                <div class="ui-form-content">
+                    <!-- Текущий файл -->
+                    <div id="edit-income-current-file" style="margin-bottom:8px;display:none;">
+                        <span style="font-size:13px;color:#535c69;">Текущий файл: </span>
+                        <span id="edit-income-current-file-link" style="font-size:13px;color:#2fc6f6;cursor:pointer;text-decoration:underline;"></span>
+                        <span style="font-size:12px;color:#9aabb8;margin-left:8px;">(загрузите новый, чтобы заменить)</span>
+                    </div>
+                    <!-- Drag & Drop зона -->
+                    <div id="edit-income-drop-zone" class="income-drop-zone">
+                        <input type="file" id="edit-income-file-input" accept=".pdf,image/*" style="display:none;">
+                        <div id="edit-income-drop-zone-content" class="income-drop-zone-content">
+                            <span class="income-drop-zone-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round" style="color:#6c7a89;">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                                </svg>
+                            </span>
+                            <span class="income-drop-zone-text">Перетащите новый файл или <span class="income-drop-zone-link">нажмите для выбора</span></span>
+                            <span class="income-drop-zone-hint">PDF или изображение</span>
+                        </div>
+                        <div id="edit-income-file-preview" class="income-file-preview" style="display:none;">
+                            <span id="edit-income-file-name" class="income-file-name"></span>
+                            <span id="edit-income-file-remove" class="income-file-remove" title="Отменить выбор">✕</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="ui-form-row">
                 <div class="ui-form-label"><div class="ui-ctl-label-text">Комментарий</div></div>
                 <div class="ui-form-content">
@@ -61,7 +90,6 @@
                 </div>
             </div>
 
-            <!-- Кнопки -->
             <div class="ui-form-row ui-form-row-actions">
                 <div class="ui-form-label"></div>
                 <div class="ui-form-content">

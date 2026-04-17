@@ -69,7 +69,7 @@ App.cashbox.api = {
     toggleIncomeConfirmation: function(id, confirm) {
         return App.api.request('toggle_income_confirmation', {}, {
             method: 'POST',
-            body: JSON.stringify({ id, confirm })
+            body: JSON.stringify({ id, confirm, confirmed_by_user_id: App.currentUser.ID })
         });
     },
 };

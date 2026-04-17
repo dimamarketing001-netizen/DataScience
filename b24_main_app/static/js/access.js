@@ -51,8 +51,9 @@ App.initializeAccessTab = async function () {
     document.getElementById('add-access-rule-btn').addEventListener('click', async () => {
         const selectedType = accessTypeSelect.value;
         const selectedValue = selectedType === 'employee' ? employeeSelect.value : departmentSelect.value;
-        const entityIdPrefix = selectedType === 'employee' ? 'user_' : 'department_';
-        const entityId = entityIdPrefix + selectedValue;
+
+        // entity.id уже содержит префикс "user_" или "department_" — используем напрямую
+        const entityId = selectedValue;
 
         if (!selectedValue || document.querySelector(`tr[data-entity-id="${entityId}"]`)) {
             await App.Notify.error('Ошибка', 'Это правило уже добавлено или ничего не выбрано.');
@@ -65,7 +66,11 @@ App.initializeAccessTab = async function () {
         if (entity) {
             const defaultPermissions = {
                 tabs: {
-                    cashbox: { view: false, income: { view: false, save: false, edit: false, delete: false }, expense: { view: false, save: false, edit: false, delete: false } },
+                    cashbox: {
+                        view: false,
+                        income: { view: false, save: false, edit: false, delete: false, confirm: false },
+                        expense: { view: false, save: false, edit: false, delete: false }
+                    },
                     statistics: { view: false },
                     access: { view: false, save: false, delete: false }
                 }
