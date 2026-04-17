@@ -170,8 +170,10 @@ App.cashbox.ui = {
                 row.style.backgroundColor = 'rgba(76, 175, 80, 0.08)';
             }
 
+            const canConfirm = App.userPermissions.tabs.cashbox.income.confirm;
+
             const confirmBtn = document.createElement('span');
-            confirmBtn.className = 'action-icon confirm-income-btn';
+            confirmBtn.className = canConfirm ? 'action-icon confirm-income-btn' : 'action-icon confirm-income-btn access-restricted';
             confirmBtn.dataset.id = income.id;
             confirmBtn.dataset.confirmed = isConfirmed ? '1' : '0';
             confirmBtn.title = isConfirmed ? 'Отменить подтверждение' : 'Подтвердить платёж';

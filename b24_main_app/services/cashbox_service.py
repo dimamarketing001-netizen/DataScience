@@ -332,40 +332,144 @@ def get_single_income_service(income_id):
         conn.close()
 
 def update_income_service(data):
-    """Сервисная функция для обновления прихода."""
+    """Сервисная функция для обновления прихода.
+    Если изменился deal_id или contact_id — удаляет старый счёт в Б24 и создаёт новый.
+    """
     income_id = data.get('id')
-    if not income_id: raise ValueError('Income ID is required')
+    if not income_id:
+        raise ValueError('Income ID is required')
 
     conn = get_db_connection()
-    if not conn: raise Exception('DB connection failed')
-    cursor = conn.cursor()
-
-    query = """UPDATE incomes \
-               SET income_date    = %s, \
-                   amount         = %s, \
-                   contact_id     = %s, \
-                   deal_id        = %s, \
-                   deal_type_id   = %s, \
-                   deal_type_name = %s, \
-                   comment        = %s
-               WHERE id = %s"""
-    values = (
-        data.get('date'), data.get('amount'), data.get('contact_id'),
-        data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
-        data.get('comment'), income_id
-    )
+    if not conn:
+        raise Exception('DB connection failed')
+    cursor = conn.cursor(dictionary=True)
 
     try:
+        # Получаем текущие данные прихода до обновления
+        cursor.execute(
+            "SELECT deal_id, contact_id, b24_invoice_id, amount, income_date, deal_type_name FROM incomes WHERE id = %s",
+            (income_id,)
+        )
+        old_income = cursor.fetchone()
+        if not old_income:
+            raise ValueError(f'Income {income_id} not found')
+
+        old_deal_id    = str(old_income['deal_id'])    if old_income.get('deal_id')    else None
+        old_contact_id = str(old_income['contact_id']) if old_income.get('contact_id') else None
+        old_invoice_id = str(old_income['b24_invoice_id']) if old_income.get('b24_invoice_id') else None
+
+        new_deal_id    = str(data.get('deal_id'))    if data.get('deal_id')    else None
+        new_contact_id = str(data.get('contact_id')) if data.get('contact_id') else None
+
+        # Флаг — нужно ли пересоздавать счёт
+        deal_changed = (old_deal_id != new_deal_id) or (old_contact_id != new_contact_id)
+
+        current_app.logger.info(
+            f"update_income_service: id={income_id}, old_deal={old_deal_id}, new_deal={new_deal_id}, "
+            f"old_contact={old_contact_id}, new_contact={new_contact_id}, deal_changed={deal_changed}"
+        )
+
+        # Обновляем запись в БД
+        query = """UPDATE incomes
+                   SET income_date    = %s,
+                       amount         = %s,
+                       contact_id     = %s,
+                       deal_id        = %s,
+                       deal_type_id   = %s,
+                       deal_type_name = %s,
+                       comment        = %s
+                   WHERE id = %s"""
+        values = (
+            data.get('date'), data.get('amount'), data.get('contact_id'),
+            data.get('deal_id'), data.get('deal_type_id'), data.get('deal_type_name'),
+            data.get('comment'), income_id
+        )
         cursor.execute(query, values)
         conn.commit()
-        current_app.logger.info(f"Income with ID {income_id} updated.")
-        return {'success': True}
-    except mysql.connector.Error as err:
+        current_app.logger.info(f"update_income_service: DB updated for income_id={income_id}")
+
+    except Exception as e:
         conn.rollback()
-        raise err
+        raise
     finally:
         cursor.close()
         conn.close()
+
+    # Если сделка/контакт изменились — пересоздаём счёт в Б24
+    invoice_result = None
+    if deal_changed and new_deal_id and new_contact_id:
+        # Шаг 1: Удаляем старый счёт если он был
+        if old_invoice_id:
+            try:
+                del_result = delete_b24_invoice_service(old_invoice_id)
+                current_app.logger.info(f"update_income_service: old invoice {old_invoice_id} deleted: {del_result}")
+            except Exception as e:
+                current_app.logger.warning(f"update_income_service: failed to delete old invoice {old_invoice_id}: {e}")
+
+        # Шаг 2: Создаём новый счёт
+        try:
+            invoice_result = create_b24_invoice_service(
+                income_data={
+                    'deal_id':        new_deal_id,
+                    'contact_id':     new_contact_id,
+                    'amount':         data.get('amount'),
+                    'date':           data.get('date'),
+                    'deal_type_name': data.get('deal_type_name', ''),
+                    'income_db_id':   income_id
+                },
+                file_data=None  # При редактировании файл не переносим
+            )
+            current_app.logger.info(f"update_income_service: new invoice created: {invoice_result}")
+
+            # Сохраняем новый invoice_id в БД
+            if invoice_result.get('success'):
+                conn2 = get_db_connection()
+                if conn2:
+                    try:
+                        cur2 = conn2.cursor()
+                        cur2.execute(
+                            "UPDATE incomes SET b24_invoice_id=%s, is_confirmed=0 WHERE id=%s",
+                            (str(invoice_result.get('invoice_id', '')), income_id)
+                        )
+                        conn2.commit()
+                        current_app.logger.info(
+                            f"update_income_service: saved new invoice_id={invoice_result.get('invoice_id')}"
+                        )
+                    except Exception as db_err:
+                        current_app.logger.warning(f"update_income_service: failed to save new invoice_id: {db_err}")
+                    finally:
+                        cur2.close()
+                        conn2.close()
+        except Exception as e:
+            current_app.logger.error(f"update_income_service: failed to create new invoice: {e}", exc_info=True)
+            invoice_result = {'success': False, 'error': str(e)}
+
+    elif deal_changed and old_invoice_id:
+        # Сделку убрали совсем (нет new_deal_id) — просто удаляем старый счёт
+        try:
+            del_result = delete_b24_invoice_service(old_invoice_id)
+            current_app.logger.info(f"update_income_service: invoice removed (no new deal): {del_result}")
+            # Обнуляем invoice_id в БД
+            conn3 = get_db_connection()
+            if conn3:
+                try:
+                    cur3 = conn3.cursor()
+                    cur3.execute(
+                        "UPDATE incomes SET b24_invoice_id=NULL, is_confirmed=0 WHERE id=%s",
+                        (income_id,)
+                    )
+                    conn3.commit()
+                finally:
+                    cur3.close()
+                    conn3.close()
+        except Exception as e:
+            current_app.logger.warning(f"update_income_service: failed to delete invoice after deal removal: {e}")
+
+    return {
+        'success': True,
+        'invoice_recreated': deal_changed,
+        'invoice': invoice_result
+    }
 
 def delete_income_service(income_id):
     """Сервисная функция для удаления прихода и связанного счёта в Б24."""
@@ -475,7 +579,7 @@ def create_b24_invoice_service(income_data, file_data=None):
 
     SMART_INVOICE_ENTITY_TYPE_ID = 31
     MY_COMPANY_ID = 8
-    FINAL_INVOICE_STAGE_ID = 'DT31_2:P'
+    FINAL_INVOICE_STAGE_ID = 'DT31_2:N'
     PAYMENT_DATE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776220509400"
 
     deal_id = income_data.get('deal_id')

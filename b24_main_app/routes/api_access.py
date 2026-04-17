@@ -25,12 +25,11 @@ def get_my_permissions():
         cursor = conn.cursor(dictionary=True)
 
         try:
-            # --- ИСПРАВЛЕНИЕ: Добавлено 'edit': False для income ---
             final_permissions = {
                 "tabs": {
                     "cashbox": {
                         "view": False,
-                        "income": {"view": False, "save": False, "edit": False, "delete": False},
+                        "income": {"view": False, "save": False, "edit": False, "delete": False, "confirm": False},
                         "expense": {"view": False, "save": False, "edit": False, "delete": False}
                     },
                     "statistics": {"view": False},

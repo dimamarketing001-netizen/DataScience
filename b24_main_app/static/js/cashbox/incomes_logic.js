@@ -274,6 +274,7 @@ App.cashbox.incomes = {
             } else if (target.classList.contains('delete-income-btn')) {
                 App.cashbox.openDeleteConfirmModal(target.dataset.id, 'income');
             } else if (target.classList.contains('confirm-income-btn')) {
+                if (target.classList.contains('access-restricted')) return;
                 openConfirmIncomeModal(target.dataset.id, target.dataset.confirmed === '1');
             }
         }

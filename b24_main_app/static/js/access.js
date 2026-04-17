@@ -141,6 +141,7 @@ App.initializeAccessTab = async function () {
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.save" ${perms.tabs.cashbox?.income?.save ? 'checked' : ''}> Сохранение</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.edit" ${perms.tabs.cashbox?.income?.edit ? 'checked' : ''}> Редактирование</label>
                     <label><input type="checkbox" data-perm="tabs.cashbox.income.delete" ${perms.tabs.cashbox?.income?.delete ? 'checked' : ''}> Удаление</label>
+                    <label><input type="checkbox" data-perm="tabs.cashbox.income.confirm" ${perms.tabs.cashbox?.income?.confirm ? 'checked' : ''}> Подтверждение</label>
                 </div>
                 <div class="access-group">
                     <strong>Касса / Расходы:</strong>
@@ -193,6 +194,7 @@ App.initializeAccessTab = async function () {
             row.querySelector('[data-perm="tabs.cashbox.expense.save"]').disabled = !cashboxChecked || !expenseView.checked;
             row.querySelector('[data-perm="tabs.cashbox.expense.edit"]').disabled = !cashboxChecked || !expenseView.checked;
             row.querySelector('[data-perm="tabs.cashbox.expense.delete"]').disabled = !cashboxChecked || !expenseView.checked;
+            row.querySelector('[data-perm="tabs.cashbox.income.confirm"]').disabled = !cashboxChecked || !incomeView.checked;
 
             row.querySelector('[data-perm="tabs.access.save"]').disabled = !accessView.checked;
             row.querySelector('[data-perm="tabs.access.delete"]').disabled = !accessView.checked;
@@ -208,10 +210,11 @@ App.initializeAccessTab = async function () {
                     cashbox: {
                         view: row.querySelector('[data-perm="tabs.cashbox.view"]').checked,
                         income: {
-                            view: row.querySelector('[data-perm="tabs.cashbox.income.view"]').checked,
-                            save: row.querySelector('[data-perm="tabs.cashbox.income.save"]').checked,
-                            edit: row.querySelector('[data-perm="tabs.cashbox.income.edit"]').checked,
-                            delete: row.querySelector('[data-perm="tabs.cashbox.income.delete"]').checked,
+                            view:    row.querySelector('[data-perm="tabs.cashbox.income.view"]').checked,
+                            save:    row.querySelector('[data-perm="tabs.cashbox.income.save"]').checked,
+                            edit:    row.querySelector('[data-perm="tabs.cashbox.income.edit"]').checked,
+                            delete:  row.querySelector('[data-perm="tabs.cashbox.income.delete"]').checked,
+                            confirm: row.querySelector('[data-perm="tabs.cashbox.income.confirm"]').checked,
                         },
                         expense: {
                             view: row.querySelector('[data-perm="tabs.cashbox.expense.view"]').checked,
