@@ -1027,6 +1027,143 @@ def delete_b24_invoice_service(invoice_id):
 
     return {'success': True}
 
+def _recalculate_sale_deal_stage(deal_id, income_id, confirm: bool):
+    """
+    Пересчитывает стадию сделки category_id=0 (Продажа).
+
+    Логика:
+    - Берём все ПОДТВЕРЖДЁННЫЕ приходы по сделке из нашей БД
+      (БД уже обновлена к моменту вызова — is_confirmed актуален)
+    - Получаем позиции товаров сделки через crm.deal.productrows.get
+    - Сортируем позиции по названию (там содержится дата) — берём самую раннюю
+    - Сравниваем confirmed_sum с суммой первой позиции:
+        confirmed_sum >= first_product_price → WON       (Полный первый платеж)
+        confirmed_sum > 0                   → EXECUTING  (Частичная оплата)
+        confirmed_sum == 0                  → без изменений (не трогаем стадию)
+    """
+    try:
+        # --- Шаг 1: Сумма подтверждённых приходов по сделке ---
+        conn = get_db_connection()
+        if not conn:
+            raise Exception('DB connection failed')
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT COALESCE(SUM(amount), 0) as confirmed_sum "
+                "FROM incomes WHERE deal_id = %s AND is_confirmed = 1",
+                (deal_id,)
+            )
+            row           = cursor.fetchone()
+            confirmed_sum = float(row['confirmed_sum'] if row else 0)
+        finally:
+            cursor.close()
+            conn.close()
+
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: deal_id={deal_id}, "
+            f"confirmed_sum={confirmed_sum}, confirm={confirm}"
+        )
+
+        # Если при отмене подтверждения confirmed_sum == 0 — не трогаем стадию
+        if not confirm and confirmed_sum == 0:
+            current_app.logger.info(
+                f"_recalculate_sale_deal_stage: confirmed_sum=0 after cancel, skip stage update"
+            )
+            return {
+                'success':       True,
+                'stage_id':      None,
+                'stage_name':    None,
+                'confirmed_sum': confirmed_sum,
+                'skipped':       True
+            }
+
+        # --- Шаг 2: Получаем позиции товаров сделки ---
+        products_res = b24_call_method('crm.deal.productrows.get', {'id': deal_id})
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: products_res={products_res}"
+        )
+
+        if not products_res or not products_res.get('result'):
+            raise Exception(f"crm.deal.productrows.get failed for deal_id={deal_id}")
+
+        products = products_res['result']
+        if not products:
+            raise Exception(f"No product rows found for deal_id={deal_id}")
+
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: found {len(products)} product rows"
+        )
+        for p in products:
+            current_app.logger.info(
+                f"  product: ID={p.get('ID')}, NAME={p.get('PRODUCT_NAME')}, "
+                f"PRICE={p.get('PRICE')}, SORT={p.get('SORT')}"
+            )
+
+        # --- Шаг 3: Сортируем позиции по названию (содержит дату) ---
+        # Название формата "Оплата БФЛ от 17.04.2026" — сортируем по имени
+        def extract_date_from_name(product):
+            """Пытаемся извлечь дату из названия позиции для сортировки."""
+            import re
+            name = product.get('PRODUCT_NAME', '') or ''
+            # Ищем дату в формате DD.MM.YYYY
+            match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', name)
+            if match:
+                day, month, year = match.groups()
+                # Возвращаем в формате YYYY-MM-DD для корректной сортировки строк
+                return f"{year}-{month}-{day}"
+            # Если дата не найдена — используем SORT или ID
+            return str(product.get('SORT', product.get('ID', '0'))).zfill(10)
+
+        products_sorted = sorted(products, key=extract_date_from_name)
+        first_product   = products_sorted[0]
+        first_price     = float(first_product.get('PRICE') or 0)
+
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: first_product='{first_product.get('PRODUCT_NAME')}', "
+            f"price={first_price}"
+        )
+
+        # --- Шаг 4: Определяем стадию ---
+        if confirmed_sum >= first_price and first_price > 0:
+            stage_id   = 'WON'
+            stage_name = 'Полный первый платеж'
+        elif confirmed_sum > 0:
+            stage_id   = 'EXECUTING'
+            stage_name = 'Частичная оплата'
+        else:
+            # confirmed_sum == 0 (например отменили все подтверждения)
+            stage_id   = 'EXECUTING'
+            stage_name = 'Частичная оплата'
+
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: confirmed_sum={confirmed_sum}, "
+            f"first_price={first_price}, → stage={stage_id}"
+        )
+
+        # --- Шаг 5: Обновляем стадию в Б24 ---
+        update_res = b24_call_method('crm.deal.update', {
+            'id':     deal_id,
+            'fields': {'STAGE_ID': stage_id}
+        })
+        current_app.logger.info(
+            f"_recalculate_sale_deal_stage: crm.deal.update result={update_res}"
+        )
+
+        return {
+            'success':        True,
+            'stage_id':       stage_id,
+            'stage_name':     stage_name,
+            'confirmed_sum':  confirmed_sum,
+            'first_price':    first_price,
+            'first_product':  first_product.get('PRODUCT_NAME', '')
+        }
+
+    except Exception as e:
+        current_app.logger.error(
+            f"_recalculate_sale_deal_stage: failed: {e}", exc_info=True
+        )
+        return {'success': False, 'error': str(e)}
+
 def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_user_id=None):
     """
     Подтверждает или отменяет подтверждение прихода.
@@ -1126,42 +1263,42 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
                 f"toggle_income_confirmation: failed to update file_url: {e}"
             )
 
-    # --- Пересчитываем стадию сделки для обязательных платежей ---
+    # --- Пересчитываем стадию сделки ---
     stage_result = None
     if deal_id:
-        # Определяем category_id сделки из нашей БД
         try:
-            conn_cat = get_db_connection()
-            if conn_cat:
-                cursor_cat = conn_cat.cursor(dictionary=True)
-                try:
-                    # Получаем category_id сделки из Б24
-                    deal_res = b24_call_method('crm.deal.get', {'id': deal_id})
-                    if deal_res and deal_res.get('result'):
-                        category_id = int(deal_res['result'].get('CATEGORY_ID') or 0)
-                        current_app.logger.info(
-                            f"toggle_income_confirmation: deal_id={deal_id}, category_id={category_id}"
-                        )
+            deal_res = b24_call_method('crm.deal.get', {'id': deal_id})
+            if deal_res and deal_res.get('result'):
+                category_id = int(deal_res['result'].get('CATEGORY_ID') or 0)
+                current_app.logger.info(
+                    f"toggle_income_confirmation: deal_id={deal_id}, category_id={category_id}"
+                )
 
-                        if category_id in (14, 16, 18):
-                            # При отмене — исключаем текущий приход из подсчёта
-                            # (БД уже обновлена: is_confirmed=0, поэтому exclude не нужен)
-                            stage_result = _recalculate_deal_stage(
-                                deal_id     = deal_id,
-                                category_id = category_id,
-                                exclude_income_id = None  # БД уже актуальна
-                            )
-                            current_app.logger.info(
-                                f"toggle_income_confirmation: stage_result={stage_result}"
-                            )
-                        else:
-                            current_app.logger.info(
-                                f"toggle_income_confirmation: category_id={category_id} "
-                                f"not in (14,16,18), skip stage update"
-                            )
-                finally:
-                    cursor_cat.close()
-                    conn_cat.close()
+                if category_id in (14, 16, 18):
+                    stage_result = _recalculate_deal_stage(
+                        deal_id=deal_id,
+                        category_id=category_id,
+                        exclude_income_id=None
+                    )
+                    current_app.logger.info(
+                        f"toggle_income_confirmation: stage_result={stage_result}"
+                    )
+
+                elif category_id == 0:
+                    stage_result = _recalculate_sale_deal_stage(
+                        deal_id=deal_id,
+                        income_id=income_id,
+                        confirm=confirm
+                    )
+                    current_app.logger.info(
+                        f"toggle_income_confirmation: sale stage_result={stage_result}"
+                    )
+
+                else:
+                    current_app.logger.info(
+                        f"toggle_income_confirmation: category_id={category_id} — skip stage"
+                    )
+
         except Exception as e:
             current_app.logger.error(
                 f"toggle_income_confirmation: stage recalculation failed: {e}", exc_info=True
