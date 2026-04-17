@@ -470,63 +470,140 @@ def update_income_service(data, file_data=None):
             import base64
             file_content_b64 = base64.b64encode(file_data['content']).decode('utf-8')
             filename = file_data.get('filename', 'document.pdf')
-            FILE_CUSTOM_FIELD = "UF_CRM_SMART_INVOICE_1776360197269"
+
+            # При update используем UF_ формат (useOriginalUfNames)
+            FILE_CUSTOM_FIELD_UF = "UF_CRM_SMART_INVOICE_1776360197269"
+
+            # В ответе Б24 возвращает camelCase вариант
+            FILE_CUSTOM_FIELD_UF_CAMEL = "ufCrm_SMART_INVOICE_1776360197269"
+
             SMART_INVOICE_ENTITY_TYPE_ID = 31
 
             update_params = {
                 'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
                 'id': old_invoice_id,
                 'fields': {
-                    FILE_CUSTOM_FIELD: [filename, file_content_b64]
+                    FILE_CUSTOM_FIELD_UF: [filename, file_content_b64]
                 },
                 'useOriginalUfNames': 'Y'
             }
-            current_app.logger.info(f"update_income_service: updating file in invoice {old_invoice_id}")
+
+            current_app.logger.info(
+                f"update_income_service: updating file in invoice {old_invoice_id}, filename={filename}"
+            )
+
             update_res = b24_call_method('crm.item.update', update_params)
-            current_app.logger.info(f"update_income_service: file update result={update_res}")
+            current_app.logger.info(f"update_income_service: crm.item.update response={update_res}")
 
-            # Получаем обновлённый URL файла
-            get_res = b24_call_method('crm.item.get', {
-                'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
-                'id': old_invoice_id
-            })
-            if get_res and get_res.get('result', {}).get('item'):
-                item = get_res['result']['item']
-                # Б24 может вернуть поле в разных форматах ключа
-                file_field = (
-                        item.get('UF_CRM_SMART_INVOICE_1776360197269') or
-                        item.get('ufCrmSmartInvoice1776360197269')
-                )
-                current_app.logger.info(f"update_income_service: file_field after update = {file_field}")
+            new_file_id = None
+            new_file_url = None
 
-                new_file_id = None
-                new_file_url = None
+            # Б24 возвращает обновлённый item прямо в ответе update
+            updated_item = update_res.get('result', {}).get('item', {}) if update_res else {}
+            current_app.logger.info(f"update_income_service: updated_item keys={list(updated_item.keys())}")
 
-                if isinstance(file_field, dict):
-                    new_file_id = str(file_field.get('id', '')) or None
-                    new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
-                elif file_field:
-                    new_file_id = str(file_field)
+            # Ищем поле файла — Б24 возвращает в camelCase формате
+            file_field = (
+                    updated_item.get(FILE_CUSTOM_FIELD_UF_CAMEL) or
+                    updated_item.get(FILE_CUSTOM_FIELD_UF)
+            )
 
-                conn4 = get_db_connection()
-                if conn4:
-                    try:
-                        cur4 = conn4.cursor()
-                        cur4.execute(
-                            "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
-                            (new_file_id, new_file_url, income_id)
-                        )
-                        conn4.commit()
+            # Если не нашли — перебираем все ключи по частичному совпадению
+            if not file_field:
+                for key, val in updated_item.items():
+                    if '1776360197269' in key and val:
+                        file_field = val
                         current_app.logger.info(
-                            f"update_income_service: file saved in DB: id={new_file_id}, url_set={bool(new_file_url)}"
+                            f"update_income_service: found file_field by partial key='{key}'"
                         )
-                    finally:
-                        cur4.close()
-                        conn4.close()
+                        break
 
-            invoice_result = {'success': True, 'file_updated': True}
+            current_app.logger.info(f"update_income_service: file_field={file_field}")
+
+            if isinstance(file_field, dict):
+                new_file_id = str(file_field.get('id', '')) or None
+                new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
+
+            elif isinstance(file_field, list) and len(file_field) > 0:
+                first = file_field[0]
+
+                if isinstance(first, dict):
+                    new_file_id = str(first.get('id', '')) or None
+                    new_file_url = first.get('urlMachine') or first.get('url') or None
+
+            elif file_field:
+                new_file_id = str(file_field)
+
+            # Если из update всё равно не получили URL — делаем отдельный get
+            if not new_file_url:
+                current_app.logger.info(
+                    f"update_income_service: URL not in update response, calling crm.item.get"
+                )
+
+                get_res = b24_call_method('crm.item.get', {
+                    'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+                    'id': old_invoice_id
+                })
+
+                current_app.logger.info(f"update_income_service: crm.item.get response={get_res}")
+
+                if get_res and get_res.get('result', {}).get('item'):
+                    item = get_res['result']['item']
+
+                    file_field2 = (
+                            item.get(FILE_CUSTOM_FIELD_UF_CAMEL) or
+                            item.get(FILE_CUSTOM_FIELD_UF)
+                    )
+
+                    if not file_field2:
+                        for key, val in item.items():
+                            if '1776360197269' in key and val:
+                                file_field2 = val
+                                current_app.logger.info(
+                                    f"update_income_service: get found file_field by key='{key}'"
+                                )
+                                break
+
+                    if isinstance(file_field2, dict):
+                        new_file_id = str(file_field2.get('id', '')) or None
+                        new_file_url = file_field2.get('urlMachine') or file_field2.get('url') or None
+                    elif file_field2:
+                        new_file_id = str(file_field2)
+
+            current_app.logger.info(
+                f"update_income_service: final new_file_id={new_file_id}, "
+                f"new_file_url={'SET' if new_file_url else 'NONE'}"
+            )
+
+            # Сохраняем в БД
+            conn4 = get_db_connection()
+
+            if conn4:
+                try:
+                    cur4 = conn4.cursor()
+                    cur4.execute(
+                        "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
+                        (new_file_id, new_file_url, income_id)
+                    )
+                    conn4.commit()
+                    current_app.logger.info(
+                        f"update_income_service: DB updated — "
+                        f"file_id={new_file_id}, url_set={bool(new_file_url)}"
+                    )
+                finally:
+                    cur4.close()
+                    conn4.close()
+
+            invoice_result = {
+                'success': True,
+                'file_updated': True,
+                'new_file_id': new_file_id,
+                'new_file_url_set': bool(new_file_url)
+            }
         except Exception as e:
-            current_app.logger.error(f"update_income_service: file update failed: {e}", exc_info=True)
+            current_app.logger.error(
+                f"update_income_service: file update failed: {e}", exc_info=True
+            )
             invoice_result = {'success': False, 'error': str(e)}
 
     return {
@@ -794,10 +871,15 @@ def delete_b24_invoice_service(invoice_id):
     result = b24_call_method('crm.item.delete', params)
     current_app.logger.info(f"delete_b24_invoice: response={result}")
 
-    if result and result.get('result'):
-        return {'success': True}
-    else:
-        return {'success': False, 'error': str(result)}
+    if result is None:
+        return {'success': False, 'error': 'No response from B24'}
+
+    # Б24 возвращает result: True ИЛИ result: [] при успешном удалении
+    # Ошибка определяется наличием ключа 'error' в ответе
+    if 'error' in result:
+        return {'success': False, 'error': result.get('error_description', str(result))}
+
+    return {'success': True}
 
 def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_user_id=None):
     """Подтверждает или отменяет подтверждение прихода, меняя статус счёта в Б24."""
@@ -807,6 +889,7 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
     SMART_INVOICE_ENTITY_TYPE_ID = 31
     CONFIRMED_STAGE_ID   = 'DT31_2:P'
     UNCONFIRMED_STAGE_ID = 'DT31_2:N'
+    FILE_CUSTOM_FIELD    = 'ufCrm_SMART_INVOICE_1776360197269'
 
     conn = get_db_connection()
     if not conn:
@@ -858,6 +941,40 @@ def toggle_income_confirmation_service(income_id, confirm: bool, confirmed_by_us
         )
         b24_result = b24_call_method('crm.item.update', params)
         current_app.logger.info(f"toggle_income_confirmation: B24 result={b24_result}")
+
+        # --- Забираем актуальный file_url из ответа Б24 и обновляем в БД ---
+        try:
+            updated_item = b24_result.get('result', {}).get('item', {}) if b24_result else {}
+            file_field = updated_item.get(FILE_CUSTOM_FIELD)
+            current_app.logger.info(
+                f"toggle_income_confirmation: file_field from update response={file_field}"
+            )
+
+            if isinstance(file_field, dict):
+                new_file_id  = str(file_field.get('id', '')) or None
+                new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
+
+                if new_file_id or new_file_url:
+                    conn_upd = get_db_connection()
+                    if conn_upd:
+                        try:
+                            cur_upd = conn_upd.cursor()
+                            cur_upd.execute(
+                                "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
+                                (new_file_id, new_file_url, income_id)
+                            )
+                            conn_upd.commit()
+                            current_app.logger.info(
+                                f"toggle_income_confirmation: updated file_url in DB: "
+                                f"file_id={new_file_id}, url_set={bool(new_file_url)}"
+                            )
+                        finally:
+                            cur_upd.close()
+                            conn_upd.close()
+        except Exception as e:
+            current_app.logger.warning(
+                f"toggle_income_confirmation: failed to update file_url from B24 response: {e}"
+            )
 
     return {
         'success': True,
