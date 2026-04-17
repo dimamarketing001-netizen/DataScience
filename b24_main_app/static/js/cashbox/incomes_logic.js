@@ -198,13 +198,13 @@ App.cashbox.incomes = {
             event.preventDefault();
             if (addIncomeBtn.classList.contains('access-restricted')) return;
 
-            const dealSelect = document.getElementById('income-deal-select');
+            const dealSelect     = document.getElementById('income-deal-select');
             const selectedOption = dealSelect.options[dealSelect.selectedIndex];
 
-            const date = document.getElementById('income-date').value;
-            const amount = document.getElementById('income-amount').value;
+            const date       = document.getElementById('income-date').value;
+            const amount     = document.getElementById('income-amount').value;
             const contact_id = document.getElementById('income-selected-client-id').value;
-            const comment = document.getElementById('income-comment').value;
+            const comment    = document.getElementById('income-comment').value;
 
             // --- Валидация ---
             if (!contact_id) {
@@ -220,39 +220,30 @@ App.cashbox.incomes = {
                 return;
             }
 
-            // --- Собираем FormData (multipart — для передачи файла) ---
-            const fd = new FormData();
-            fd.append('date', date);
-            fd.append('amount', amount);
-            fd.append('contact_id', contact_id);
-            fd.append('deal_id', dealSelect.value);
-            fd.append('deal_type_id', selectedOption ? selectedOption.dataset.typeId || '' : '');
-            fd.append('deal_type_name', selectedOption ? selectedOption.dataset.typeName || '' : '');
-            fd.append('comment', comment);
-            fd.append('added_by_user_id', App.currentUser.ID);
-            fd.append('income_file', selectedFile, selectedFile.name);
-
             App.showLoader();
             try {
-                // Конвертируем файл в base64 для передачи через JSON
+                // Конвертируем файл в base64
                 const fileBase64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onload = () => {
-                        const base64 = reader.result.split(',')[1];
-                        resolve(base64);
-                    };
+                    reader.onload  = () => resolve(reader.result.split(',')[1]);
                     reader.onerror = reject;
                     reader.readAsDataURL(selectedFile);
                 });
 
+                // Получаем category_id и opportunity из выбранной опции
+                const categoryId  = selectedOption ? (selectedOption.dataset.categoryId  || '0') : '0';
+                const opportunity = selectedOption ? (selectedOption.dataset.opportunity || '0') : '0';
+
                 const payload = {
-                    date:             document.getElementById('income-date').value,
-                    amount:           parseFloat(document.getElementById('income-amount').value),
-                    contact_id:       document.getElementById('income-selected-client-id').value,
+                    date:             date,
+                    amount:           parseFloat(amount),
+                    contact_id:       contact_id,
                     deal_id:          dealSelect.value,
-                    deal_type_id:     selectedOption ? selectedOption.dataset.typeId || '' : '',
+                    deal_type_id:     selectedOption ? selectedOption.dataset.typeId   || '' : '',
                     deal_type_name:   selectedOption ? selectedOption.dataset.typeName || '' : '',
-                    comment:          document.getElementById('income-comment').value,
+                    category_id:      categoryId,
+                    deal_opportunity: parseFloat(opportunity),
+                    comment:          comment,
                     added_by_user_id: App.currentUser.ID,
                     file_data: {
                         filename:    selectedFile.name,
@@ -261,19 +252,22 @@ App.cashbox.incomes = {
                     }
                 };
 
-                // Используем App.cashbox.api.addIncome — он идёт через App.api.request
-                // который формирует правильный URL без leading slash
                 const result = await App.cashbox.api.addIncome(payload);
 
-                let successMsg = "Приход успешно сохранен!";
+                let successMsg = 'Приход успешно сохранен!';
                 if (result.invoice) {
                     if (result.invoice.success) {
                         successMsg += ` Счёт #${result.invoice.invoice_id} создан в Б24.`;
-                        if (result.invoice.file_uploaded) {
-                            successMsg += ` Файл прикреплён.`;
-                        }
+                        if (result.invoice.file_uploaded) successMsg += ' Файл прикреплён.';
                     } else {
-                        successMsg += ` ⚠️ Счёт в Б24 не создан: ${result.invoice.error || 'ошибка'}`;
+                        successMsg += ` ⚠️ Счёт не создан: ${result.invoice.error || 'ошибка'}`;
+                    }
+                }
+                if (result.stage) {
+                    if (result.stage.success) {
+                        successMsg += ` Стадия сделки → ${result.stage.stage_id}.`;
+                    } else {
+                        successMsg += ` ⚠️ Стадия не обновлена: ${result.stage.error || 'ошибка'}`;
                     }
                 }
 
@@ -281,7 +275,7 @@ App.cashbox.incomes = {
                 incomeForm.reset();
                 clearSelectedFile();
                 App.cashbox.ui.renderDealSelect(
-                    [],
+                    { sale: [], mandatory: [] },
                     document.getElementById('income-deal-select'),
                     document.getElementById('income-deal-wrapper')
                 );
@@ -395,14 +389,16 @@ App.cashbox.incomes = {
             const selectedEditOption  = editDealSelect.options[editDealSelect.selectedIndex];
 
             const formData = {
-                id:             document.getElementById('edit-income-id').value,
-                date:           document.getElementById('edit-income-date').value,
-                amount:         parseFloat(document.getElementById('edit-income-amount').value),
-                contact_id:     document.getElementById('edit-income-selected-client-id').value,
-                deal_id:        editDealSelect.value,
-                deal_type_id:   selectedEditOption ? selectedEditOption.dataset.typeId   || '' : '',
-                deal_type_name: selectedEditOption ? selectedEditOption.dataset.typeName || '' : '',
-                comment:        document.getElementById('edit-income-comment').value,
+                id:               document.getElementById('edit-income-id').value,
+                date:             document.getElementById('edit-income-date').value,
+                amount:           parseFloat(document.getElementById('edit-income-amount').value),
+                contact_id:       document.getElementById('edit-income-selected-client-id').value,
+                deal_id:          editDealSelect.value,
+                deal_type_id:     selectedEditOption ? selectedEditOption.dataset.typeId      || '' : '',
+                deal_type_name:   selectedEditOption ? selectedEditOption.dataset.typeName    || '' : '',
+                category_id:      selectedEditOption ? selectedEditOption.dataset.categoryId  || '0' : '0',
+                deal_opportunity: selectedEditOption ? parseFloat(selectedEditOption.dataset.opportunity || 0) : 0,
+                comment:          document.getElementById('edit-income-comment').value,
             };
 
             App.showLoader();

@@ -235,21 +235,55 @@ App.cashbox.ui = {
             console.error('renderDealSelect: selectElement или wrapperElement не найден!');
             return;
         }
-        if (deals && deals.length > 0) {
-            selectElement.innerHTML = '<option value="">Выберите сделку...</option>';
-            deals.forEach(deal => {
-                const option = document.createElement('option');
-                option.value = deal.id;               // 2086
-                option.textContent = deal.name;       // БФЛ
-                option.dataset.typeId = deal.type_id; // SALE
-                option.dataset.typeName = deal.name;  // БФЛ
-                selectElement.appendChild(option);
-            });
-            wrapperElement.style.display = '';
-        } else {
+
+        // deals теперь объект {sale: [], mandatory: []} или пустой массив [] (старый формат)
+        const saleDeals      = Array.isArray(deals) ? deals : (deals.sale      || []);
+        const mandatoryDeals = Array.isArray(deals) ? []    : (deals.mandatory || []);
+        const hasDeals       = saleDeals.length > 0 || mandatoryDeals.length > 0;
+
+        if (!hasDeals) {
             wrapperElement.style.display = 'none';
             selectElement.innerHTML = '';
+            return;
         }
+
+        selectElement.innerHTML = '<option value="">Выберите сделку...</option>';
+
+        // --- Группа: Продажа ---
+        if (saleDeals.length > 0) {
+            const group1 = document.createElement('optgroup');
+            group1.label = 'Продажа';
+            saleDeals.forEach(deal => {
+                const option = document.createElement('option');
+                option.value               = deal.id;
+                option.textContent         = deal.name;
+                option.dataset.typeId      = deal.type_id   || '';
+                option.dataset.typeName    = deal.name      || '';
+                option.dataset.categoryId  = deal.category_id;
+                option.dataset.opportunity = deal.opportunity || 0;
+                group1.appendChild(option);
+            });
+            selectElement.appendChild(group1);
+        }
+
+        // --- Группа: Обязательные платежи ---
+        if (mandatoryDeals.length > 0) {
+            const group2 = document.createElement('optgroup');
+            group2.label = 'Обязательные платежи';
+            mandatoryDeals.forEach(deal => {
+                const option = document.createElement('option');
+                option.value               = deal.id;
+                option.textContent         = deal.name;
+                option.dataset.typeId      = '';
+                option.dataset.typeName    = deal.name      || '';
+                option.dataset.categoryId  = deal.category_id;
+                option.dataset.opportunity = deal.opportunity || 0;
+                group2.appendChild(option);
+            });
+            selectElement.appendChild(group2);
+        }
+
+        wrapperElement.style.display = '';
     },
 
     openEditIncomeModal: function(income) {

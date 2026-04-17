@@ -167,20 +167,58 @@ def delete_expense_service(expense_id):
         conn.close()
 
 # --- Новая логика для ПРИХОДОВ ---
+def _update_deal_stage_by_amount(deal_id, category_id, income_amount, deal_opportunity):
+    """Обновляет стадию сделки в зависимости от суммы прихода."""
+    STAGE_MAP = {
+        14: {'partial': 'C14:FINAL_INVOICE', 'full': 'C14:WON'},
+        16: {'partial': 'C16:FINAL_INVOICE', 'full': 'C16:WON'},
+        18: {'partial': 'C18:FINAL_INVOICE', 'full': 'C18:WON'},
+    }
+
+    if category_id not in STAGE_MAP:
+        return None
+
+    try:
+        amount     = float(income_amount or 0)
+        opportunity = float(deal_opportunity or 0)
+
+        if opportunity > 0 and amount >= opportunity:
+            stage_id = STAGE_MAP[category_id]['full']
+        else:
+            stage_id = STAGE_MAP[category_id]['partial']
+
+        current_app.logger.info(
+            f"_update_deal_stage: deal_id={deal_id}, cat={category_id}, "
+            f"amount={amount}, opportunity={opportunity}, stage={stage_id}"
+        )
+
+        result = b24_call_method('crm.deal.update', {
+            'id': deal_id,
+            'fields': {'STAGE_ID': stage_id}
+        })
+        current_app.logger.info(f"_update_deal_stage: B24 result={result}")
+        return {'success': True, 'stage_id': stage_id}
+
+    except Exception as e:
+        current_app.logger.error(f"_update_deal_stage: failed: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
 
 def add_income_service(data):
     """Сервисная функция для добавления нового прихода в БД."""
-    current_app.logger.info(f"add_income_service START: date={data.get('date')}, amount={data.get('amount')}, contact_id={data.get('contact_id')}, deal_id={data.get('deal_id')}")
+    current_app.logger.info(
+        f"add_income_service START: date={data.get('date')}, amount={data.get('amount')}, "
+        f"contact_id={data.get('contact_id')}, deal_id={data.get('deal_id')}, "
+        f"category_id={data.get('category_id')}"
+    )
 
     conn = get_db_connection()
     if not conn:
         raise Exception('Не удалось подключиться к базе данных')
     cursor = conn.cursor()
     query = """
-            INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, \
-                                 added_by_user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
-            """
+        INSERT INTO incomes (income_date, amount, contact_id, deal_id, deal_type_id, deal_type_name, comment, added_by_user_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
     try:
         cursor.execute(query, (
             data['date'], data['amount'], data.get('contact_id'),
@@ -201,22 +239,23 @@ def add_income_service(data):
     # --- Создаём смарт-счёт в Б24 ---
     invoice_result = None
     if data.get('deal_id') and data.get('contact_id'):
-        current_app.logger.info(f"add_income_service: starting invoice creation for deal_id={data.get('deal_id')}")
+        current_app.logger.info(
+            f"add_income_service: starting invoice for deal_id={data.get('deal_id')}"
+        )
         try:
             invoice_result = create_b24_invoice_service(
                 income_data={
-                    'deal_id': data.get('deal_id'),
-                    'contact_id': data.get('contact_id'),
-                    'amount': data.get('amount'),
-                    'date': data.get('date'),
+                    'deal_id':        data.get('deal_id'),
+                    'contact_id':     data.get('contact_id'),
+                    'amount':         data.get('amount'),
+                    'date':           data.get('date'),
                     'deal_type_name': data.get('deal_type_name', ''),
-                    'income_db_id': new_income_id
+                    'income_db_id':   new_income_id
                 },
                 file_data=data.get('file_data')
             )
             current_app.logger.info(f"add_income_service: invoice result={invoice_result}")
 
-            # Сохраняем b24_invoice_id и b24_file_id в БД
             if invoice_result.get('success'):
                 conn2 = get_db_connection()
                 if conn2:
@@ -231,11 +270,14 @@ def add_income_service(data):
                                 new_income_id
                             )
                         )
-                        current_app.logger.info(
-                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}, file_id={invoice_result.get('b24_file_id')}, file_url saved={bool(invoice_result.get('b24_file_url'))}")
                         conn2.commit()
+                        current_app.logger.info(
+                            f"add_income_service: saved invoice_id={invoice_result.get('invoice_id')}"
+                        )
                     except Exception as db_err:
-                        current_app.logger.warning(f"add_income_service: failed to save invoice/file ids: {db_err}")
+                        current_app.logger.warning(
+                            f"add_income_service: failed to save invoice ids: {db_err}"
+                        )
                     finally:
                         cur2.close()
                         conn2.close()
@@ -245,10 +287,26 @@ def add_income_service(data):
     else:
         current_app.logger.info("add_income_service: skipping invoice — no deal_id or contact_id")
 
+    # --- Обновляем стадию сделки для обязательных платежей ---
+    stage_result = None
+    category_id  = data.get('category_id')
+    deal_id      = data.get('deal_id')
+
+    if category_id and int(category_id) in (14, 16, 18) and deal_id:
+        deal_opportunity = data.get('deal_opportunity', 0)
+        stage_result = _update_deal_stage_by_amount(
+            deal_id      = deal_id,
+            category_id  = int(category_id),
+            income_amount = data.get('amount'),
+            deal_opportunity = deal_opportunity
+        )
+        current_app.logger.info(f"add_income_service: stage update result={stage_result}")
+
     return {
-        'success': True,
-        'id': new_income_id,
-        'invoice': invoice_result
+        'success':  True,
+        'id':       new_income_id,
+        'invoice':  invoice_result,
+        'stage':    stage_result
     }
 
 def get_incomes_service(args):
@@ -606,10 +664,25 @@ def update_income_service(data, file_data=None):
             )
             invoice_result = {'success': False, 'error': str(e)}
 
+    # --- Обновляем стадию сделки для обязательных платежей ---
+    stage_result = None
+    category_id  = data.get('category_id')
+    deal_id      = data.get('deal_id')
+
+    if category_id and int(category_id) in (14, 16, 18) and deal_id:
+        stage_result = _update_deal_stage_by_amount(
+            deal_id          = deal_id,
+            category_id      = int(category_id),
+            income_amount    = data.get('amount'),
+            deal_opportunity = data.get('deal_opportunity', 0)
+        )
+        current_app.logger.info(f"update_income_service: stage update={stage_result}")
+
     return {
-        'success': True,
+        'success':          True,
         'invoice_recreated': deal_changed,
-        'invoice': invoice_result
+        'invoice':          invoice_result,
+        'stage':            stage_result
     }
 
 def delete_income_service(income_id):
@@ -660,50 +733,79 @@ def delete_income_service(income_id):
     }
 
 def get_client_deals_service(contact_id):
-    """Получает список сделок для указанного контакта, используя их тип в качестве названия."""
+    """Получает список сделок для контакта по нескольким категориям."""
     if not contact_id:
         return []
 
-    # Пакетный запрос: получаем сделки и справочник типов сделок
+    CATEGORY_NAMES = {
+        14: 'Финансовый управляющий',
+        16: 'Публикация',
+        18: 'Депозит'
+    }
+
+    # Пакетный запрос: сделки category_id=0 + справочник типов + сделки доп. категорий
     batch_payload = {
         'halt': 0,
         'cmd': {
-            'deals': f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=0&select[]=ID&select[]=TYPE_ID",
-            'deal_types': "crm.status.list?filter[ENTITY_ID]=DEAL_TYPE"
+            'deals_sale':    f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=0&select[]=ID&select[]=TYPE_ID&select[]=OPPORTUNITY",
+            'deals_14':      f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=14&select[]=ID&select[]=CATEGORY_ID&select[]=OPPORTUNITY",
+            'deals_16':      f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=16&select[]=ID&select[]=CATEGORY_ID&select[]=OPPORTUNITY",
+            'deals_18':      f"crm.deal.list?filter[CONTACT_ID]={contact_id}&filter[CATEGORY_ID]=18&select[]=ID&select[]=CATEGORY_ID&select[]=OPPORTUNITY",
+            'deal_types':    "crm.status.list?filter[ENTITY_ID]=DEAL_TYPE"
         }
     }
 
     response = b24_call_method('batch', batch_payload)
 
     if not response or not response.get('result', {}).get('result'):
-        current_app.logger.error("Failed to fetch deals or deal types from Bitrix24.")
+        current_app.logger.error("get_client_deals_service: Failed to fetch deals from Bitrix24.")
         return []
 
-    result = response['result']['result']
-    deals = result.get('deals', [])
-    deal_type_info = result.get('deal_types', [])
+    result      = response['result']['result']
+    deals_sale  = result.get('deals_sale', []) or []
+    deals_14    = result.get('deals_14', [])   or []
+    deals_16    = result.get('deals_16', [])   or []
+    deals_18    = result.get('deals_18', [])   or []
+    deal_types  = result.get('deal_types', []) or []
 
-    current_app.logger.info(f"deal_type_info raw: {deal_type_info}")
+    type_map = {item['STATUS_ID']: item['NAME'] for item in deal_types}
+    current_app.logger.info(f"get_client_deals_service: type_map={type_map}")
 
-    # Ключ теперь STATUS_ID (например 'SALE'), значение NAME (например 'БФЛ')
-    type_map = {item['STATUS_ID']: item['NAME'] for item in deal_type_info}
-
-    current_app.logger.info(f"type_map built: {type_map}")
-
-    formatted_deals = []
-    for deal in deals:
-        type_id = deal.get('TYPE_ID')
+    # --- Группа 1: Продажа (category_id=0) ---
+    sale_group = []
+    for deal in deals_sale:
+        type_id   = deal.get('TYPE_ID')
         deal_name = type_map.get(type_id, f"Тип неизвестен ({type_id})")
-        current_app.logger.info(f"Deal ID={deal['ID']}, TYPE_ID='{type_id}', name='{deal_name}'")
-        formatted_deals.append({
-            'id': deal['ID'],  # 2086
-            'type_id': type_id,  # SALE
-            'name': deal_name  # БФЛ
+        sale_group.append({
+            'id':          deal['ID'],
+            'type_id':     type_id,
+            'name':        deal_name,
+            'category_id': 0,
+            'opportunity': float(deal.get('OPPORTUNITY') or 0)
         })
 
-    current_app.logger.info(f"Found {len(formatted_deals)} deals for contact_id {contact_id}")
+    # --- Группа 2: Обязательные платежи (category_id=14,16,18) ---
+    mandatory_group = []
+    for cat_id, deals in [(14, deals_14), (16, deals_16), (18, deals_18)]:
+        cat_name = CATEGORY_NAMES[cat_id]
+        for deal in deals:
+            mandatory_group.append({
+                'id':          deal['ID'],
+                'type_id':     None,
+                'name':        cat_name,
+                'category_id': cat_id,
+                'opportunity': float(deal.get('OPPORTUNITY') or 0)
+            })
 
-    return formatted_deals
+    current_app.logger.info(
+        f"get_client_deals_service: contact_id={contact_id}, "
+        f"sale={len(sale_group)}, mandatory={len(mandatory_group)}"
+    )
+
+    return {
+        'sale':      sale_group,
+        'mandatory': mandatory_group
+    }
 
 
 def create_b24_invoice_service(income_data, file_data=None):
