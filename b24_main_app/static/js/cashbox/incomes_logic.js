@@ -4,7 +4,32 @@ App.cashbox.incomes = {
         console.log("Initializing Incomes logic...");
 
         let currentPage = 1;
+        let currentFilters = {};
         let currentIncomes = []; // Кэш для редактирования
+
+        // --- Фильтры ---
+        const incomesFilterForm = document.getElementById('incomes-filter-form');
+        const incomeResetFilterBtn = document.getElementById('income-reset-filter-btn');
+
+        flatpickr("#income-filter-start-date", { locale: "ru", dateFormat: "Y-m-d" });
+        flatpickr("#income-filter-end-date", { locale: "ru", dateFormat: "Y-m-d" });
+
+        incomesFilterForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentFilters = {
+                start_date: document.getElementById('income-filter-start-date').value,
+                end_date: document.getElementById('income-filter-end-date').value,
+                is_confirmed: document.getElementById('income-filter-status').value,
+            };
+            Object.keys(currentFilters).forEach(k => { if (currentFilters[k] === '') delete currentFilters[k]; });
+            loadIncomesTable(1);
+        });
+
+        incomeResetFilterBtn.addEventListener('click', () => {
+            incomesFilterForm.reset();
+            currentFilters = {};
+            loadIncomesTable(1);
+        });
 
         const incomeForm = document.getElementById('income-form');
         const addIncomeBtn = incomeForm.querySelector('button[type="submit"]');
@@ -229,9 +254,9 @@ App.cashbox.incomes = {
             currentPage = page;
             App.showLoader();
             try {
-                const params = { limit: 25, offset: (page - 1) * 25 };
+                const params = { limit: 25, offset: (page - 1) * 25, ...currentFilters };
                 const data = await App.cashbox.api.getIncomes(params);
-                currentIncomes = data.incomes; // Кэшируем данные
+                currentIncomes = data.incomes;
                 App.cashbox.ui.renderIncomesTable(currentIncomes);
             } catch (error) {
                 await App.Notify.error('Ошибка', `Ошибка загрузки приходов: ${error.message}`);
@@ -248,7 +273,48 @@ App.cashbox.incomes = {
                 openEditIncomeModal(target.dataset.id);
             } else if (target.classList.contains('delete-income-btn')) {
                 App.cashbox.openDeleteConfirmModal(target.dataset.id, 'income');
+            } else if (target.classList.contains('confirm-income-btn')) {
+                openConfirmIncomeModal(target.dataset.id, target.dataset.confirmed === '1');
             }
+        }
+
+        function openConfirmIncomeModal(incomeId, isCurrentlyConfirmed) {
+            const modal = document.getElementById('confirm-income-modal');
+            const title = document.getElementById('confirm-income-modal-title');
+            const text = document.getElementById('confirm-income-modal-text');
+            const yesBtn = document.getElementById('confirm-income-yes-btn');
+            const cancelBtn = document.getElementById('confirm-income-cancel-btn');
+
+            const willConfirm = !isCurrentlyConfirmed;
+
+            title.textContent = willConfirm ? 'Подтвердить платёж' : 'Отменить подтверждение';
+            text.textContent = willConfirm
+                ? 'Вы уверены, что хотите подтвердить этот платёж? Статус счёта в Битрикс24 будет изменён на "Оплачен".'
+                : 'Вы уверены, что хотите отменить подтверждение? Статус счёта в Битрикс24 будет изменён на "Неподтверждённый".';
+
+            modal.style.display = 'flex';
+
+            // Клонируем кнопки чтобы сбросить старые обработчики
+            const newYesBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+            newCancelBtn.onclick = () => { modal.style.display = 'none'; };
+
+            newYesBtn.onclick = async () => {
+                modal.style.display = 'none';
+                App.showLoader();
+                try {
+                    await App.cashbox.api.toggleIncomeConfirmation(incomeId, willConfirm);
+                    App.Notify.success(willConfirm ? 'Платёж подтверждён!' : 'Подтверждение отменено.');
+                    loadIncomesTable(currentPage);
+                } catch (e) {
+                    await App.Notify.error('Ошибка', e.message);
+                } finally {
+                    App.hideLoader();
+                }
+            };
         }
 
         async function openEditIncomeModal(incomeId) {

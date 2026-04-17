@@ -65,4 +65,11 @@ App.cashbox.api = {
     getClientDeals: function(contactId) {
         return App.api.request('get_client_deals', { contact_id: contactId });
     }
+
+    toggleIncomeConfirmation: function(id, confirm) {
+        return App.api.request('toggle_income_confirmation', {}, {
+            method: 'POST',
+            body: JSON.stringify({ id, confirm })
+        });
+    },
 };

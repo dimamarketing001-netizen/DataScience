@@ -269,6 +269,9 @@ def get_incomes_service(args):
     if args.get('end_date'):
         filters.append("i.income_date <= %s")
         filter_params.append(args['end_date'])
+    if args.get('is_confirmed') is not None and args.get('is_confirmed') != '':
+        filters.append("i.is_confirmed = %s")
+        filter_params.append(int(args['is_confirmed']))
 
     if filters:
         data_query += " WHERE " + " AND ".join(filters)
@@ -296,7 +299,7 @@ def get_incomes_service(args):
         income['b24_invoice_id'] = str(income['b24_invoice_id']) if income.get('b24_invoice_id') else None
         income['b24_file_id'] = str(income['b24_file_id']) if income.get('b24_file_id') else None
         income['b24_file_url'] = income.get('b24_file_url') or None
-        # contact_id и deal_id уже есть в SELECT * — явно приводим к строке для JS
+        income['is_confirmed'] = bool(income.get('is_confirmed', 0))
         income['contact_id'] = str(income['contact_id']) if income.get('contact_id') else None
         income['deal_id'] = str(income['deal_id']) if income.get('deal_id') else None
     return {
@@ -627,3 +630,58 @@ def delete_b24_invoice_service(invoice_id):
         return {'success': True}
     else:
         return {'success': False, 'error': str(result)}
+
+def toggle_income_confirmation_service(income_id, confirm: bool):
+    """Подтверждает или отменяет подтверждение прихода, меняя статус счёта в Б24."""
+    if not income_id:
+        raise ValueError('Income ID is required')
+
+    SMART_INVOICE_ENTITY_TYPE_ID = 31
+    CONFIRMED_STAGE_ID = 'DT31_2:P'      # Оплачен / Подтверждён
+    UNCONFIRMED_STAGE_ID = 'DT31_2:N'    # Новый / Неподтверждённый
+
+    conn = get_db_connection()
+    if not conn:
+        raise Exception('DB connection failed')
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT b24_invoice_id FROM incomes WHERE id = %s", (income_id,))
+        income = cursor.fetchone()
+        if not income:
+            raise ValueError(f'Income {income_id} not found')
+
+        b24_invoice_id = income.get('b24_invoice_id')
+
+        # Обновляем статус в БД
+        cursor.execute(
+            "UPDATE incomes SET is_confirmed = %s WHERE id = %s",
+            (1 if confirm else 0, income_id)
+        )
+        conn.commit()
+        current_app.logger.info(f"toggle_income_confirmation: income_id={income_id}, confirm={confirm}, DB updated")
+    except Exception as e:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    # Обновляем статус смарт-счёта в Б24 если он есть
+    b24_result = None
+    if b24_invoice_id:
+        target_stage = CONFIRMED_STAGE_ID if confirm else UNCONFIRMED_STAGE_ID
+        params = {
+            'entityTypeId': SMART_INVOICE_ENTITY_TYPE_ID,
+            'id': b24_invoice_id,
+            'fields': {'stageId': target_stage}
+        }
+        current_app.logger.info(f"toggle_income_confirmation: updating B24 invoice {b24_invoice_id} → stageId={target_stage}")
+        b24_result = b24_call_method('crm.item.update', params)
+        current_app.logger.info(f"toggle_income_confirmation: B24 result={b24_result}")
+
+    return {
+        'success': True,
+        'is_confirmed': confirm,
+        'b24_updated': b24_result is not None and 'error' not in (b24_result or {})
+    }

@@ -162,12 +162,36 @@ App.cashbox.ui = {
             // --- Столбец "Действия" ---
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
-            const editIconClass = canEdit ? 'action-icon edit-income-btn' : 'action-icon edit-income-btn access-restricted';
-            const deleteIconClass = canDelete ? 'action-icon delete-income-btn' : 'action-icon delete-income-btn access-restricted';
-            actionsCell.innerHTML = `
-                <span class="${editIconClass}" data-id="${income.id}" title="Редактировать">✏️</span>
-                <span class="${deleteIconClass}" data-id="${income.id}" title="Удалить">🗑️</span>
-            `;
+
+            const isConfirmed = income.is_confirmed;
+
+            // Зелёный фон для подтверждённых
+            if (isConfirmed) {
+                row.style.backgroundColor = 'rgba(76, 175, 80, 0.08)';
+            }
+
+            const confirmBtn = document.createElement('span');
+            confirmBtn.className = 'action-icon confirm-income-btn';
+            confirmBtn.dataset.id = income.id;
+            confirmBtn.dataset.confirmed = isConfirmed ? '1' : '0';
+            confirmBtn.title = isConfirmed ? 'Отменить подтверждение' : 'Подтвердить платёж';
+            confirmBtn.textContent = isConfirmed ? '↩️' : '✅';
+
+            const editBtn = document.createElement('span');
+            editBtn.className = canEdit ? 'action-icon edit-income-btn' : 'action-icon edit-income-btn access-restricted';
+            editBtn.dataset.id = income.id;
+            editBtn.title = 'Редактировать';
+            editBtn.textContent = '✏️';
+
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = canDelete ? 'action-icon delete-income-btn' : 'action-icon delete-income-btn access-restricted';
+            deleteBtn.dataset.id = income.id;
+            deleteBtn.title = 'Удалить';
+            deleteBtn.textContent = '🗑️';
+
+            actionsCell.appendChild(confirmBtn);
+            actionsCell.appendChild(editBtn);
+            actionsCell.appendChild(deleteBtn);
         });
     },
 

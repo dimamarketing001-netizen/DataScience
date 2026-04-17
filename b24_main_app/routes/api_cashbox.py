@@ -15,7 +15,8 @@ from services.cashbox_service import (
     delete_income_service,
     get_client_deals_service,
     create_b24_invoice_service,
-    delete_b24_invoice_service
+    delete_b24_invoice_service,
+    toggle_income_confirmation_service
 )
 
 # Blueprint остается, но теперь он вызывает сервисные функции
@@ -168,3 +169,15 @@ def get_client_deals():
         return jsonify(deals)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def toggle_income_confirmation():
+    """Контроллер для подтверждения/отмены подтверждения прихода."""
+    from flask import current_app
+    try:
+        data = request.get_json()
+        income_id = data.get('id')
+        confirm = data.get('confirm')  # True или False
+        result = toggle_income_confirmation_service(income_id, confirm)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

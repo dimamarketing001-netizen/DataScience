@@ -6,7 +6,7 @@ from core.db import init_db
 from routes.api_access import get_my_permissions, handle_access_rights
 from routes.api_common import search_contacts, get_initial_data_for_access
 from routes.api_statistics import get_statistics
-from routes.api_cashbox import get_cashbox_initial_data, add_expense, get_expenses, get_single_expense, update_expense, delete_expense, add_income, get_incomes, get_single_income, update_income, delete_income, get_client_deals
+from routes.api_cashbox import get_cashbox_initial_data, add_expense, get_expenses, get_single_expense, update_expense, delete_expense, add_income, get_incomes, get_single_income, update_income, delete_income, get_client_deals, toggle_income_confirmation
 
 # --- Инициализация приложения ---
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,7 @@ api_actions = {
     'update_income': update_income,
     'delete_income': delete_income,
     'get_client_deals': get_client_deals,
+    'toggle_income_confirmation': toggle_income_confirmation,
     
     # Access actions
     'my_permissions': get_my_permissions,
