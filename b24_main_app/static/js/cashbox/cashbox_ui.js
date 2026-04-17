@@ -51,8 +51,8 @@ App.cashbox.ui = {
             expensesTableBody.innerHTML = `<tr><td colspan="12">Нет записей о расходах по заданным фильтрам.</td></tr>`;
             return;
         }
-        
-        const canEdit = App.userPermissions.tabs.cashbox.expense.edit;
+
+        const canEdit   = App.userPermissions.tabs.cashbox.expense.edit;
         const canDelete = App.userPermissions.tabs.cashbox.expense.delete;
 
         expenses.forEach(expense => {
@@ -61,24 +61,43 @@ App.cashbox.ui = {
             row.insertCell().textContent = expense.expense_date;
             row.insertCell().textContent = parseFloat(expense.amount).toFixed(2);
             row.insertCell().textContent = expense.category;
-            row.insertCell().textContent = expense.employee_name || '—';
-            row.insertCell().textContent = expense.source_name || '—';
-            row.insertCell().textContent = expense.contact_name || '—';
-            row.insertCell().textContent = expense.comment || '—';
-            row.insertCell().textContent = expense.paid_leads !== null ? expense.paid_leads : '—';
-            row.insertCell().textContent = expense.free_leads !== null ? expense.free_leads : '—';
+            row.insertCell().textContent = expense.employee_name  || '—';
+            row.insertCell().textContent = expense.source_name    || '—';
+            row.insertCell().textContent = expense.contact_name   || '—';
+            row.insertCell().textContent = expense.comment        || '—';
+            row.insertCell().textContent = expense.paid_leads  !== null ? expense.paid_leads  : '—';
+            row.insertCell().textContent = expense.free_leads  !== null ? expense.free_leads  : '—';
             row.insertCell().textContent = expense.added_by_user_name || 'Неизвестно';
-            
+
             const actionsCell = row.insertCell();
             actionsCell.className = 'actions-column';
 
-            const editIconClass = canEdit ? 'action-icon edit-icon' : 'action-icon edit-icon access-restricted';
-            const deleteIconClass = canDelete ? 'action-icon delete-icon' : 'action-icon delete-icon access-restricted';
+            const editBtn = document.createElement('span');
+            editBtn.className   = canEdit
+                ? 'action-icon edit-icon'
+                : 'action-icon edit-icon access-restricted';
+            editBtn.dataset.id  = expense.id;
+            editBtn.title       = 'Редактировать';
+            editBtn.textContent = '✏️';
+            editBtn.addEventListener('click', () => {
+                if (editBtn.classList.contains('access-restricted')) return;
+                onEdit(expense.id);
+            });
 
-            actionsCell.innerHTML = `
-                <span class="${editIconClass}" data-id="${expense.id}" title="Редактировать">✏️</span>
-                <span class="${deleteIconClass}" data-id="${expense.id}" title="Удалить">🗑️</span>
-            `;
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className   = canDelete
+                ? 'action-icon delete-icon'
+                : 'action-icon delete-icon access-restricted';
+            deleteBtn.dataset.id  = expense.id;
+            deleteBtn.title       = 'Удалить';
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.addEventListener('click', () => {
+                if (deleteBtn.classList.contains('access-restricted')) return;
+                onDelete(expense.id);
+            });
+
+            actionsCell.appendChild(editBtn);
+            actionsCell.appendChild(deleteBtn);
         });
     },
 
@@ -411,99 +430,160 @@ App.cashbox.ui = {
     },
 
     openFileViewer: function(fileUrl, fileId) {
-        const modal       = document.getElementById('file-viewer-modal');
-        const content     = document.getElementById('file-viewer-content');
-        const title       = document.getElementById('file-viewer-title');
+        const modal        = document.getElementById('file-viewer-modal');
+        const content      = document.getElementById('file-viewer-content');
+        const title        = document.getElementById('file-viewer-title');
         const downloadLink = document.getElementById('file-viewer-download');
 
-        content.innerHTML = '<div class="file-viewer-loading">⏳ Загрузка...</div>';
+        // Сбрасываем и показываем модалку
+        content.innerHTML = '';
         modal.style.display = 'flex';
-        downloadLink.href = fileUrl;
+        downloadLink.href = '#';
+        title.textContent = 'Загрузка файла...';
 
-        // Определяем тип по URL (расширение) или пробуем оба варианта
-        const urlLower = (fileUrl || '').toLowerCase().split('?')[0];
-        const isPdf    = urlLower.endsWith('.pdf');
-        const isImage  = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(urlLower);
-
-        if (isPdf) {
-            // Сразу показываем PDF через iframe
-            showAsIframe();
-            return;
-        }
-
-        if (isImage) {
-            // Сразу показываем как картинку
-            showAsImage();
-            return;
-        }
-
-        // Тип неизвестен — пробуем сначала как картинку, fallback на iframe
-        showAsImage(true);
-
-        function showAsImage(withFallback = false) {
-            content.innerHTML = '';
-            title.textContent = 'Просмотр изображения';
-            const img = document.createElement('img');
-            img.style.cssText = 'max-width:100%;max-height:calc(90vh - 130px);object-fit:contain;display:block;';
-            img.onload = function() {
-                title.textContent = 'Просмотр изображения';
-            };
-            img.onerror = function() {
-                if (withFallback) {
-                    showAsIframe();
-                } else {
-                    showError();
-                }
-            };
-            img.src = fileUrl;
-            content.appendChild(img);
-        }
-
-        function showAsIframe() {
-            content.innerHTML = '';
-            title.textContent = 'Просмотр документа';
-
-            // Для PDF используем Google Docs viewer как fallback если прямой iframe заблокирован
-            const frame = document.createElement('iframe');
-            frame.style.cssText = 'width:100%;height:calc(90vh - 130px);border:none;background:#fff;';
-            frame.title = 'Документ';
-            frame.src   = fileUrl;
-
-            // Таймаут — если через 4 секунды iframe не загрузился, предлагаем скачать
-            const timer = setTimeout(() => {
-                if (content.contains(frame)) {
-                    showDownloadFallback();
-                }
-            }, 4000);
-
-            frame.onload = () => clearTimeout(timer);
-
-            content.appendChild(frame);
-        }
-
-        function showDownloadFallback() {
-            content.innerHTML = `
-                <div class="file-viewer-error">
-                    <p>Не удалось отобразить файл в браузере.<br>
-                    Это может быть связано с ограничениями сервера Битрикс24.</p>
-                    <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;display:inline-block;">
-                        ⬇️ Скачать файл
-                    </a>
+        // Показываем спиннер загрузки
+        content.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;color:#fff;">
+                <div style="
+                    width:48px;height:48px;
+                    border:4px solid rgba(255,255,255,0.2);
+                    border-top:4px solid #2fc6f6;
+                    border-radius:50%;
+                    animation:spin 1s linear infinite;
+                "></div>
+                <div id="file-viewer-progress-text" style="font-size:14px;opacity:0.85;">Скачиваем файл...</div>
+                <div style="width:240px;height:6px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;">
+                    <div id="file-viewer-progress-bar" style="
+                        height:100%;width:0%;
+                        background:#2fc6f6;
+                        border-radius:4px;
+                        transition:width 0.3s ease;
+                    "></div>
                 </div>
-            `;
-            title.textContent = 'Просмотр недоступен';
-        }
+            </div>
+        `;
 
-        function showError() {
-            content.innerHTML = `
-                <div class="file-viewer-error">
-                    <p>Не удалось открыть файл.</p>
-                    <a href="${fileUrl}" target="_blank" class="ui-btn ui-btn-primary" style="margin-top:12px;display:inline-block;">
-                        ⬇️ Скачать файл
-                    </a>
-                </div>
-            `;
-            title.textContent = 'Ошибка';
-        }
+        const progressText = () => document.getElementById('file-viewer-progress-text');
+        const progressBar  = () => document.getElementById('file-viewer-progress-bar');
+
+        // Скачиваем файл через BX24.ajax чтобы передать авторизацию,
+        // или через обычный fetch (urlMachine уже содержит подписанный токен)
+        fetch(fileUrl)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const contentType   = response.headers.get('Content-Type') || '';
+                const contentLength = response.headers.get('Content-Length');
+                const total         = contentLength ? parseInt(contentLength) : 0;
+                let   loaded        = 0;
+
+                // Читаем поток с прогрессом
+                const reader = response.body.getReader();
+                const chunks = [];
+
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            return { chunks, contentType, total: loaded };
+                        }
+                        chunks.push(value);
+                        loaded += value.length;
+
+                        if (total > 0) {
+                            const pct = Math.round((loaded / total) * 100);
+                            if (progressBar()) progressBar().style.width = pct + '%';
+                            if (progressText()) progressText().textContent = `Скачиваем файл... ${pct}%`;
+                        } else {
+                            const kb = Math.round(loaded / 1024);
+                            if (progressText()) progressText().textContent = `Скачиваем файл... ${kb} KB`;
+                            // Анимируем прогресс-бар без точного значения
+                            if (progressBar()) {
+                                const cur = parseFloat(progressBar().style.width) || 0;
+                                progressBar().style.width = Math.min(cur + 5, 90) + '%';
+                            }
+                        }
+
+                        return pump();
+                    });
+                }
+
+                return pump().then(({ chunks, contentType, total }) => {
+                    return { blob: new Blob(chunks, { type: contentType }), contentType };
+                });
+            })
+            .then(({ blob, contentType }) => {
+                const blobUrl  = URL.createObjectURL(blob);
+                const isPdf    = contentType.includes('pdf') ||
+                                 fileUrl.toLowerCase().includes('.pdf');
+                const isImage  = contentType.startsWith('image/');
+
+                // Обновляем ссылку скачивания
+                downloadLink.href = blobUrl;
+                downloadLink.download = fileId ? `file_${fileId}` : 'document';
+
+                // Заполняем прогресс до 100%
+                if (progressBar()) progressBar().style.width = '100%';
+                if (progressText()) progressText().textContent = 'Готово!';
+
+                setTimeout(() => {
+                    content.innerHTML = '';
+
+                    if (isPdf) {
+                        title.textContent = 'Просмотр PDF';
+                        const frame = document.createElement('iframe');
+                        frame.src   = blobUrl;
+                        frame.style.cssText = 'width:100%;height:calc(90vh - 130px);border:none;background:#fff;';
+                        frame.title = 'PDF документ';
+                        content.appendChild(frame);
+
+                    } else if (isImage) {
+                        title.textContent = 'Просмотр изображения';
+                        const img = document.createElement('img');
+                        img.src   = blobUrl;
+                        img.style.cssText = 'max-width:100%;max-height:calc(90vh - 130px);object-fit:contain;display:block;';
+                        img.alt   = 'Изображение';
+                        content.appendChild(img);
+
+                    } else {
+                        // Неизвестный тип — пробуем iframe
+                        title.textContent = 'Просмотр документа';
+                        const frame = document.createElement('iframe');
+                        frame.src   = blobUrl;
+                        frame.style.cssText = 'width:100%;height:calc(90vh - 130px);border:none;background:#fff;';
+                        content.appendChild(frame);
+                    }
+                }, 300); // небольшая пауза чтобы пользователь увидел 100%
+            })
+            .catch(err => {
+                console.error('openFileViewer fetch error:', err);
+                content.innerHTML = `
+                    <div style="
+                        display:flex;flex-direction:column;align-items:center;
+                        justify-content:center;padding:40px;gap:16px;
+                        color:#ff6b6b;text-align:center;
+                    ">
+                        <div style="font-size:32px;">⚠️</div>
+                        <div style="font-size:14px;max-width:320px;line-height:1.5;">
+                            Не удалось загрузить файл.<br>
+                            <span style="font-size:12px;opacity:0.7;">${err.message}</span>
+                        </div>
+                        <a href="${fileUrl}" target="_blank"
+                           class="ui-btn ui-btn-primary"
+                           style="margin-top:8px;display:inline-block;">
+                            ⬇️ Скачать файл напрямую
+                        </a>
+                    </div>
+                `;
+                title.textContent = 'Ошибка загрузки';
+            });
+
+        // Освобождаем blob URL при закрытии модалки
+        const closeBtn = document.getElementById('file-viewer-close');
+        const oldClose = closeBtn.onclick;
+        closeBtn.onclick = () => {
+            content.innerHTML = '';
+            modal.style.display = 'none';
+            title.textContent = 'Документ';
+        };
     },
 };

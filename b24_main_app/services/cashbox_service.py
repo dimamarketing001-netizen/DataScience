@@ -254,6 +254,8 @@ def add_income_service(data):
 def get_incomes_service(args):
     """Сервисная функция для получения списка приходов с фильтрацией и пагинацией."""
     conn = get_db_connection()
+    if not conn:
+        raise Exception('Не удалось подключиться к базе данных')
     cursor = conn.cursor(dictionary=True)
 
     base_query = "FROM incomes i"
@@ -490,26 +492,37 @@ def update_income_service(data, file_data=None):
             })
             if get_res and get_res.get('result', {}).get('item'):
                 item = get_res['result']['item']
-                file_field = item.get('UF_CRM_SMART_INVOICE_1776360197269') or \
-                             item.get('ufCrmSmartInvoice1776360197269')
+                # Б24 может вернуть поле в разных форматах ключа
+                file_field = (
+                        item.get('UF_CRM_SMART_INVOICE_1776360197269') or
+                        item.get('ufCrmSmartInvoice1776360197269')
+                )
+                current_app.logger.info(f"update_income_service: file_field after update = {file_field}")
+
+                new_file_id = None
+                new_file_url = None
+
                 if isinstance(file_field, dict):
-                    new_file_id  = str(file_field.get('id', '')) or None
+                    new_file_id = str(file_field.get('id', '')) or None
                     new_file_url = file_field.get('urlMachine') or file_field.get('url') or None
-                    conn4 = get_db_connection()
-                    if conn4:
-                        try:
-                            cur4 = conn4.cursor()
-                            cur4.execute(
-                                "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
-                                (new_file_id, new_file_url, income_id)
-                            )
-                            conn4.commit()
-                            current_app.logger.info(
-                                f"update_income_service: new file saved: id={new_file_id}"
-                            )
-                        finally:
-                            cur4.close()
-                            conn4.close()
+                elif file_field:
+                    new_file_id = str(file_field)
+
+                conn4 = get_db_connection()
+                if conn4:
+                    try:
+                        cur4 = conn4.cursor()
+                        cur4.execute(
+                            "UPDATE incomes SET b24_file_id=%s, b24_file_url=%s WHERE id=%s",
+                            (new_file_id, new_file_url, income_id)
+                        )
+                        conn4.commit()
+                        current_app.logger.info(
+                            f"update_income_service: file saved in DB: id={new_file_id}, url_set={bool(new_file_url)}"
+                        )
+                    finally:
+                        cur4.close()
+                        conn4.close()
 
             invoice_result = {'success': True, 'file_updated': True}
         except Exception as e:
