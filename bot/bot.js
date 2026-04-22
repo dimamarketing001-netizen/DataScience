@@ -7,8 +7,6 @@ dotenv.config();
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
-// ─── Хранилище состояний (в памяти) ───────────────────────────────────────────
-// Для production лучше использовать Redis
 const userStates = new Map();
 
 const STATE = {
@@ -20,15 +18,13 @@ const STATE = {
 // ─── Клавиатура с кнопкой запроса контакта ────────────────────────────────────
 function getContactKeyboard() {
   return Keyboard.inlineKeyboard([
-    [
-      Keyboard.button.requestContact('📱 Поделиться номером телефона'),
-    ],
+    [Keyboard.button.requestContact('📱 Поделиться номером телефона')],
   ]);
 }
 
-// ─── Приветственное сообщение с запросом телефона ─────────────────────────────
+// ─── Запрос телефона у пользователя ───────────────────────────────────────────
 async function askForPhone(ctx) {
-  const userId = ctx.update?.user?.user_id || ctx.user?.user_id;
+  const userId = getUserId(ctx);
   userStates.set(userId, STATE.WAITING_PHONE);
 
   await ctx.reply(
@@ -45,86 +41,93 @@ async function askForPhone(ctx) {
 
 // ─── Обработка полученного телефона ───────────────────────────────────────────
 async function handlePhone(ctx, phone, userId) {
-  // Убираем пробелы
   phone = phone.trim();
 
-  // Базовая валидация номера
+  // Валидация формата номера
   const phoneRegex = /^[\+\d][\d\s\-\(\)]{6,20}$/;
   if (!phoneRegex.test(phone)) {
     await ctx.reply(
       '❌ Некорректный формат номера телефона.\n\n' +
-      'Пожалуйста, введите номер в формате **+79991234567** ' +
-      'или нажмите кнопку для автоматической отправки.',
+      'Я не смог найти ваш номер телефона в базе, пожалуйста проверьте телефон ' +
+      'и укажите его вручную в формате **+79999999999**',
       {
         format: 'markdown',
         attachments: [getContactKeyboard()],
       }
     );
+    userStates.set(userId, STATE.WAITING_PHONE);
     return;
   }
 
-  // Сообщение о поиске
   await ctx.reply('🔍 Ищу вас в базе данных...');
 
   try {
-    // Поиск в Битрикс24
     const bitrixData = await findByPhone(phone);
 
+    // ─── Ничего не найдено ─────────────────────────────────────────────────
     if (!bitrixData) {
-      // Телефон не найден в Битрикс24
       await ctx.reply(
-        '❌ К сожалению, ваш номер телефона не найден в нашей базе.\n\n' +
-        'Пожалуйста, обратитесь к менеджеру или попробуйте другой номер.',
+        'Я не смог найти ваш номер телефона в базе, пожалуйста проверьте телефон ' +
+        'и укажите его вручную в формате **+79999999999**',
         {
-          attachments: [
-            Keyboard.inlineKeyboard([
-              [Keyboard.button.requestContact('📱 Попробовать другой номер')],
-            ])
-          ]
+          format: 'markdown',
+          attachments: [getContactKeyboard()],
         }
       );
-
+      // Ждём — пользователь введёт другой номер
       userStates.set(userId, STATE.WAITING_PHONE);
       return;
     }
 
-    // Сохраняем в БД
+    // ─── Найдено — сохраняем в БД ──────────────────────────────────────────
     await saveUser({
       maxUserId: userId,
-      bitrixContactId: bitrixData.contactId,
-      bitrixLeadId: bitrixData.leadId,
+      bitrixContactId: bitrixData.contactId,  // может быть null
+      bitrixLeadId: bitrixData.leadId,         // может быть null
       phone: phone,
     });
 
     userStates.set(userId, STATE.REGISTERED);
 
-    // Успешная регистрация
+    // Формируем сообщение об успехе
     const nameText = bitrixData.name ? `, **${bitrixData.name}**` : '';
-    await ctx.reply(
+    let successMsg =
       `✅ Отлично${nameText}! Вы успешно авторизованы.\n\n` +
-      `📞 Телефон: ${phone}\n` +
-      (bitrixData.leadId ? `🆔 Лид: #${bitrixData.leadId}\n` : '') +
-      '\nТеперь вы можете пользоваться всеми функциями бота!',
-      { format: 'markdown' }
-    );
+      `📞 Телефон: ${phone}\n`;
+
+    if (bitrixData.leadId && bitrixData.contactId) {
+      successMsg += `📋 Лид: #${bitrixData.leadId}\n`;
+      successMsg += `👤 Контакт: #${bitrixData.contactId}\n`;
+    } else if (bitrixData.leadId && !bitrixData.contactId) {
+      successMsg += `📋 Лид: #${bitrixData.leadId}\n`;
+      successMsg += `ℹ️ Контакт не привязан\n`;
+    } else if (!bitrixData.leadId && bitrixData.contactId) {
+      successMsg += `👤 Контакт: #${bitrixData.contactId}\n`;
+    }
+
+    successMsg += '\nТеперь вы можете пользоваться всеми функциями бота!';
+
+    await ctx.reply(successMsg, { format: 'markdown' });
 
     console.log(
-      `✅ Пользователь зарегистрирован: ` +
-      `MAX ID=${userId}, ` +
-      `Contact=${bitrixData.contactId}, ` +
+      `✅ Сохранено: MAX ID=${userId}, ` +
       `Lead=${bitrixData.leadId}, ` +
-      `Phone=${phone}`
+      `Contact=${bitrixData.contactId}, ` +
+      `Phone=${phone}, ` +
+      `Source=${bitrixData.source}`
     );
 
   } catch (error) {
     console.error('Ошибка при обработке телефона:', error);
     await ctx.reply(
-      '⚠️ Произошла ошибка при проверке номера. Попробуйте позже.'
+      '⚠️ Произошла техническая ошибка. Попробуйте позже или введите номер ещё раз.',
+      { attachments: [getContactKeyboard()] }
     );
+    userStates.set(userId, STATE.WAITING_PHONE);
   }
 }
 
-// ─── Получение user_id из контекста ───────────────────────────────────────────
+// ─── Получение user_id ────────────────────────────────────────────────────────
 function getUserId(ctx) {
   return (
     ctx.update?.user?.user_id ||
@@ -133,16 +136,14 @@ function getUserId(ctx) {
   );
 }
 
-// ─── Обработчик старта бота ───────────────────────────────────────────────────
+// ─── bot_started ──────────────────────────────────────────────────────────────
 bot.on('bot_started', async (ctx) => {
   const userId = getUserId(ctx);
   if (!userId) return;
 
   console.log(`▶️  bot_started: user_id=${userId}`);
 
-  // Проверяем — зарегистрирован ли уже пользователь
   const existingUser = await findUserByMaxId(userId);
-
   if (existingUser) {
     userStates.set(userId, STATE.REGISTERED);
     await ctx.reply(
@@ -151,17 +152,15 @@ bot.on('bot_started', async (ctx) => {
     return;
   }
 
-  // Новый пользователь — запрашиваем телефон
   await askForPhone(ctx);
 });
 
-// ─── Команда /start ───────────────────────────────────────────────────────────
+// ─── /start ───────────────────────────────────────────────────────────────────
 bot.command('start', async (ctx) => {
   const userId = getUserId(ctx);
   if (!userId) return;
 
   const existingUser = await findUserByMaxId(userId);
-
   if (existingUser) {
     userStates.set(userId, STATE.REGISTERED);
     await ctx.reply(
@@ -173,52 +172,46 @@ bot.command('start', async (ctx) => {
   await askForPhone(ctx);
 });
 
-// ─── Обработчик входящих сообщений ───────────────────────────────────────────
+// ─── Входящие сообщения ───────────────────────────────────────────────────────
 bot.on('message_created', async (ctx) => {
   const userId = getUserId(ctx);
   if (!userId) return;
 
   const message = ctx.message;
 
-  // Проверяем — пришёл ли контакт через кнопку requestContact
+  // Контакт через кнопку requestContact
   const contactAttachment = message?.body?.attachments?.find(
     (a) => a.type === 'contact'
   );
 
   if (contactAttachment) {
-    // Пользователь поделился контактом через кнопку
     const phone =
       contactAttachment.payload?.phone ||
       contactAttachment.phone ||
       null;
 
     if (phone) {
-      console.log(`📱 Получен контакт от ${userId}: ${phone}`);
+      console.log(`📱 Контакт через кнопку от ${userId}: ${phone}`);
       await handlePhone(ctx, phone, userId);
       return;
     }
   }
 
-  // Проверяем текстовое сообщение
   const text = message?.body?.text?.trim();
   if (!text) return;
-
-  // Команды не обрабатываем повторно
   if (text.startsWith('/')) return;
 
   const state = userStates.get(userId) || STATE.IDLE;
 
+  // Ждём телефон — обрабатываем ввод
   if (state === STATE.WAITING_PHONE) {
-    // Пользователь вводит телефон вручную
     await handlePhone(ctx, text, userId);
     return;
   }
 
+  // Уже зарегистрирован
   if (state === STATE.REGISTERED) {
-    // Пользователь уже зарегистрирован — основная логика бота
-    await ctx.reply(
-      `Вы написали: "${text}"\n\nЯ получил ваше сообщение! Чем могу помочь?`
-    );
+    await ctx.reply(`Чем могу помочь?`);
     return;
   }
 
@@ -232,15 +225,13 @@ bot.on('message_created', async (ctx) => {
   }
 });
 
-// ─── Обработчик callback-кнопок ───────────────────────────────────────────────
+// ─── Callback кнопки ──────────────────────────────────────────────────────────
 bot.on('message_callback', async (ctx) => {
   const userId = getUserId(ctx);
-  console.log(`🔘 Callback от ${userId}:`, ctx.update);
+  console.log(`🔘 Callback от ${userId}`);
 });
 
 // ─── Запуск ───────────────────────────────────────────────────────────────────
 console.log('🤖 Бот запускается...');
-
 bot.start();
-
 console.log('✅ Бот запущен!');
