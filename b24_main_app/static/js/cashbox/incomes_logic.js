@@ -265,10 +265,8 @@ App.cashbox.incomes = {
                 }
                 if (result.stage) {
                     const stageNames = {
-                        'C14:WON':           'Оплачено',
                         'C16:WON':           'Оплачено',
                         'C18:WON':           'Оплачено',
-                        'C14:FINAL_INVOICE': 'Частичная оплата',
                         'C16:FINAL_INVOICE': 'Частичная оплата',
                         'C18:FINAL_INVOICE': 'Частичная оплата',
                     };
@@ -351,14 +349,11 @@ App.cashbox.incomes = {
             newCancelBtn.onclick = () => { modal.style.display = 'none'; };
 
             const stageNames = {
-                // Обязательные платежи (cat 14/16/18)
-                'C14:WON':           'Оплачено',
+                // Обязательные платежи (cat 16/18)
                 'C16:WON':           'Оплачено',
                 'C18:WON':           'Оплачено',
-                'C14:FINAL_INVOICE': 'Частичная оплата',
                 'C16:FINAL_INVOICE': 'Частичная оплата',
                 'C18:FINAL_INVOICE': 'Частичная оплата',
-                'DC14:NEW':          'Новый',
                 'DC16:NEW':          'Новый',
                 'DC18:NEW':          'Новый',
                 // Продажа (cat 0)
@@ -471,10 +466,8 @@ App.cashbox.incomes = {
                 }
                 if (result.stage) {
                     const stageNames = {
-                        'C14:WON':           'Оплачено',
                         'C16:WON':           'Оплачено',
                         'C18:WON':           'Оплачено',
-                        'C14:FINAL_INVOICE': 'Частичная оплата',
                         'C16:FINAL_INVOICE': 'Частичная оплата',
                         'C18:FINAL_INVOICE': 'Частичная оплата',
                     };
