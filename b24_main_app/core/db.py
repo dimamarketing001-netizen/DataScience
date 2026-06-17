@@ -29,63 +29,45 @@ def init_db():
         logger.error("Could not connect to the database to initialize it.")
         return
     cursor = conn.cursor()
-    
+
     try:
         # --- Инициализация таблицы расходов ---
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `expenses` (
-              `id` int(11) NOT NULL AUTO_INCREMENT, `expense_date` date NOT NULL, `amount` decimal(10, 2) NOT NULL,
-              `category` varchar(255) DEFAULT NULL, `category_val` varchar(255) DEFAULT NULL, `employee_id` varchar(50) DEFAULT NULL,
-              `source_id` varchar(50) DEFAULT NULL, `contact_id` varchar(50) DEFAULT NULL, `comment` text,
-              `paid_leads` INT DEFAULT NULL, `free_leads` INT DEFAULT NULL,
-              `added_by_user_id` varchar(50) DEFAULT NULL, `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`)
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `expense_date` date NOT NULL,
+              `amount` decimal(10, 2) NOT NULL,
+              `category` varchar(255) DEFAULT NULL,
+              `category_val` varchar(255) DEFAULT NULL,
+              `employee_id` varchar(50) DEFAULT NULL,
+              `source_id` varchar(50) DEFAULT NULL,
+              `contact_id` varchar(50) DEFAULT NULL,
+              `comment` text,
+              `paid_leads` INT DEFAULT NULL,
+              `free_leads` INT DEFAULT NULL,
+              `added_by_user_id` varchar(50) DEFAULT NULL,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`)
             ) ENGINE=InnoDB
         """)
         logger.info("Table 'expenses' is ready.")
 
         # --- Инициализация таблицы приходов ---
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS `incomes`
-                       (
-                           `id`
-                           int
-                       (
-                           11
-                       ) NOT NULL AUTO_INCREMENT,
-                           `income_date` date NOT NULL,
-                           `amount` decimal
-                       (
-                           10,
-                           2
-                       ) NOT NULL,
-                           `contact_id` varchar
-                       (
-                           50
-                       ) DEFAULT NULL,
-                           `deal_id` varchar
-                       (
-                           50
-                       ) DEFAULT NULL,
-                           `deal_type_id` varchar
-                       (
-                           100
-                       ) DEFAULT NULL,
-                           `deal_type_name` varchar
-                       (
-                           255
-                       ) DEFAULT NULL,
-                           `comment` text,
-                           `added_by_user_id` varchar
-                       (
-                           50
-                       ) DEFAULT NULL,
-                           `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                           PRIMARY KEY
-                       (
-                           `id`
-                       )
-                           ) ENGINE=InnoDB
-                       """)
+            CREATE TABLE IF NOT EXISTS `incomes` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `income_date` date NOT NULL,
+              `amount` decimal(10, 2) NOT NULL,
+              `contact_id` varchar(50) DEFAULT NULL,
+              `deal_id` varchar(50) DEFAULT NULL,
+              `deal_type_id` varchar(100) DEFAULT NULL,
+              `deal_type_name` varchar(255) DEFAULT NULL,
+              `comment` text,
+              `added_by_user_id` varchar(50) DEFAULT NULL,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB
+        """)
         logger.info("Table 'incomes' is ready.")
 
         # Для уже существующей БД — добавляем столбцы если их нет
@@ -112,15 +94,35 @@ def init_db():
         # --- Инициализация таблицы прав доступа ---
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `access_rights` (
-              `id` INT AUTO_INCREMENT PRIMARY KEY, `entity_id` VARCHAR(50) NOT NULL UNIQUE, `entity_type` VARCHAR(20) NOT NULL,
-              `entity_name` VARCHAR(255) NOT NULL, `permissions` JSON NOT NULL
+              `id` INT AUTO_INCREMENT PRIMARY KEY,
+              `entity_id` VARCHAR(50) NOT NULL UNIQUE,
+              `entity_type` VARCHAR(20) NOT NULL,
+              `entity_name` VARCHAR(255) NOT NULL,
+              `permissions` JSON NOT NULL
             ) ENGINE=InnoDB
         """)
         logger.info("Table 'access_rights' is ready.")
 
+        # =====================================================================
+        # НОВОЕ: Таблица пользовательских меток UTM
+        # =====================================================================
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `utm_labels` (
+              `id` INT AUTO_INCREMENT PRIMARY KEY,
+              `utm_type` VARCHAR(50) NOT NULL COMMENT 'utm_campaign или utm_content',
+              `utm_value` VARCHAR(255) NOT NULL COMMENT 'Исходное значение UTM-параметра',
+              `custom_name` VARCHAR(255) DEFAULT NULL COMMENT 'Пользовательское отображаемое имя',
+              UNIQUE KEY `uq_utm_type_value` (`utm_type`, `utm_value`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            COMMENT='Пользовательские имена для UTM-параметров'
+        """)
+        logger.info("Table 'utm_labels' is ready.")
+
+        conn.commit()
+
     except mysql.connector.Error as err:
         logger.error(f"Error during DB initialization: {err.msg}")
-    
+
     finally:
         cursor.close()
         conn.close()
