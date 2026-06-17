@@ -925,3 +925,15 @@ body {
     justify-content: flex-end;
     flex-shrink: 0;
 }
+
+.diff-positive {
+    background-color: rgba(76, 175, 80, 0.15);
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+.diff-negative {
+    background-color: rgba(244, 67, 54, 0.15);
+    color: #c62828;
+    font-weight: 600;
+}

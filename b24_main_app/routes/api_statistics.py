@@ -11,125 +11,125 @@ LEAD_STATUS_GROUPS = {
 }
 
 def get_statistics():
-    """Собирает, обрабатывает и возвращает статистику по лидам, сделкам и счетам."""
+    """
+    Универсальная статистика:
+    group_by:
+        - source (по умолчанию)
+        - utm_campaign
+        - utm_content
+    """
+
     try:
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         source_id = request.args.get('source_id')
+        group_by = request.args.get('group_by', 'source')
 
         if not date_from or not date_to:
             return jsonify({'error': 'Date range is required'}), 400
 
-        lead_filter = {'>=DATE_CREATE': f"{date_from}T00:00:00", '<=DATE_CREATE': f"{date_to}T23:59:59"}
-        if source_id: lead_filter['SOURCE_ID'] = source_id
-        all_leads = fetch_paginated_data('crm.lead.list', {'filter': lead_filter, 'select': ['ID', 'SOURCE_ID', 'STATUS_ID', 'CONTACT_ID']})
+        # --- Определяем поле группировки ---
+        if group_by == 'utm_campaign':
+            group_field = 'UTM_CAMPAIGN'
+        elif group_by == 'utm_content':
+            group_field = 'UTM_CONTENT'
+        else:
+            group_field = 'SOURCE_ID'
+            group_by = 'source'  # если передали что-то левое
 
-        sources_result = b24_call_method('crm.status.entity.items', {'entityId': 'SOURCE'})
-        source_map = {str(s['STATUS_ID']): s['NAME'] for s in sources_result.get('result', [])}
+        # --- Фильтр лидов ---
+        lead_filter = {
+            '>=DATE_CREATE': f"{date_from}T00:00:00",
+            '<=DATE_CREATE': f"{date_to}T23:59:59"
+        }
 
-        successful_leads = [lead for lead in all_leads if lead['STATUS_ID'] == 'CONVERTED' and lead.get('CONTACT_ID')]
-        contact_ids = list(set([lead['CONTACT_ID'] for lead in successful_leads]))
+        sales_department = request.args.get('sales_department')
 
-        deals = fetch_paginated_data('crm.deal.list', {'filter': {'CONTACT_ID': contact_ids, 'CATEGORY_ID': 0}, 'select': ['ID', 'CONTACT_ID']}) if contact_ids else []
-        deal_ids = [deal['ID'] for deal in deals]
-        invoices = fetch_paginated_data('crm.invoice.list', {'filter': {'UF_DEAL_ID': deal_ids}, 'select': ['ID', 'UF_DEAL_ID', 'STATUS_ID', 'PRICE']}) if deal_ids else []
+        if sales_department:
+            lead_filter['UF_CRM_1779024295'] = sales_department
 
-        expenses_by_source = defaultdict(float)
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            query = "SELECT source_id, SUM(amount) as total_expenses FROM expenses WHERE category_val = 'marketing' AND expense_date BETWEEN %s AND %s GROUP BY source_id"
-            cursor.execute(query, (date_from, date_to))
-            for row in cursor.fetchall():
-                if row['source_id']:
-                    expenses_by_source[str(row['source_id'])] = float(row['total_expenses'])
-            cursor.close()
-            conn.close()
+        if source_id and group_by == 'source':
+            lead_filter['SOURCE_ID'] = source_id
 
-        stats_by_source = defaultdict(lambda: {
-            'total': 0, 'answered': 0, 'meeting_scheduled': 0, 'arrival': 0, 'success': 0,
-            'clients': set(), 'clients_with_payment': set(), 'deals': set(), 'deals_with_payment': set(), 'invoices_sum': 0, 'expenses': 0
+        # --- Получаем лиды ---
+        all_leads = fetch_paginated_data(
+            'crm.lead.list',
+            {
+                'filter': lead_filter,
+                'select': ['ID', 'STATUS_ID', 'CONTACT_ID', group_field]
+            }
+        )
+
+        # --- Получаем карту источников (если группировка по source) ---
+        source_map = {}
+        if group_by == 'source':
+            sources_result = b24_call_method(
+                'crm.status.entity.items',
+                {'entityId': 'SOURCE'}
+            )
+            if sources_result and sources_result.get('result'):
+                source_map = {
+                    str(s['STATUS_ID']): s['NAME']
+                    for s in sources_result['result']
+                }
+
+        # --- Группируем ---
+        stats_by_group = defaultdict(lambda: {
+            'total': 0,
+            'success': 0
         })
 
-        paid_deal_ids = {inv['UF_DEAL_ID'] for inv in invoices if inv['STATUS_ID'] == 'P'}
-        deals_by_contact = defaultdict(list)
-        for deal in deals: deals_by_contact[deal['CONTACT_ID']].append(deal)
-        
         for lead in all_leads:
-            sid = str(lead.get('SOURCE_ID', 'unknown'))
-            stats = stats_by_source[sid]
-            stats['total'] += 1
-            status_id = lead.get('STATUS_ID')
-            for group, statuses in LEAD_STATUS_GROUPS.items():
-                if status_id in statuses: stats[group] += 1
-            
-            if status_id == 'CONVERTED' and lead.get('CONTACT_ID'):
-                contact_id = lead['CONTACT_ID']
-                stats['clients'].add(contact_id)
-                contact_deals = deals_by_contact.get(contact_id, [])
-                stats['deals'].update(d['ID'] for d in contact_deals)
-                
-                for deal in contact_deals:
-                    if deal['ID'] in paid_deal_ids:
-                        stats['deals_with_payment'].add(deal['ID'])
-                        stats['clients_with_payment'].add(contact_id)
-                
-                for inv in invoices:
-                    if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
-                        stats['invoices_sum'] += float(inv.get('PRICE', 0))
+            group_value = str(lead.get(group_field) or 'unknown')
 
+            stats = stats_by_group[group_value]
+            stats['total'] += 1
+
+            if lead.get('STATUS_ID') == 'CONVERTED':
+                stats['success'] += 1
+
+        # --- Загружаем пользовательские UTM-названия ---
+        utm_label_map = {}
+
+        if group_by in ['utm_campaign', 'utm_content']:
+            conn = get_db_connection()
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+                try:
+                    cursor.execute(
+                        "SELECT utm_value, custom_name FROM utm_labels WHERE utm_type = %s",
+                        (group_by,)
+                    )
+                    rows = cursor.fetchall()
+                    utm_label_map = {
+                        row['utm_value']: row['custom_name']
+                        for row in rows
+                    }
+                finally:
+                    cursor.close()
+                    conn.close()
+
+        # --- Формируем итог ---
         final_statistics = []
-        for sid, data in stats_by_source.items():
-            data['expenses'] = expenses_by_source.get(sid, 0)
+
+        for group_value, data in stats_by_group.items():
+
+            if group_by == 'source':
+                group_name = source_map.get(group_value, f"Неизвестный ({group_value})")
+            elif group_by in ['utm_campaign', 'utm_content']:
+                group_name = utm_label_map.get(group_value, group_value)
+            else:
+                group_name = group_value
+
             final_statistics.append({
-                "source_name": source_map.get(sid, f"Неизвестный ({sid})"),
+                "group_value": group_value,
+                "group_name": group_name,
                 "total": data['total'],
-                "answered": calculate_conversion(data['answered'], data['total'], data['total']),
-                "meeting_scheduled": calculate_conversion(data['meeting_scheduled'], data['answered'], data['total']),
-                "arrival": calculate_conversion(data['arrival'], data['meeting_scheduled'], data['total']),
-                "success": calculate_conversion(data['success'], data['arrival'], data['total']),
-                "clients": len(data['clients']),
-                "clients_with_payment": calculate_conversion(len(data['clients_with_payment']), len(data['clients']), data['total']),
-                "deals": len(data['deals']),
-                "deals_with_payment": len(data['deals_with_payment']),
-                "invoices_sum": data['invoices_sum'],
-                "expenses": data['expenses'],
-                "cpl": data['expenses'] / data['total'] if data['total'] > 0 else 0,
-                "cpo": data['expenses'] / len(data['deals_with_payment']) if len(data['deals_with_payment']) > 0 else 0,
-                "romi": calculate_romi(data['invoices_sum'], data['expenses'])
+                "success": data['success']
             })
 
+        # сортировка по количеству лидов
         final_statistics.sort(key=lambda x: x['total'], reverse=True)
-        
-        if len(final_statistics) > 1:
-            summary = {
-                'total': sum(s['total'] for s in final_statistics),
-                'answered_count': sum(s['answered']['count'] for s in final_statistics),
-                'meeting_scheduled_count': sum(s['meeting_scheduled']['count'] for s in final_statistics),
-                'arrival_count': sum(s['arrival']['count'] for s in final_statistics),
-                'success_count': sum(s['success']['count'] for s in final_statistics),
-                'clients': sum(s['clients'] for s in final_statistics),
-                'clients_with_payment_count': sum(s['clients_with_payment']['count'] for s in final_statistics),
-                'deals': sum(s['deals'] for s in final_statistics),
-                'deals_with_payment': sum(s['deals_with_payment'] for s in final_statistics),
-                'invoices_sum': sum(s['invoices_sum'] for s in final_statistics),
-                'expenses': sum(s['expenses'] for s in final_statistics)
-            }
-            summary_row = {
-                "source_name": "Итого", "total": summary['total'],
-                "answered": calculate_conversion(summary['answered_count'], summary['total'], summary['total']),
-                "meeting_scheduled": calculate_conversion(summary['meeting_scheduled_count'], summary['answered_count'], summary['total']),
-                "arrival": calculate_conversion(summary['arrival_count'], summary['meeting_scheduled_count'], summary['total']),
-                "success": calculate_conversion(summary['success_count'], summary['arrival_count'], summary['total']),
-                "clients": summary['clients'],
-                "clients_with_payment": calculate_conversion(summary['clients_with_payment_count'], summary['clients'], summary['total']),
-                "deals": summary['deals'], "deals_with_payment": summary['deals_with_payment'],
-                "invoices_sum": summary['invoices_sum'], "expenses": summary['expenses'],
-                "cpl": summary['expenses'] / summary['total'] if summary['total'] > 0 else 0,
-                "cpo": summary['expenses'] / summary['deals_with_payment'] if summary['deals_with_payment'] > 0 else 0,
-                "romi": calculate_romi(summary['invoices_sum'], summary['expenses'])
-            }
-            final_statistics.append(summary_row)
 
         return jsonify(final_statistics)
 
@@ -142,3 +142,389 @@ def calculate_conversion(current, prev, total):
 
 def calculate_romi(revenue, expenses):
     return ((revenue - expenses) / expenses * 100) if expenses > 0 else 0
+
+def get_utm_values():
+    """
+    Возвращает список всех найденных utm_campaign или utm_content
+    вместе с пользовательскими названиями (если заданы)
+    """
+
+    try:
+        utm_type = request.args.get('utm_type')
+
+        if utm_type not in ['utm_campaign', 'utm_content']:
+            return jsonify({'error': 'Invalid utm_type'}), 400
+
+        field_name = 'UTM_CAMPAIGN' if utm_type == 'utm_campaign' else 'UTM_CONTENT'
+
+        # --- Получаем все лиды ---
+        leads = fetch_paginated_data(
+            'crm.lead.list',
+            {
+                'select': [field_name],
+                'filter': {}
+            }
+        )
+
+        # --- Собираем уникальные значения ---
+        utm_values = set()
+
+        for lead in leads:
+            value = lead.get(field_name)
+            if value:
+                utm_values.add(value)
+
+        utm_values = sorted(list(utm_values))
+
+        # --- Загружаем пользовательские названия ---
+        conn = get_db_connection()
+        label_map = {}
+
+        if conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                cursor.execute(
+                    "SELECT utm_value, custom_name FROM utm_labels WHERE utm_type=%s",
+                    (utm_type,)
+                )
+                rows = cursor.fetchall()
+                label_map = {
+                    row['utm_value']: row['custom_name']
+                    for row in rows
+                }
+            finally:
+                cursor.close()
+                conn.close()
+
+        # --- Формируем ответ ---
+        result = []
+
+        for value in utm_values:
+            result.append({
+                "utm_value": value,
+                "custom_name": label_map.get(value, "")
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_utm_values: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def save_utm_label():
+    """
+    Сохраняет или обновляет пользовательское название UTM
+    """
+
+    try:
+        data = request.get_json()
+
+        utm_type = data.get('utm_type')
+        utm_value = data.get('utm_value')
+        custom_name = data.get('custom_name')
+
+        if not utm_type or not utm_value:
+            return jsonify({'error': 'utm_type and utm_value required'}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'error': 'DB connection failed'}), 500
+
+        cursor = conn.cursor()
+
+        query = """
+            INSERT INTO utm_labels (utm_type, utm_value, custom_name)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE custom_name = VALUES(custom_name)
+        """
+
+        cursor.execute(query, (utm_type, utm_value, custom_name))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        current_app.logger.error(f"Error in save_utm_label: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def get_sales_departments():
+    """
+    Возвращает список всех значений пользовательского поля UF_CRM_1779024295
+    """
+
+    try:
+        response = b24_call_method(
+            'crm.lead.userfield.get',
+            {'id': 'UF_CRM_1779024295'}
+        )
+
+        if not response or not response.get('result'):
+            return jsonify([])
+
+        field = response['result']
+        items = field.get('LIST', [])
+
+        result = []
+
+        for item in items:
+            result.append({
+                "id": item['ID'],
+                "name": item['VALUE']
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_sales_departments: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def get_statistics_details():
+    """
+    Возвращает список лидов для выбранной группы
+    """
+
+    try:
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        group_by = request.args.get('group_by', 'source')
+        group_value = request.args.get('group_value')
+
+        if not date_from or not date_to or not group_value:
+            return jsonify({'error': 'Missing parameters'}), 400
+
+        # Определяем поле группировки
+        if group_by == 'utm_campaign':
+            group_field = 'UTM_CAMPAIGN'
+        elif group_by == 'utm_content':
+            group_field = 'UTM_CONTENT'
+        else:
+            group_field = 'SOURCE_ID'
+
+        lead_filter = {
+            '>=DATE_CREATE': f"{date_from}T00:00:00",
+            '<=DATE_CREATE': f"{date_to}T23:59:59",
+            group_field: group_value
+        }
+
+        leads = fetch_paginated_data(
+            'crm.lead.list',
+            {
+                'filter': lead_filter,
+                'select': ['ID', 'TITLE']
+            }
+        )
+
+        result = []
+
+        for lead in leads:
+            result.append({
+                "id": lead['ID'],
+                "title": lead.get('TITLE', f"Лид #{lead['ID']}")
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_statistics_details: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def get_statistics_comparison():
+
+    try:
+        year = request.args.get('year')
+        group_by = request.args.get('group_by', 'source')
+        metrics = request.args.getlist('metrics')
+        period_type = request.args.get('period_type', 'month')
+
+        if not year:
+            return jsonify({'error': 'Year required'}), 400
+
+        year = int(year)
+
+        # Определяем поле группировки
+        if group_by == 'utm_campaign':
+            group_field = 'UTM_CAMPAIGN'
+        elif group_by == 'utm_content':
+            group_field = 'UTM_CONTENT'
+        else:
+            group_field = 'SOURCE_ID'
+
+        stats = {}
+
+        for month in range(1, 13):
+
+            from datetime import datetime, timedelta
+
+            stats = {}
+
+            if period_type == 'week':
+
+                # Получаем первую неделю года
+                current = datetime(year, 1, 1)
+
+                week_index = 1
+
+                while current.year == year:
+
+                    week_start = current - timedelta(days=current.weekday())
+                    week_end = week_start + timedelta(days=6)
+
+                    date_from = week_start.strftime("%Y-%m-%d")
+                    date_to = week_end.strftime("%Y-%m-%d")
+
+                    lead_filter = {
+                        '>=DATE_CREATE': f"{date_from}T00:00:00",
+                        '<=DATE_CREATE': f"{date_to}T23:59:59"
+                    }
+
+                    leads = fetch_paginated_data(
+                        'crm.lead.list',
+                        {
+                            'filter': lead_filter,
+                            'select': ['ID', 'STATUS_ID', group_field]
+                        }
+                    )
+
+                    week_data = {}
+
+                    for lead in leads:
+                        group_value = str(lead.get(group_field) or 'unknown')
+
+                        if group_value not in week_data:
+                            week_data[group_value] = {
+                                "total": 0,
+                                "answered": 0,
+                                "meeting_scheduled": 0,
+                                "arrival": 0,
+                                "success": 0
+                            }
+
+                        week_data[group_value]["total"] += 1
+
+                        status = lead.get('STATUS_ID')
+
+                        for key, statuses in LEAD_STATUS_GROUPS.items():
+                            if status in statuses:
+                                week_data[group_value][key] += 1
+
+                    stats[week_index] = week_data
+
+                    current += timedelta(days=7)
+                    week_index += 1
+
+            else:
+                # ===== МЕСЯЦЫ =====
+
+                for month in range(1, 13):
+
+                    date_from = f"{year}-{str(month).zfill(2)}-01"
+
+                    if month == 12:
+                        date_to = f"{year}-12-31"
+                    else:
+                        next_month = month + 1
+                        date_to = f"{year}-{str(next_month).zfill(2)}-01"
+
+                    lead_filter = {
+                        '>=DATE_CREATE': f"{date_from}T00:00:00",
+                        '<=DATE_CREATE': f"{date_to}T23:59:59"
+                    }
+
+                    leads = fetch_paginated_data(
+                        'crm.lead.list',
+                        {
+                            'filter': lead_filter,
+                            'select': ['ID', 'STATUS_ID', group_field]
+                        }
+                    )
+
+                    month_data = {}
+
+                    for lead in leads:
+
+                        group_value = str(lead.get(group_field) or 'unknown')
+
+                        if group_value not in month_data:
+                            month_data[group_value] = {
+                                "total": 0,
+                                "answered": 0,
+                                "meeting_scheduled": 0,
+                                "arrival": 0,
+                                "success": 0
+                            }
+
+                        month_data[group_value]["total"] += 1
+
+                        status = lead.get('STATUS_ID')
+
+                        for key, statuses in LEAD_STATUS_GROUPS.items():
+                            if status in statuses:
+                                month_data[group_value][key] += 1
+
+                    for group_value, data in month_data.items():
+                        total = data["total"]
+
+                        data["total"] = {
+                            "count": total
+                        }
+
+                        data["answered"] = calculate_conversion(
+                            data["answered"],
+                            total,
+                            total
+                        )
+
+                        data["meeting_scheduled"] = calculate_conversion(
+                            data["meeting_scheduled"],
+                            data["answered"]["count"],
+                            total
+                        )
+
+                        data["arrival"] = calculate_conversion(
+                            data["arrival"],
+                            data["meeting_scheduled"]["count"],
+                            total
+                        )
+
+                        data["success"] = calculate_conversion(
+                            data["success"],
+                            data["arrival"]["count"],
+                            total
+                        )
+
+                    stats[month] = month_data
+
+        # Собираем все группы
+        all_groups = set()
+        for month_data in stats.values():
+            for group in month_data.keys():
+                all_groups.add(group)
+
+        result = []
+
+        for group in all_groups:
+
+            row = {
+                "group_value": group,
+                "values": {}
+            }
+
+            for month in range(1, 13):
+                row["values"][month] = stats.get(month, {}).get(group, {
+                    "total": 0,
+                    "answered": 0,
+                    "meeting_scheduled": 0,
+                    "arrival": 0,
+                    "success": 0
+                })
+
+            result.append(row)
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_statistics_comparison: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
