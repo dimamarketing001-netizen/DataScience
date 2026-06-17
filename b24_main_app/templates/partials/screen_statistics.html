@@ -32,7 +32,7 @@
                                 <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
                             </div>
 
-                            <!-- Источник (мультивыбор + исключения) -->
+                            <!-- Источник -->
                             <div class="multi-filter-wrap">
                                 <div class="multi-filter-label">Источник</div>
                                 <div class="multi-filter-box" id="stats-source-box">
@@ -50,11 +50,11 @@
                                 <div class="multi-filter-tags" id="stats-source-tags"></div>
                             </div>
 
-                            <!-- Отдел продаж (мультивыбор + исключения) -->
+                            <!-- Отдел продаж -->
                             <div class="multi-filter-wrap">
                                 <div class="multi-filter-label">Отдел продаж</div>
                                 <div class="multi-filter-box" id="stats-dept-box">
-                                    <div class="multi-filter-placeholder">Все отделы</div>
+                                    <div class="multi-filter-placeholder">Не выбрано</div>
                                     <div class="multi-filter-dropdown" id="stats-dept-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
                                             <input type="text" class="multi-filter-search" placeholder="Поиск...">
@@ -78,7 +78,27 @@
                                 </select>
                             </div>
 
+                            <!-- Режим периода -->
+                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                                <select id="stats-period-mode" class="ui-ctl-element">
+                                    <option value="standard">Стандартный режим</option>
+                                    <option value="strict">В разрезе периода</option>
+                                </select>
+                            </div>
+
                         </div>
+
+                        <!-- Подсказка режима -->
+                        <div id="stats-period-mode-hint" class="period-mode-hint" style="display:none;">
+                            <span class="period-mode-hint-icon">ℹ️</span>
+                            <span class="period-mode-hint-text">
+                                <b>Режим «В разрезе периода»:</b> учитываются только те лиды, у которых
+                                дата изменения статуса попадает в указанный период.
+                                Сделки и счета также фильтруются по дате создания в этом периоде.
+                            </span>
+                        </div>
+
                     </div>
                 </div>
                 <div class="ui-form-row ui-form-row-bottom-buttons">
@@ -134,7 +154,16 @@
                                 </select>
                             </div>
 
-                            <!-- Значения группировки (мультивыбор) -->
+                            <!-- Режим периода -->
+                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                                <select id="cmp-period-mode" class="ui-ctl-element">
+                                    <option value="standard">Стандартный режим</option>
+                                    <option value="strict">В разрезе периода</option>
+                                </select>
+                            </div>
+
+                            <!-- Значения группировки -->
                             <div class="multi-filter-wrap" id="cmp-group-value-wrap" style="display:none;">
                                 <div class="multi-filter-label">Значение группировки</div>
                                 <div class="multi-filter-box" id="cmp-group-value-box">
@@ -152,11 +181,11 @@
                                 <div class="multi-filter-tags" id="cmp-group-value-tags"></div>
                             </div>
 
-                            <!-- Отдел продаж (мультивыбор) -->
+                            <!-- Отдел продаж -->
                             <div class="multi-filter-wrap">
                                 <div class="multi-filter-label">Отдел продаж</div>
                                 <div class="multi-filter-box" id="cmp-dept-box">
-                                    <div class="multi-filter-placeholder">Все отделы</div>
+                                    <div class="multi-filter-placeholder">Не выбрано</div>
                                     <div class="multi-filter-dropdown" id="cmp-dept-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
                                             <input type="text" class="multi-filter-search" placeholder="Поиск...">
@@ -172,14 +201,28 @@
 
                         </div>
 
+                        <!-- Подсказка режима (сравнение) -->
+                        <div id="cmp-period-mode-hint" class="period-mode-hint" style="display:none;">
+                            <span class="period-mode-hint-icon">ℹ️</span>
+                            <span class="period-mode-hint-text">
+                                <b>Режим «В разрезе периода»:</b> для каждого периода учитываются
+                                только лиды с датой изменения статуса в этом периоде,
+                                а также сделки и счета, созданные в этом периоде.
+                            </span>
+                        </div>
+
                         <!-- Выбор показателей -->
                         <div class="stats-metrics-picker">
                             <div class="stats-metrics-header">
                                 <span class="stats-metrics-label">Показатели:</span>
-                                <button type="button" id="cmp-select-all-metrics" class="ui-btn ui-btn-light-border" style="padding:4px 12px; font-size:12px;">
+                                <button type="button" id="cmp-select-all-metrics"
+                                        class="ui-btn ui-btn-light-border"
+                                        style="padding:4px 12px; font-size:12px;">
                                     Выбрать все
                                 </button>
-                                <button type="button" id="cmp-clear-all-metrics" class="ui-btn ui-btn-light-border" style="padding:4px 12px; font-size:12px;">
+                                <button type="button" id="cmp-clear-all-metrics"
+                                        class="ui-btn ui-btn-light-border"
+                                        style="padding:4px 12px; font-size:12px;">
                                     Снять все
                                 </button>
                             </div>
@@ -224,7 +267,8 @@
                     <thead id="comparison-table-head"></thead>
                     <tbody id="comparison-table-body"></tbody>
                 </table>
-                <div id="comparison-empty" style="display:none; padding:24px; color:#828b95; text-align:center;">
+                <div id="comparison-empty"
+                     style="display:block; padding:24px; color:#828b95; text-align:center;">
                     Настройте фильтры и нажмите «Построить».
                 </div>
             </div>
@@ -244,7 +288,8 @@
                 </p>
 
                 <form id="utm-label-form" class="ui-form" style="margin-bottom:20px;">
-                    <div class="filter-grid" style="grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:end;">
+                    <div class="filter-grid"
+                         style="grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:end;">
                         <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                             <select id="utm-label-type" class="ui-ctl-element">
@@ -253,12 +298,15 @@
                             </select>
                         </div>
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="utm-label-value" class="ui-ctl-element" placeholder="Значение UTM...">
+                            <input type="text" id="utm-label-value" class="ui-ctl-element"
+                                   placeholder="Значение UTM...">
                         </div>
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="utm-label-name" class="ui-ctl-element" placeholder="Пользовательское имя...">
+                            <input type="text" id="utm-label-name" class="ui-ctl-element"
+                                   placeholder="Пользовательское имя...">
                         </div>
-                        <button type="submit" class="ui-btn ui-btn-primary" style="white-space:nowrap;">Сохранить</button>
+                        <button type="submit" class="ui-btn ui-btn-primary"
+                                style="white-space:nowrap;">Сохранить</button>
                     </div>
                 </form>
 
@@ -273,7 +321,10 @@
                             </tr>
                         </thead>
                         <tbody id="utm-labels-body">
-                            <tr><td colspan="4" style="text-align:center;color:#828b95;">Загрузка...</td></tr>
+                            <tr>
+                                <td colspan="4"
+                                    style="text-align:center; color:#828b95;">Загрузка...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

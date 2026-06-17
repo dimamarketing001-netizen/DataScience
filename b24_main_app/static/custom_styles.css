@@ -991,6 +991,7 @@ body {
     color: #535c69;
     transition: border-color 0.2s;
     user-select: none;
+    box-sizing: border-box;
 }
 
 .multi-filter-box:hover {
@@ -1155,7 +1156,6 @@ body {
     background: #f0f0f0;
 }
 
-/* Теги выбранных значений */
 .multi-filter-tags {
     display: flex;
     flex-wrap: wrap;
@@ -1252,18 +1252,21 @@ body {
     text-decoration: underline;
     text-underline-offset: 2px;
     cursor: pointer;
+    font-weight: 600;
 }
 
 .clickable-cell:hover .cell-value {
     color: #0a58a6;
 }
 
+/* Конверсия — без подчёркивания, серая, inline */
 .conversion-percent {
     color: #828b95;
     font-size: 12px;
-    margin-left: 4px;
+    margin-left: 3px;
     display: inline;
     text-decoration: none !important;
+    white-space: nowrap;
 }
 
 /* ===================================================================
@@ -1318,6 +1321,35 @@ body {
 .stats-filter-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     align-items: start;
+}
+
+/* ===================================================================
+   РЕЖИМ ПЕРИОДА — ПОДСКАЗКА
+   =================================================================== */
+
+.period-mode-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: #fffbe6;
+    border: 1px solid #ffe58f;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #7c5500;
+    line-height: 1.5;
+}
+
+.period-mode-hint-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.period-mode-hint-text b {
+    font-weight: 700;
+    color: #5c3d00;
 }
 
 /* ===================================================================
@@ -1380,23 +1412,24 @@ body {
 }
 
 /* ===================================================================
-   СРАВНЕНИЕ: ТАБЛИЦА
+   СРАВНЕНИЕ: ТАБЛИЦА — СТРУКТУРА
    =================================================================== */
 
 .cmp-table {
     min-width: 900px;
     border-collapse: separate;
     border-spacing: 0;
+    table-layout: auto;
 }
 
 .cmp-table th,
 .cmp-table td {
     border: 1px solid #eef2f4;
-    padding: 0;
     vertical-align: top;
+    padding: 0;
 }
 
-/* Заголовок группировки (sticky) */
+/* Заголовок группировки (sticky, первый столбец) */
 .cmp-th-group {
     background: #f0f5fa;
     font-size: 13px;
@@ -1405,11 +1438,12 @@ body {
     padding: 10px 14px;
     text-align: left;
     white-space: nowrap;
-    min-width: 160px;
+    min-width: 140px;
     position: sticky;
     left: 0;
     z-index: 4;
     border-right: 2px solid #aed5ff;
+    vertical-align: middle;
 }
 
 /* Заголовок периода */
@@ -1430,33 +1464,34 @@ body {
     font-size: 11px;
     font-weight: 600;
     color: #828b95;
-    padding: 6px 10px;
+    padding: 6px 8px;
     text-align: center;
     white-space: nowrap;
-    min-width: 110px;
+    min-width: 100px;
 }
 
-/* Ячейка группировки в теле */
+/* Ячейка группировки в теле таблицы */
 .cmp-td-group {
     background: #fff;
     font-size: 13px;
     font-weight: 600;
     color: #333;
-    padding: 10px 14px;
+    padding: 0 14px;
     white-space: nowrap;
-    vertical-align: middle;
     position: sticky;
     left: 0;
     z-index: 2;
     border-right: 2px solid #aed5ff;
+    vertical-align: middle;
+    min-height: 60px;
 }
 
 /* Ячейка данных */
 .cmp-td {
-    padding: 8px 10px;
+    padding: 0;
     text-align: center;
     vertical-align: top;
-    min-width: 110px;
+    min-width: 100px;
     background: #fff;
 }
 
@@ -1472,30 +1507,59 @@ body {
     background: #f0f5fa;
 }
 
-/* Значение в ячейке */
-.cmp-cell-value {
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-    line-height: 1.3;
-    white-space: nowrap;
+/* ===================================================================
+   СРАВНЕНИЕ: СОДЕРЖИМОЕ ЯЧЕЙКИ
+   Значение + конверсия inline, плашки по центру под ними
+   =================================================================== */
+
+/* Обёртка всего содержимого ячейки */
+.cmp-cell-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 8px 6px 6px;
+    gap: 4px;
+    min-height: 54px;
 }
 
-/* Конверсия под значением */
-.cmp-td .conversion-percent {
-    display: block;
-    margin-left: 0;
-    margin-top: 2px;
+/* Верхняя строка: значение + конверсия inline */
+.cmp-cell-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 0;
+    width: 100%;
     text-align: center;
 }
 
-/* Контейнер плашек */
+/* Само значение */
+.cmp-cell-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #222;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+/* Конверсия рядом со значением — как в общей статистике */
+.cmp-cell-top .conversion-percent {
+    font-size: 11px;
+    color: #9aabb8;
+    margin-left: 3px;
+    white-space: nowrap;
+    display: inline;
+}
+
+/* Контейнер плашек — по центру */
 .cmp-cell-badges {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 3px;
-    margin-top: 5px;
+    width: 100%;
 }
 
 /* ===================================================================
@@ -1505,13 +1569,15 @@ body {
 .cmp-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    justify-content: center;
+    gap: 2px;
     padding: 2px 8px;
     border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
-    line-height: 1.4;
+    line-height: 1.5;
+    text-align: center;
 }
 
 /* Рост — зелёный */
@@ -1535,10 +1601,9 @@ body {
     border: 1px solid #ddd;
 }
 
-/* Плашка конверсии — чуть прозрачнее */
+/* Плашка конверсии — чуть меньше */
 .cmp-badge-conv {
     font-size: 10px;
-    opacity: 0.9;
     padding: 1px 7px;
 }
 
@@ -1667,7 +1732,7 @@ body {
 }
 
 /* ===================================================================
-   ТАБЛИЦА СРАВНЕНИЯ: ДЕЛЬТА ЦВЕТОВ (legacy)
+   ТАБЛИЦА СРАВНЕНИЯ: ЦВЕТА ДЕЛЬТ (совместимость)
    =================================================================== */
 
 .cmp-delta-pos {
@@ -1694,12 +1759,16 @@ body {
     }
 
     .cmp-th-metric {
-        min-width: 90px;
+        min-width: 80px;
         font-size: 10px;
     }
 
     .cmp-td {
-        min-width: 90px;
+        min-width: 80px;
+    }
+
+    .cmp-cell-value {
+        font-size: 13px;
     }
 }
 
@@ -1730,6 +1799,10 @@ body {
     .stats-metrics-col {
         min-width: 120px;
     }
+
+    .period-mode-hint {
+        font-size: 12px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1750,5 +1823,10 @@ body {
     .cmp-badge {
         font-size: 10px;
         padding: 1px 6px;
+    }
+
+    .cmp-cell-inner {
+        padding: 6px 4px 4px;
+        min-height: 44px;
     }
 }
