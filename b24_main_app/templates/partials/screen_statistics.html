@@ -17,36 +17,58 @@
         <!-- ===================== ВКЛАДКА: ОБЩАЯ СТАТИСТИКА ===================== -->
         <div class="stats-tab-content active" id="stats-tab-general">
 
-            <!-- Фильтры -->
             <form id="statistics-filter-form" class="ui-form filter-form">
                 <div class="ui-form-row">
                     <div class="ui-form-content">
                         <div class="filter-grid stats-filter-grid">
 
+                            <!-- Дата от -->
                             <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
                                 <input type="text" id="stats-start-date" class="ui-ctl-element" placeholder="Дата от...">
                             </div>
 
+                            <!-- Дата до -->
                             <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
                                 <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
                             </div>
 
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="stats-source-filter" class="ui-ctl-element">
-                                    <option value="">Все источники</option>
-                                </select>
+                            <!-- Источник (мультивыбор + исключения) -->
+                            <div class="multi-filter-wrap">
+                                <div class="multi-filter-label">Источник</div>
+                                <div class="multi-filter-box" id="stats-source-box">
+                                    <div class="multi-filter-placeholder">Все источники</div>
+                                    <div class="multi-filter-dropdown" id="stats-source-dropdown" style="display:none;">
+                                        <div class="multi-filter-search-wrap">
+                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                        </div>
+                                        <div class="multi-filter-options" id="stats-source-options"></div>
+                                        <div class="multi-filter-footer">
+                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="multi-filter-tags" id="stats-source-tags"></div>
                             </div>
 
-                            <!-- НОВОЕ: Фильтр по отделу продаж -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="stats-sales-dept-filter" class="ui-ctl-element">
-                                    <option value="">Все отделы</option>
-                                </select>
+                            <!-- Отдел продаж (мультивыбор + исключения) -->
+                            <div class="multi-filter-wrap">
+                                <div class="multi-filter-label">Отдел продаж</div>
+                                <div class="multi-filter-box" id="stats-dept-box">
+                                    <div class="multi-filter-placeholder">Все отделы</div>
+                                    <div class="multi-filter-dropdown" id="stats-dept-dropdown" style="display:none;">
+                                        <div class="multi-filter-search-wrap">
+                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                        </div>
+                                        <div class="multi-filter-options" id="stats-dept-options"></div>
+                                        <div class="multi-filter-footer">
+                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="multi-filter-tags" id="stats-dept-tags"></div>
                             </div>
 
-                            <!-- НОВОЕ: Группировка -->
+                            <!-- Группировка -->
                             <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="stats-grouping-filter" class="ui-ctl-element">
@@ -68,13 +90,11 @@
             </form>
 
             <!-- Таблица -->
-            <div class="ui-card" style="margin-top: 0; padding: 0;">
-                <div class="expenses-table-container">
-                    <table class="expenses-table">
-                        <thead id="statistics-table-head"></thead>
-                        <tbody id="statistics-table-body"></tbody>
-                    </table>
-                </div>
+            <div class="expenses-table-container">
+                <table class="expenses-table">
+                    <thead id="statistics-table-head"></thead>
+                    <tbody id="statistics-table-body"></tbody>
+                </table>
             </div>
 
         </div><!-- /stats-tab-general -->
@@ -82,11 +102,11 @@
         <!-- ===================== ВКЛАДКА: СРАВНЕНИЕ ===================== -->
         <div class="stats-tab-content" id="stats-tab-comparison">
 
-            <!-- Фильтры сравнения -->
             <form id="comparison-filter-form" class="ui-form filter-form">
                 <div class="ui-form-row">
                     <div class="ui-form-content">
-                        <div class="filter-grid stats-filter-grid">
+
+                        <div class="filter-grid stats-filter-grid" style="margin-bottom:12px;">
 
                             <!-- Год -->
                             <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
@@ -107,54 +127,89 @@
                             <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="cmp-grouping" class="ui-ctl-element">
-                                    <option value="">Все (без группировки)</option>
+                                    <option value="">Без группировки</option>
                                     <option value="source">По источникам</option>
                                     <option value="utm_campaign">По utm_campaign</option>
                                     <option value="utm_content">По utm_content</option>
                                 </select>
                             </div>
 
-                            <!-- Значение группировки -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100" id="cmp-group-value-wrap" style="display:none;">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="cmp-group-value" class="ui-ctl-element">
-                                    <option value="">Все</option>
-                                </select>
+                            <!-- Значения группировки (мультивыбор) -->
+                            <div class="multi-filter-wrap" id="cmp-group-value-wrap" style="display:none;">
+                                <div class="multi-filter-label">Значение группировки</div>
+                                <div class="multi-filter-box" id="cmp-group-value-box">
+                                    <div class="multi-filter-placeholder">Все</div>
+                                    <div class="multi-filter-dropdown" id="cmp-group-value-dropdown" style="display:none;">
+                                        <div class="multi-filter-search-wrap">
+                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                        </div>
+                                        <div class="multi-filter-options" id="cmp-group-value-options"></div>
+                                        <div class="multi-filter-footer">
+                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="multi-filter-tags" id="cmp-group-value-tags"></div>
                             </div>
 
-                            <!-- Фильтр по отделу продаж -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="cmp-sales-dept" class="ui-ctl-element">
-                                    <option value="">Все отделы</option>
-                                </select>
+                            <!-- Отдел продаж (мультивыбор) -->
+                            <div class="multi-filter-wrap">
+                                <div class="multi-filter-label">Отдел продаж</div>
+                                <div class="multi-filter-box" id="cmp-dept-box">
+                                    <div class="multi-filter-placeholder">Все отделы</div>
+                                    <div class="multi-filter-dropdown" id="cmp-dept-dropdown" style="display:none;">
+                                        <div class="multi-filter-search-wrap">
+                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                        </div>
+                                        <div class="multi-filter-options" id="cmp-dept-options"></div>
+                                        <div class="multi-filter-footer">
+                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="multi-filter-tags" id="cmp-dept-tags"></div>
                             </div>
 
                         </div>
 
                         <!-- Выбор показателей -->
                         <div class="stats-metrics-picker">
-                            <div class="stats-metrics-label">Показатели:</div>
+                            <div class="stats-metrics-header">
+                                <span class="stats-metrics-label">Показатели:</span>
+                                <button type="button" id="cmp-select-all-metrics" class="ui-btn ui-btn-light-border" style="padding:4px 12px; font-size:12px;">
+                                    Выбрать все
+                                </button>
+                                <button type="button" id="cmp-clear-all-metrics" class="ui-btn ui-btn-light-border" style="padding:4px 12px; font-size:12px;">
+                                    Снять все
+                                </button>
+                            </div>
                             <div class="stats-metrics-list" id="cmp-metrics-list">
-                                <label><input type="checkbox" value="expenses" checked> Расходы</label>
-                                <label><input type="checkbox" value="total" checked> Лиды</label>
-                                <label><input type="checkbox" value="cpl" checked> CPL</label>
-                                <label><input type="checkbox" value="answered" checked> Дозвон</label>
-                                <label><input type="checkbox" value="meeting_scheduled" checked> Назначена встреча</label>
-                                <label><input type="checkbox" value="arrival" checked> Приход</label>
-                                <label><input type="checkbox" value="success" checked> Успех</label>
-                                <label><input type="checkbox" value="clients" checked> Клиенты</label>
-                                <label><input type="checkbox" value="clients_with_payment" checked> Клиенты с оплатой</label>
-                                <label><input type="checkbox" value="deals" checked> Сделки</label>
-                                <label><input type="checkbox" value="deals_with_payment" checked> Сделки с оплатой</label>
-                                <label><input type="checkbox" value="cpo" checked> CPO</label>
-                                <label><input type="checkbox" value="invoices_sum" checked> Сумма счетов</label>
-                                <label><input type="checkbox" value="romi" checked> ROMI</label>
+                                <div class="stats-metrics-col">
+                                    <label><input type="checkbox" value="expenses"> Расходы</label>
+                                    <label><input type="checkbox" value="total"> Лиды</label>
+                                    <label><input type="checkbox" value="cpl"> CPL</label>
+                                    <label><input type="checkbox" value="answered"> Дозвон</label>
+                                    <label><input type="checkbox" value="meeting_scheduled"> Назначена встреча</label>
+                                </div>
+                                <div class="stats-metrics-col">
+                                    <label><input type="checkbox" value="arrival"> Приход</label>
+                                    <label><input type="checkbox" value="success"> Успех</label>
+                                    <label><input type="checkbox" value="clients"> Клиенты</label>
+                                    <label><input type="checkbox" value="clients_with_payment"> Клиенты с оплатой</label>
+                                    <label><input type="checkbox" value="deals"> Сделки</label>
+                                </div>
+                                <div class="stats-metrics-col">
+                                    <label><input type="checkbox" value="deals_with_payment"> Сделки с оплатой</label>
+                                    <label><input type="checkbox" value="cpo"> CPO</label>
+                                    <label><input type="checkbox" value="invoices_sum"> Сумма счетов</label>
+                                    <label><input type="checkbox" value="romi"> ROMI</label>
+                                </div>
                             </div>
                         </div>
 
                     </div>
                 </div>
+
                 <div class="ui-form-row ui-form-row-bottom-buttons">
                     <div class="ui-form-content">
                         <button type="submit" class="ui-btn ui-btn-primary">Построить</button>
@@ -164,13 +219,13 @@
             </form>
 
             <!-- Таблица сравнения -->
-            <div class="expenses-table-container" style="margin-top: 16px;">
-                <table class="expenses-table" id="comparison-table">
+            <div class="expenses-table-container" style="margin-top:16px;">
+                <table class="expenses-table cmp-table" id="comparison-table">
                     <thead id="comparison-table-head"></thead>
                     <tbody id="comparison-table-body"></tbody>
                 </table>
-                <div id="comparison-empty" style="display:none; padding: 20px; color: #828b95; text-align:center;">
-                    Нет данных для отображения. Настройте фильтры и нажмите «Построить».
+                <div id="comparison-empty" style="display:none; padding:24px; color:#828b95; text-align:center;">
+                    Настройте фильтры и нажмите «Построить».
                 </div>
             </div>
 
@@ -179,19 +234,17 @@
         <!-- ===================== ВКЛАДКА: НАСТРОЙКИ ===================== -->
         <div class="stats-tab-content" id="stats-tab-settings">
 
-            <div style="margin-bottom: 24px;">
-                <div class="ui-form-title-text" style="font-size: 16px; margin-bottom: 12px;">
+            <div style="margin-bottom:24px;">
+                <div class="ui-form-title-text" style="font-size:16px; margin-bottom:12px;">
                     Пользовательские имена UTM-параметров
                 </div>
-                <p style="color: #828b95; font-size: 13px; margin-bottom: 16px;">
+                <p style="color:#828b95; font-size:13px; margin-bottom:16px;">
                     Задайте читаемые названия для значений utm_campaign и utm_content.
                     Если имя не задано — отображается исходное значение.
                 </p>
 
-                <!-- Форма добавления -->
-                <form id="utm-label-form" class="ui-form" style="margin-bottom: 20px;">
-                    <div class="filter-grid" style="grid-template-columns: 1fr 1fr 2fr auto; gap: 10px; align-items: end;">
-
+                <form id="utm-label-form" class="ui-form" style="margin-bottom:20px;">
+                    <div class="filter-grid" style="grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:end;">
                         <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                             <select id="utm-label-type" class="ui-ctl-element">
@@ -199,23 +252,16 @@
                                 <option value="utm_content">utm_content</option>
                             </select>
                         </div>
-
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
                             <input type="text" id="utm-label-value" class="ui-ctl-element" placeholder="Значение UTM...">
                         </div>
-
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
                             <input type="text" id="utm-label-name" class="ui-ctl-element" placeholder="Пользовательское имя...">
                         </div>
-
-                        <button type="submit" class="ui-btn ui-btn-primary" style="white-space: nowrap;">
-                            Сохранить
-                        </button>
-
+                        <button type="submit" class="ui-btn ui-btn-primary" style="white-space:nowrap;">Сохранить</button>
                     </div>
                 </form>
 
-                <!-- Таблица меток -->
                 <div class="expenses-table-container">
                     <table class="expenses-table" id="utm-labels-table">
                         <thead>
@@ -223,33 +269,30 @@
                                 <th>Тип</th>
                                 <th>Значение UTM</th>
                                 <th>Пользовательское имя</th>
-                                <th style="width: 80px; text-align: center;">Действия</th>
+                                <th style="width:80px; text-align:center;">Действия</th>
                             </tr>
                         </thead>
                         <tbody id="utm-labels-body">
-                            <tr>
-                                <td colspan="4" style="text-align:center; color:#828b95;">Загрузка...</td>
-                            </tr>
+                            <tr><td colspan="4" style="text-align:center;color:#828b95;">Загрузка...</td></tr>
                         </tbody>
                     </table>
                 </div>
-
             </div>
 
         </div><!-- /stats-tab-settings -->
 
     </div><!-- /ui-card -->
 
-    <!-- ===================== POPUP: ДЕТАЛИЗАЦИЯ ЛИДОВ ===================== -->
+    <!-- ===================== POPUP: ДЕТАЛИЗАЦИЯ ===================== -->
     <div id="leads-detail-overlay" class="modal-overlay" style="display:none;">
-        <div class="modal-content" style="width: 600px; max-width: 95%; max-height: 80vh; display: flex; flex-direction: column;">
+        <div class="modal-content leads-detail-modal">
             <div class="file-viewer-header">
                 <div class="file-viewer-title" id="leads-detail-title">Детализация</div>
                 <button class="file-viewer-close" id="leads-detail-close">✕</button>
             </div>
-            <div style="overflow-y: auto; flex: 1; padding: 16px;">
+            <div class="leads-detail-body">
                 <div id="leads-detail-content">
-                    <div style="text-align:center; padding: 20px; color: #828b95;">Загрузка...</div>
+                    <div style="text-align:center; padding:20px; color:#828b95;">Загрузка...</div>
                 </div>
             </div>
         </div>
