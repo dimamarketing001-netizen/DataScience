@@ -11,6 +11,7 @@ LEAD_STATUS_GROUPS = {
 }
 
 SALES_DEPT_FIELD = "UF_CRM_1779024295"
+B24_PORTAL = "https://b24-p41gmg.bitrix24.ru"
 
 
 # =====================================================================
@@ -27,18 +28,8 @@ def get_statistics():
             return jsonify({'error': 'Date range is required'}), 400
 
         lead_filter = {'>=DATE_CREATE': f"{date_from}T00:00:00", '<=DATE_CREATE': f"{date_to}T23:59:59"}
-        if source_id:
-            lead_filter['SOURCE_ID'] = source_id
-
-        # Фильтр по отделу продаж (новое, добавлено поверх)
-        sales_dept = request.args.get('sales_dept')
-        if sales_dept:
-            lead_filter[SALES_DEPT_FIELD] = sales_dept
-
-        all_leads = fetch_paginated_data('crm.lead.list', {
-            'filter': lead_filter,
-            'select': ['ID', 'SOURCE_ID', 'STATUS_ID', 'CONTACT_ID', 'UTM_CAMPAIGN', 'UTM_CONTENT', SALES_DEPT_FIELD]
-        })
+        if source_id: lead_filter['SOURCE_ID'] = source_id
+        all_leads = fetch_paginated_data('crm.lead.list', {'filter': lead_filter, 'select': ['ID', 'SOURCE_ID', 'STATUS_ID', 'CONTACT_ID']})
 
         sources_result = b24_call_method('crm.status.entity.items', {'entityId': 'SOURCE'})
         source_map = {str(s['STATUS_ID']): s['NAME'] for s in sources_result.get('result', [])}
@@ -46,16 +37,9 @@ def get_statistics():
         successful_leads = [lead for lead in all_leads if lead['STATUS_ID'] == 'CONVERTED' and lead.get('CONTACT_ID')]
         contact_ids = list(set([lead['CONTACT_ID'] for lead in successful_leads]))
 
-        deals = fetch_paginated_data('crm.deal.list', {
-            'filter': {'CONTACT_ID': contact_ids, 'CATEGORY_ID': 0},
-            'select': ['ID', 'CONTACT_ID']
-        }) if contact_ids else []
-
+        deals = fetch_paginated_data('crm.deal.list', {'filter': {'CONTACT_ID': contact_ids, 'CATEGORY_ID': 0}, 'select': ['ID', 'CONTACT_ID']}) if contact_ids else []
         deal_ids = [deal['ID'] for deal in deals]
-        invoices = fetch_paginated_data('crm.invoice.list', {
-            'filter': {'UF_DEAL_ID': deal_ids},
-            'select': ['ID', 'UF_DEAL_ID', 'STATUS_ID', 'PRICE']
-        }) if deal_ids else []
+        invoices = fetch_paginated_data('crm.invoice.list', {'filter': {'UF_DEAL_ID': deal_ids}, 'select': ['ID', 'UF_DEAL_ID', 'STATUS_ID', 'PRICE']}) if deal_ids else []
 
         expenses_by_source = defaultdict(float)
         conn = get_db_connection()
@@ -71,25 +55,20 @@ def get_statistics():
 
         stats_by_source = defaultdict(lambda: {
             'total': 0, 'answered': 0, 'meeting_scheduled': 0, 'arrival': 0, 'success': 0,
-            'clients': set(), 'clients_with_payment': set(), 'deals': set(),
-            'deals_with_payment': set(), 'invoices_sum': 0, 'expenses': 0,
-            'lead_ids': []
+            'clients': set(), 'clients_with_payment': set(), 'deals': set(), 'deals_with_payment': set(), 'invoices_sum': 0, 'expenses': 0
         })
 
         paid_deal_ids = {inv['UF_DEAL_ID'] for inv in invoices if inv['STATUS_ID'] == 'P'}
         deals_by_contact = defaultdict(list)
-        for deal in deals:
-            deals_by_contact[deal['CONTACT_ID']].append(deal)
+        for deal in deals: deals_by_contact[deal['CONTACT_ID']].append(deal)
 
         for lead in all_leads:
             sid = str(lead.get('SOURCE_ID', 'unknown'))
             stats = stats_by_source[sid]
             stats['total'] += 1
-            stats['lead_ids'].append(lead['ID'])
             status_id = lead.get('STATUS_ID')
             for group, statuses in LEAD_STATUS_GROUPS.items():
-                if status_id in statuses:
-                    stats[group] += 1
+                if status_id in statuses: stats[group] += 1
 
             if status_id == 'CONVERTED' and lead.get('CONTACT_ID'):
                 contact_id = lead['CONTACT_ID']
@@ -283,27 +262,6 @@ def delete_utm_label():
         return jsonify({'error': str(e)}), 500
 
 
-def _build_lead_filter_with_grouping(date_from, date_to, grouping, group_value, source_id, sales_dept):
-    """Вспомогательная функция: строит фильтр лида с учётом группировки."""
-    lead_filter = {
-        '>=DATE_CREATE': f"{date_from}T00:00:00",
-        '<=DATE_CREATE': f"{date_to}T23:59:59"
-    }
-    if source_id:
-        lead_filter['SOURCE_ID'] = source_id
-    if sales_dept:
-        lead_filter[SALES_DEPT_FIELD] = sales_dept
-
-    if grouping == 'source' and group_value:
-        lead_filter['SOURCE_ID'] = group_value
-    elif grouping == 'utm_campaign' and group_value:
-        lead_filter['UTM_CAMPAIGN'] = group_value
-    elif grouping == 'utm_content' and group_value:
-        lead_filter['UTM_CONTENT'] = group_value
-
-    return lead_filter
-
-
 def _load_utm_label_map(conn):
     """Загружает маппинг utm_value -> custom_name из таблицы utm_labels."""
     label_map = {}
@@ -320,18 +278,15 @@ def _load_utm_label_map(conn):
 
 def get_statistics_grouped():
     """
-    Статистика с поддержкой группировок:
-    - по источникам (source)
-    - по utm_campaign
-    - по utm_content
-    Поддерживает фильтр по отделу продаж.
+    Статистика с поддержкой группировок.
+    Теперь возвращает раздельные ID для каждого статуса/группы.
     """
     try:
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         source_id = request.args.get('source_id')
         sales_dept = request.args.get('sales_dept')
-        grouping = request.args.get('grouping', 'source')  # source | utm_campaign | utm_content
+        grouping = request.args.get('grouping', 'source')
 
         if not date_from or not date_to:
             return jsonify({'error': 'Date range is required'}), 400
@@ -351,18 +306,15 @@ def get_statistics_grouped():
                        'UTM_CAMPAIGN', 'UTM_CONTENT', SALES_DEPT_FIELD]
         })
 
-        # Загружаем карту источников
         sources_result = b24_call_method('crm.status.entity.items', {'entityId': 'SOURCE'})
         source_map = {str(s['STATUS_ID']): s['NAME'] for s in sources_result.get('result', [])}
 
-        # Загружаем UTM-метки из БД
         conn = get_db_connection()
         utm_label_map = {}
         expenses_by_key = defaultdict(float)
 
         if conn:
             utm_label_map = _load_utm_label_map(conn)
-            # Расходы группируем только по source (так хранятся в БД)
             cursor = conn.cursor(dictionary=True)
             query = """
                 SELECT source_id, SUM(amount) as total_expenses
@@ -378,7 +330,6 @@ def get_statistics_grouped():
             cursor.close()
             conn.close()
 
-        # Сделки и счета
         successful_leads = [l for l in all_leads if l['STATUS_ID'] == 'CONVERTED' and l.get('CONTACT_ID')]
         contact_ids = list(set([l['CONTACT_ID'] for l in successful_leads]))
         deals = fetch_paginated_data('crm.deal.list', {
@@ -397,7 +348,11 @@ def get_statistics_grouped():
         for deal in deals:
             deals_by_contact[deal['CONTACT_ID']].append(deal)
 
-        # Группировка
+        # contact_id -> deal_id маппинг для детализации
+        contact_to_deals = defaultdict(list)
+        for deal in deals:
+            contact_to_deals[deal['CONTACT_ID']].append(deal['ID'])
+
         def get_group_key(lead):
             if grouping == 'utm_campaign':
                 return lead.get('UTM_CAMPAIGN') or '(не задан)'
@@ -417,11 +372,18 @@ def get_statistics_grouped():
                 return source_map.get(key, f"Неизвестный ({key})")
 
         stats_by_group = defaultdict(lambda: {
-            'total': 0, 'answered': 0, 'meeting_scheduled': 0, 'arrival': 0, 'success': 0,
-            'clients': set(), 'clients_with_payment': set(), 'deals': set(),
-            'deals_with_payment': set(), 'invoices_sum': 0, 'expenses': 0,
+            'total': 0,
+            'answered': 0, 'meeting_scheduled': 0, 'arrival': 0, 'success': 0,
+            'clients': set(), 'clients_with_payment': set(),
+            'deals': set(), 'deals_with_payment': set(),
+            'invoices_sum': 0, 'expenses': 0,
             'display_name': '', 'source_id_for_expenses': None,
-            'lead_ids': []
+            # Раздельные ID для детализации
+            'ids_total': [],
+            'ids_answered': [],
+            'ids_meeting_scheduled': [],
+            'ids_arrival': [],
+            'ids_success': [],
         })
 
         for lead in all_leads:
@@ -429,16 +391,25 @@ def get_statistics_grouped():
             stats = stats_by_group[key]
             stats['total'] += 1
             stats['display_name'] = get_group_display_name(key, lead)
-            stats['lead_ids'].append(lead['ID'])
+            stats['ids_total'].append(lead['ID'])
 
-            # Для расходов всегда берём source_id
             if not stats['source_id_for_expenses']:
                 stats['source_id_for_expenses'] = str(lead.get('SOURCE_ID', ''))
 
             status_id = lead.get('STATUS_ID')
-            for group, statuses in LEAD_STATUS_GROUPS.items():
-                if status_id in statuses:
-                    stats[group] += 1
+
+            if status_id in LEAD_STATUS_GROUPS['answered']:
+                stats['answered'] += 1
+                stats['ids_answered'].append(lead['ID'])
+            if status_id in LEAD_STATUS_GROUPS['meeting_scheduled']:
+                stats['meeting_scheduled'] += 1
+                stats['ids_meeting_scheduled'].append(lead['ID'])
+            if status_id in LEAD_STATUS_GROUPS['arrival']:
+                stats['arrival'] += 1
+                stats['ids_arrival'].append(lead['ID'])
+            if status_id in LEAD_STATUS_GROUPS['success']:
+                stats['success'] += 1
+                stats['ids_success'].append(lead['ID'])
 
             if status_id == 'CONVERTED' and lead.get('CONTACT_ID'):
                 contact_id = lead['CONTACT_ID']
@@ -457,11 +428,15 @@ def get_statistics_grouped():
 
         final_statistics = []
         for key, data in stats_by_group.items():
-            # Расходы: для UTM-группировок берём по source, для source — напрямую
             if grouping == 'source':
                 data['expenses'] = expenses_by_key.get(key, 0)
             else:
                 data['expenses'] = expenses_by_key.get(data.get('source_id_for_expenses', ''), 0)
+
+            clients_list = list(data['clients'])
+            clients_with_payment_list = list(data['clients_with_payment'])
+            deals_list = list(data['deals'])
+            deals_with_payment_list = list(data['deals_with_payment'])
 
             final_statistics.append({
                 "group_key": key,
@@ -480,12 +455,20 @@ def get_statistics_grouped():
                 "cpl": data['expenses'] / data['total'] if data['total'] > 0 else 0,
                 "cpo": data['expenses'] / len(data['deals_with_payment']) if len(data['deals_with_payment']) > 0 else 0,
                 "romi": calculate_romi(data['invoices_sum'], data['expenses']),
-                "lead_ids": data['lead_ids']
+                # Раздельные ID для детализации
+                "ids_total": data['ids_total'],
+                "ids_answered": data['ids_answered'],
+                "ids_meeting_scheduled": data['ids_meeting_scheduled'],
+                "ids_arrival": data['ids_arrival'],
+                "ids_success": data['ids_success'],
+                "ids_clients": clients_list,
+                "ids_clients_with_payment": clients_with_payment_list,
+                "ids_deals": deals_list,
+                "ids_deals_with_payment": deals_with_payment_list,
             })
 
         final_statistics.sort(key=lambda x: x['total'], reverse=True)
 
-        # Итоговая строка
         if len(final_statistics) > 1:
             summary = {
                 'total': sum(s['total'] for s in final_statistics),
@@ -498,7 +481,16 @@ def get_statistics_grouped():
                 'deals': sum(s['deals'] for s in final_statistics),
                 'deals_with_payment': sum(s['deals_with_payment'] for s in final_statistics),
                 'invoices_sum': sum(s['invoices_sum'] for s in final_statistics),
-                'expenses': sum(s['expenses'] for s in final_statistics)
+                'expenses': sum(s['expenses'] for s in final_statistics),
+                'ids_total': [i for s in final_statistics for i in s.get('ids_total', [])],
+                'ids_answered': [i for s in final_statistics for i in s.get('ids_answered', [])],
+                'ids_meeting_scheduled': [i for s in final_statistics for i in s.get('ids_meeting_scheduled', [])],
+                'ids_arrival': [i for s in final_statistics for i in s.get('ids_arrival', [])],
+                'ids_success': [i for s in final_statistics for i in s.get('ids_success', [])],
+                'ids_clients': [i for s in final_statistics for i in s.get('ids_clients', [])],
+                'ids_clients_with_payment': [i for s in final_statistics for i in s.get('ids_clients_with_payment', [])],
+                'ids_deals': [i for s in final_statistics for i in s.get('ids_deals', [])],
+                'ids_deals_with_payment': [i for s in final_statistics for i in s.get('ids_deals_with_payment', [])],
             }
             summary_row = {
                 "group_key": "__total__",
@@ -517,7 +509,15 @@ def get_statistics_grouped():
                 "cpl": summary['expenses'] / summary['total'] if summary['total'] > 0 else 0,
                 "cpo": summary['expenses'] / summary['deals_with_payment'] if summary['deals_with_payment'] > 0 else 0,
                 "romi": calculate_romi(summary['invoices_sum'], summary['expenses']),
-                "lead_ids": []
+                "ids_total": summary['ids_total'],
+                "ids_answered": summary['ids_answered'],
+                "ids_meeting_scheduled": summary['ids_meeting_scheduled'],
+                "ids_arrival": summary['ids_arrival'],
+                "ids_success": summary['ids_success'],
+                "ids_clients": summary['ids_clients'],
+                "ids_clients_with_payment": summary['ids_clients_with_payment'],
+                "ids_deals": summary['ids_deals'],
+                "ids_deals_with_payment": summary['ids_deals_with_payment'],
             }
             final_statistics.append(summary_row)
 
@@ -530,8 +530,8 @@ def get_statistics_grouped():
 
 def get_lead_details():
     """
-    Возвращает список лидов по списку ID.
-    Используется для детализации при клике на число в таблице.
+    Возвращает список лидов по ID.
+    Для каждого лида — имя, контакт, сделка, дата.
     """
     try:
         ids_raw = request.args.get('ids', '')
@@ -544,18 +544,64 @@ def get_lead_details():
 
         leads = fetch_paginated_data('crm.lead.list', {
             'filter': {'ID': ids},
-            'select': ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'STATUS_ID', 'SOURCE_ID', 'DATE_CREATE']
+            'select': ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'STATUS_ID',
+                       'SOURCE_ID', 'DATE_CREATE', 'CONTACT_ID']
         })
+
+        # Собираем contact_id для загрузки имён контактов
+        contact_ids = list(set([l['CONTACT_ID'] for l in leads if l.get('CONTACT_ID')]))
+        contact_map = {}
+        if contact_ids:
+            contacts = fetch_paginated_data('crm.contact.list', {
+                'filter': {'ID': contact_ids},
+                'select': ['ID', 'NAME', 'LAST_NAME']
+            })
+            for c in contacts:
+                name = f"{c.get('LAST_NAME', '')} {c.get('NAME', '')}".strip()
+                contact_map[c['ID']] = {'id': c['ID'], 'name': name}
+
+        # Сделки по контактам
+        deal_map = {}
+        if contact_ids:
+            deals = fetch_paginated_data('crm.deal.list', {
+                'filter': {'CONTACT_ID': contact_ids, 'CATEGORY_ID': 0},
+                'select': ['ID', 'TITLE', 'CONTACT_ID', 'DATE_CREATE']
+            })
+            for d in deals:
+                cid = d['CONTACT_ID']
+                if cid not in deal_map:
+                    deal_map[cid] = []
+                deal_map[cid].append(d)
 
         result = []
         for lead in leads:
-            name = f"{lead.get('LAST_NAME', '')} {lead.get('NAME', '')}".strip() or lead.get('TITLE', f"Лид #{lead['ID']}")
+            lead_name = f"{lead.get('LAST_NAME', '')} {lead.get('NAME', '')}".strip()
+            if not lead_name:
+                lead_name = lead.get('TITLE', f"Лид #{lead['ID']}")
+
+            contact_info = None
+            deal_info = None
+            cid = lead.get('CONTACT_ID')
+            if cid and cid in contact_map:
+                contact_info = contact_map[cid]
+                contact_info['url'] = f"{B24_PORTAL}/crm/contact/show/{cid}/"
+                # Берём первую сделку контакта
+                if cid in deal_map and deal_map[cid]:
+                    d = deal_map[cid][0]
+                    deal_info = {
+                        'id': d['ID'],
+                        'title': d.get('TITLE', f"Сделка #{d['ID']}"),
+                        'url': f"{B24_PORTAL}/crm/deal/show/{d['ID']}/",
+                        'date_create': d.get('DATE_CREATE', '')
+                    }
+
             result.append({
                 'id': lead['ID'],
-                'name': name,
-                'status_id': lead.get('STATUS_ID', ''),
+                'name': lead_name,
                 'date_create': lead.get('DATE_CREATE', ''),
-                'url': f"https://b24-p41gmg.bitrix24.ru/crm/lead/show/{lead['ID']}/"
+                'url': f"{B24_PORTAL}/crm/lead/show/{lead['ID']}/",
+                'contact': contact_info,
+                'deal': deal_info
             })
 
         return jsonify(result)
@@ -565,15 +611,127 @@ def get_lead_details():
         return jsonify({'error': str(e)}), 500
 
 
+def get_contact_details():
+    """
+    Возвращает список контактов по ID.
+    Для каждого контакта — имя, первая сделка, дата создания.
+    """
+    try:
+        ids_raw = request.args.get('ids', '')
+        if not ids_raw:
+            return jsonify([])
+
+        ids = [i.strip() for i in ids_raw.split(',') if i.strip()]
+        if not ids:
+            return jsonify([])
+
+        contacts = fetch_paginated_data('crm.contact.list', {
+            'filter': {'ID': ids},
+            'select': ['ID', 'NAME', 'LAST_NAME', 'DATE_CREATE']
+        })
+
+        # Сделки по контактам
+        deal_map = {}
+        deals = fetch_paginated_data('crm.deal.list', {
+            'filter': {'CONTACT_ID': ids, 'CATEGORY_ID': 0},
+            'select': ['ID', 'TITLE', 'CONTACT_ID', 'DATE_CREATE']
+        })
+        for d in deals:
+            cid = d['CONTACT_ID']
+            if cid not in deal_map:
+                deal_map[cid] = []
+            deal_map[cid].append(d)
+
+        result = []
+        for c in contacts:
+            name = f"{c.get('LAST_NAME', '')} {c.get('NAME', '')}".strip() or f"Контакт #{c['ID']}"
+            deal_info = None
+            if c['ID'] in deal_map and deal_map[c['ID']]:
+                d = deal_map[c['ID']][0]
+                deal_info = {
+                    'id': d['ID'],
+                    'title': d.get('TITLE', f"Сделка #{d['ID']}"),
+                    'url': f"{B24_PORTAL}/crm/deal/show/{d['ID']}/",
+                    'date_create': d.get('DATE_CREATE', '')
+                }
+
+            result.append({
+                'id': c['ID'],
+                'name': name,
+                'date_create': c.get('DATE_CREATE', ''),
+                'url': f"{B24_PORTAL}/crm/contact/show/{c['ID']}/",
+                'contact': None,
+                'deal': deal_info
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_contact_details: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+def get_deal_details():
+    """
+    Возвращает список сделок по ID.
+    Для каждой сделки — название, контакт, дата.
+    """
+    try:
+        ids_raw = request.args.get('ids', '')
+        if not ids_raw:
+            return jsonify([])
+
+        ids = [i.strip() for i in ids_raw.split(',') if i.strip()]
+        if not ids:
+            return jsonify([])
+
+        deals = fetch_paginated_data('crm.deal.list', {
+            'filter': {'ID': ids},
+            'select': ['ID', 'TITLE', 'CONTACT_ID', 'DATE_CREATE']
+        })
+
+        contact_ids = list(set([d['CONTACT_ID'] for d in deals if d.get('CONTACT_ID')]))
+        contact_map = {}
+        if contact_ids:
+            contacts = fetch_paginated_data('crm.contact.list', {
+                'filter': {'ID': contact_ids},
+                'select': ['ID', 'NAME', 'LAST_NAME']
+            })
+            for c in contacts:
+                name = f"{c.get('LAST_NAME', '')} {c.get('NAME', '')}".strip()
+                contact_map[c['ID']] = {'id': c['ID'], 'name': name,
+                                         'url': f"{B24_PORTAL}/crm/contact/show/{c['ID']}/"}
+
+        result = []
+        for d in deals:
+            contact_info = None
+            cid = d.get('CONTACT_ID')
+            if cid and cid in contact_map:
+                contact_info = contact_map[cid]
+
+            result.append({
+                'id': d['ID'],
+                'name': d.get('TITLE', f"Сделка #{d['ID']}"),
+                'date_create': d.get('DATE_CREATE', ''),
+                'url': f"{B24_PORTAL}/crm/deal/show/{d['ID']}/",
+                'contact': contact_info,
+                'deal': None
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_deal_details: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 def get_comparison_data():
     """
-    Режим 'Сравнение': возвращает данные по периодам (месяцы или недели) за выбранный год.
-    Поддерживает группировку и выбор показателей.
-    Для каждого периода возвращает count, % от пред., % от общего, Δ count, Δ конверсия.
+    Режим 'Сравнение': данные по периодам за выбранный год.
     """
     try:
         year = request.args.get('year')
-        period_type = request.args.get('period_type', 'month')  # month | week
+        period_type = request.args.get('period_type', 'month')
         grouping = request.args.get('grouping', 'source')
         group_value = request.args.get('group_value', '')
         source_id = request.args.get('source_id', '')
@@ -585,7 +743,6 @@ def get_comparison_data():
 
         year = int(year)
 
-        # Все доступные метрики
         all_metrics = [
             'expenses', 'total', 'cpl', 'answered', 'meeting_scheduled',
             'arrival', 'success', 'clients', 'clients_with_payment',
@@ -593,7 +750,6 @@ def get_comparison_data():
         ]
         selected_metrics = [m for m in metrics_raw.split(',') if m in all_metrics] if metrics_raw else all_metrics
 
-        # Определяем периоды
         import calendar
         periods = []
         if period_type == 'month':
@@ -603,10 +759,9 @@ def get_comparison_data():
                     'date_from': f"{year}-{m:02d}-01",
                     'date_to': f"{year}-{m:02d}-{calendar.monthrange(year, m)[1]:02d}"
                 })
-        else:  # week
+        else:
             import datetime
             d = datetime.date(year, 1, 1)
-            # Найдём первый понедельник
             while d.weekday() != 0:
                 d += datetime.timedelta(days=1)
             week_num = 1
@@ -622,7 +777,6 @@ def get_comparison_data():
                 d += datetime.timedelta(days=7)
                 week_num += 1
 
-        # Собираем данные по каждому периоду
         periods_data = []
         for period in periods:
             pdata = _compute_period_stats(
@@ -636,7 +790,6 @@ def get_comparison_data():
                 'stats': pdata
             })
 
-        # Вычисляем дельты и проценты
         result_periods = []
         prev_stats = None
         total_leads_year = sum(p['stats'].get('total', 0) for p in periods_data)
@@ -656,7 +809,6 @@ def get_comparison_data():
 
                 metric_data = {'value': val}
 
-                # % от предыдущего периода
                 if prev_val is not None:
                     if prev_val > 0:
                         metric_data['pct_from_prev'] = round((val / prev_val * 100) - 100, 2)
@@ -667,7 +819,6 @@ def get_comparison_data():
                     metric_data['pct_from_prev'] = None
                     metric_data['delta'] = None
 
-                # % от общего (только для count-метрик)
                 if metric == 'total' and total_leads_year > 0:
                     metric_data['pct_from_total'] = round(val / total_leads_year * 100, 2)
                 else:
@@ -692,10 +843,6 @@ def get_comparison_data():
 
 
 def _compute_period_stats(date_from, date_to, grouping, group_value, source_id, sales_dept):
-    """
-    Вычисляет плоскую статистику для одного периода с учётом группировки.
-    Возвращает словарь с числовыми значениями всех метрик.
-    """
     lead_filter = {
         '>=DATE_CREATE': f"{date_from}T00:00:00",
         '<=DATE_CREATE': f"{date_to}T23:59:59"
@@ -717,10 +864,7 @@ def _compute_period_stats(date_from, date_to, grouping, group_value, source_id, 
     })
 
     total = len(all_leads)
-    answered = 0
-    meeting_scheduled = 0
-    arrival = 0
-    success_count = 0
+    answered = meeting_scheduled = arrival = success_count = 0
     clients = set()
     clients_with_payment = set()
     deals_set = set()
@@ -770,7 +914,6 @@ def _compute_period_stats(date_from, date_to, grouping, group_value, source_id, 
                 if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
                     invoices_sum += float(inv.get('PRICE', 0))
 
-    # Расходы
     expenses = 0.0
     conn = get_db_connection()
     if conn:
@@ -795,25 +938,21 @@ def _compute_period_stats(date_from, date_to, grouping, group_value, source_id, 
         finally:
             conn.close()
 
-    clients_count = len(clients)
-    clients_with_payment_count = len(clients_with_payment)
-    deals_count = len(deals_set)
-    deals_with_payment_count = len(deals_with_payment_set)
-
+    dwp = len(deals_with_payment_set)
     return {
         'total': total,
         'answered': answered,
         'meeting_scheduled': meeting_scheduled,
         'arrival': arrival,
         'success': success_count,
-        'clients': clients_count,
-        'clients_with_payment': clients_with_payment_count,
-        'deals': deals_count,
-        'deals_with_payment': deals_with_payment_count,
+        'clients': len(clients),
+        'clients_with_payment': len(clients_with_payment),
+        'deals': len(deals_set),
+        'deals_with_payment': dwp,
         'invoices_sum': round(invoices_sum, 2),
         'expenses': round(expenses, 2),
         'cpl': round(expenses / total, 2) if total > 0 else 0,
-        'cpo': round(expenses / deals_with_payment_count, 2) if deals_with_payment_count > 0 else 0,
+        'cpo': round(expenses / dwp, 2) if dwp > 0 else 0,
         'romi': round(calculate_romi(invoices_sum, expenses), 2)
     }
 

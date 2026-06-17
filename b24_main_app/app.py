@@ -13,6 +13,8 @@ from routes.api_statistics import (
     save_utm_label,
     delete_utm_label,
     get_lead_details,
+    get_contact_details,
+    get_deal_details,
     get_comparison_data
 )
 from routes.api_cashbox import (
@@ -51,7 +53,7 @@ api_actions = {
     'search_contacts': search_contacts,
     'initial_data_for_access': get_initial_data_for_access,
 
-    # Statistics actions — оригинальный
+    # Statistics actions — оригинальный (не трогаем)
     'get_statistics': get_statistics,
 
     # Statistics actions — новые
@@ -61,6 +63,8 @@ api_actions = {
     'save_utm_label': save_utm_label,
     'delete_utm_label': delete_utm_label,
     'get_lead_details': get_lead_details,
+    'get_contact_details': get_contact_details,
+    'get_deal_details': get_deal_details,
     'get_comparison_data': get_comparison_data,
 }
 
