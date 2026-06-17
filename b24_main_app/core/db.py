@@ -31,38 +31,6 @@ def init_db():
     cursor = conn.cursor()
     
     try:
-
-        # --- Инициализация таблицы пользовательских названий UTM ---
-        cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS `utm_labels`
-                       (
-                           `id`
-                           INT
-                           AUTO_INCREMENT
-                           PRIMARY
-                           KEY,
-                           `utm_type`
-                           VARCHAR
-                       (
-                           50
-                       ) NOT NULL,
-                           `utm_value` VARCHAR
-                       (
-                           255
-                       ) NOT NULL,
-                           `custom_name` VARCHAR
-                       (
-                           255
-                       ) NOT NULL,
-                           UNIQUE KEY `unique_utm`
-                       (
-                           `utm_type`,
-                           `utm_value`
-                       )
-                           ) ENGINE=InnoDB
-                       """)
-        logger.info("Table 'utm_labels' is ready.")
-
         # --- Инициализация таблицы расходов ---
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `expenses` (

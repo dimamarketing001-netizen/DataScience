@@ -1,103 +1,39 @@
 <!-- ЭКРАН: СТАТИСТИКА -->
 <div id="statistics-screen" class="app-screen" data-tab="statistics">
     <button class="ui-btn ui-btn-light-border back-button">← Назад в меню</button>
-
     <div class="ui-card">
-
-        <!-- ВКЛАДКИ -->
-        <div style="display:flex; gap:15px; margin-bottom:20px;">
-            <button class="ui-btn ui-btn-primary stats-tab-btn" data-tab="general">Общая</button>
-            <button class="ui-btn ui-btn-light-border stats-tab-btn" data-tab="comparison">Сравнение</button>
-        </div>
-
-        <!-- ===================== -->
-        <!-- ОБЩАЯ СТАТИСТИКА -->
-        <!-- ===================== -->
-        <div id="stats-tab-general" class="stats-tab-content">
-
-            <form id="statistics-filter-form" class="ui-form filter-form">
-                <div class="ui-form-row">
-                    <div class="ui-form-content">
-                        <div class="filter-grid">
-
-                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
-                                <input type="text" id="stats-start-date" class="ui-ctl-element" placeholder="Дата от...">
-                            </div>
-
-                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
-                                <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
-                            </div>
-
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="stats-source-filter" class="ui-ctl-element">
-                                    <option value="">Все источники</option>
-                                </select>
-                            </div>
-
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
-                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
-                                <select id="stats-sales-department" class="ui-ctl-element">
-                                    <option value="">Все отделы продаж</option>
-                                </select>
-                            </div>
-
+        <div class="ui-form-title"><div class="ui-form-title-text">Статистика по лидам</div></div>
+        <form id="statistics-filter-form" class="ui-form filter-form">
+            <div class="ui-form-row">
+                <div class="ui-form-content">
+                    <div class="filter-grid">
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
+                            <input type="text" id="stats-start-date" class="ui-ctl-element" placeholder="Дата от...">
+                        </div>
+                        <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
+                            <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
+                        </div>
+                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                            <select id="stats-source-filter" class="ui-ctl-element"><option value="">Все источники</option></select>
                         </div>
                     </div>
                 </div>
-
-                <div class="ui-form-row ui-form-row-bottom-buttons">
-                    <div class="ui-form-content">
-                        <button type="submit" class="ui-btn ui-btn-primary">Применить</button>
-                    </div>
-                </div>
-            </form>
-
-            <div class="expenses-table-container">
-                <table class="expenses-table">
-                    <thead id="statistics-table-head"></thead>
-                    <tbody id="statistics-table-body"></tbody>
-                </table>
             </div>
-
-        </div>
-
-        <!-- ===================== -->
-        <!-- СРАВНЕНИЕ -->
-        <!-- ===================== -->
-        <div id="stats-tab-comparison" class="stats-tab-content" style="display:none;">
-
-            <div class="ui-form-row">
-                <div class="ui-form-content" style="display:flex; gap:15px; flex-wrap:wrap;">
-
-                    <input type="number" id="comparison-year" class="ui-ctl-element" value="2026" placeholder="Год">
-
-                    <select id="comparison-group-by" class="ui-ctl-element">
-                        <option value="source">По источникам</option>
-                        <option value="utm_campaign">По кампаниям</option>
-                        <option value="utm_content">По объявлениям</option>
-                    </select>
-
-                    <select id="comparison-period-type" class="ui-ctl-element">
-                        <option value="month">Месяцы</option>
-                        <option value="week">Недели</option>
-                    </select>
-
-                    <button id="comparison-apply-btn" class="ui-btn ui-btn-primary">
-                        Применить
-                    </button>
-
+            <div class="ui-form-row ui-form-row-bottom-buttons">
+                <div class="ui-form-content">
+                    <button type="submit" class="ui-btn ui-btn-primary">Применить</button>
+                    <button type="button" id="stats-reset-btn" class="ui-btn ui-btn-light-border">Сбросить</button>
                 </div>
             </div>
-
-            <div class="expenses-table-container">
-                <table class="expenses-table">
-                    <thead id="comparison-table-head"></thead>
-                    <tbody id="comparison-table-body"></tbody>
-                </table>
-            </div>
-
+        </form>
+    </div>
+    <div class="ui-card">
+        <div class="expenses-table-container">
+            <table class="expenses-table">
+                <thead id="statistics-table-head"></thead>
+                <tbody id="statistics-table-body"></tbody>
+            </table>
         </div>
-
     </div>
 </div>

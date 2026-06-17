@@ -1,152 +1,161 @@
+// Модуль для управления вкладкой "Статистика"
 App.initializeStatistics = async function () {
+    console.log("Initializing Statistics Tab...");
 
-    const tabButtons = document.querySelectorAll('.stats-tab-btn');
-    const tabContents = document.querySelectorAll('.stats-tab-content');
-
+    // --- Элементы UI ---
+    const filterForm = document.getElementById('statistics-filter-form');
+    const startDateInput = document.getElementById('stats-start-date');
+    const endDateInput = document.getElementById('stats-end-date');
+    const sourceFilterSelect = document.getElementById('stats-source-filter');
+    const resetBtn = document.getElementById('stats-reset-btn');
     const tableHead = document.getElementById('statistics-table-head');
     const tableBody = document.getElementById('statistics-table-body');
 
-    const sourceFilter = document.getElementById('stats-source-filter');
-    const salesDepartment = document.getElementById('stats-sales-department');
+    // --- Инициализация ---
+    async function initialize() {
+        App.showLoader();
+        try {
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            flatpickr(startDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: firstDayOfMonth });
+            flatpickr(endDateInput, { locale: "ru", dateFormat: "Y-m-d", defaultDate: today });
 
-    const comparisonBtn = document.getElementById('comparison-apply-btn');
-    const comparisonHead = document.getElementById('comparison-table-head');
-    const comparisonBody = document.getElementById('comparison-table-body');
+            const sources = await getLeadSources();
+            App.populateSelect(sourceFilterSelect, sources, "Все источники");
 
-    flatpickr("#stats-start-date", { locale: "ru", dateFormat: "Y-m-d" });
-    flatpickr("#stats-end-date", { locale: "ru", dateFormat: "Y-m-d" });
+            renderTableHead();
+            await loadStatistics();
+        } catch (error) {
+            console.error("Error initializing statistics tab:", error);
+            await App.Notify.error('Ошибка инициализации', `Не удалось загрузить начальные данные: ${error.message}`);
+        } finally {
+            App.hideLoader();
+        }
+    }
 
-    // ===== ТАБЫ =====
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-
-            tabButtons.forEach(b => {
-                b.classList.remove('ui-btn-primary');
-                b.classList.add('ui-btn-light-border');
+    async function getLeadSources() {
+        return new Promise((resolve, reject) => {
+            BX24.callMethod('crm.status.entity.items', { entityId: 'SOURCE' }, (result) => {
+                if (result.error()) {
+                    console.error("Failed to get lead sources:", result.error());
+                    reject(new Error("Не удалось загрузить источники лидов"));
+                } else {
+                    const sources = result.data().map(item => ({
+                        id: item.STATUS_ID,
+                        name: item.NAME
+                    }));
+                    resolve(sources);
+                }
             });
-
-            btn.classList.remove('ui-btn-light-border');
-            btn.classList.add('ui-btn-primary');
-
-            tabContents.forEach(c => c.style.display = 'none');
-            document.getElementById('stats-tab-' + btn.dataset.tab).style.display = 'block';
-        });
-    });
-
-    // ===== ЗАГРУЗКА ОТДЕЛОВ =====
-    async function loadSalesDepartments() {
-        const res = await fetch('?action=get_sales_departments');
-        const data = await res.json();
-
-        data.forEach(dep => {
-            const option = document.createElement('option');
-            option.value = dep.id;
-            option.textContent = dep.name;
-            salesDepartment.appendChild(option);
         });
     }
 
-    // ===== ОБЩАЯ СТАТИСТИКА =====
+    // --- Загрузка данных ---
     async function loadStatistics() {
-
+        App.showLoader();
         const params = {
-            date_from: document.getElementById('stats-start-date').value,
-            date_to: document.getElementById('stats-end-date').value,
-            source_id: sourceFilter.value,
-            sales_department: salesDepartment.value
+            date_from: startDateInput.value,
+            date_to: endDateInput.value,
+            source_id: sourceFilterSelect.value
         };
 
-        const data = await App.statistics.api.getStatistics(params);
-
-        renderHead();
-        renderBody(data);
+        try {
+            const data = await App.statistics.api.getStatistics(params);
+            renderTableBody(data);
+        } catch (error) {
+            console.error("Failed to load statistics:", error);
+            await App.Notify.error('Ошибка загрузки', `Не удалось получить данные статистики: ${error.message}`);
+            tableBody.innerHTML = `<tr><td colspan="15">Ошибка загрузки данных.</td></tr>`;
+        } finally {
+            App.hideLoader();
+        }
     }
 
-    function renderHead() {
-
+    // --- Рендеринг таблицы ---
+    function renderTableHead() {
         tableHead.innerHTML = `
-        <tr>
-            <th>Источник</th>
-            <th>Лиды</th>
-            <th>Дозвон</th>
-            <th>Назначена встреча</th>
-            <th>Приход</th>
-            <th>Успех</th>
-        </tr>`;
+            <tr>
+                <th class="group-1">Источник</th>
+                <th class="group-2">Расходы</th>
+                <th class="group-2">Лиды</th>
+                <th class="group-2">CPL</th>
+                <th class="group-3">Дозвон</th>
+                <th class="group-3">Назначена встреча</th>
+                <th class="group-3">Приход</th>
+                <th class="group-3">Успех</th>
+                <th class="group-4">Клиенты</th>
+                <th class="group-4">Клиенты с оплатой</th>
+                <th class="group-4">Сделки</th>
+                <th class="group-4">Сделки с оплатой</th>
+                <th class="group-4">CPO</th>
+                <th class="group-5">Сумма счетов</th>
+                <th class="group-5">ROMI</th>
+            </tr>
+        `;
     }
 
-    function renderBody(data) {
-
+    function renderTableBody(data) {
         tableBody.innerHTML = '';
+        if (!data || data.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="15">Нет данных за выбранный период.</td></tr>`;
+            return;
+        }
 
         data.forEach(row => {
-
-            tableBody.innerHTML += `
-            <tr>
-                <td>${row.source_name}</td>
-                <td>${row.total}</td>
-                <td>${row.answered.count}</td>
-                <td>${row.meeting_scheduled.count}</td>
-                <td>${row.arrival.count}</td>
-                <td>${row.success.count}</td>
-            </tr>`;
+            const tr = document.createElement('tr');
+            if (row.source_name === "Итого") {
+                tr.classList.add('summary-row');
+            }
+            tr.innerHTML = `
+                <td class="group-1">${row.source_name}</td>
+                <td class="group-2">${formatCurrency(row.expenses)}</td>
+                <td class="group-2">${row.total}</td>
+                <td class="group-2">${formatCurrency(row.cpl)}</td>
+                ${createCell(row.answered, 'group-3')}
+                ${createCell(row.meeting_scheduled, 'group-3')}
+                ${createCell(row.arrival, 'group-3')}
+                ${createCell(row.success, 'group-3')}
+                <td class="group-4">${row.clients}</td>
+                ${createCell(row.clients_with_payment, 'group-4')}
+                <td class="group-4">${row.deals}</td>
+                <td class="group-4">${row.deals_with_payment}</td>
+                <td class="group-4">${formatCurrency(row.cpo)}</td>
+                <td class="group-5">${formatCurrency(row.invoices_sum)}</td>
+                <td class="group-5">${row.romi.toFixed(2)}%</td>
+            `;
+            tableBody.appendChild(tr);
         });
     }
 
-    document.getElementById('statistics-filter-form')
-        .addEventListener('submit', e => {
-            e.preventDefault();
-            loadStatistics();
-        });
+    function createCell(data, groupClass) {
+        if (!data) return `<td class="${groupClass}">-</td>`;
+        return `
+            <td class="${groupClass}">
+                ${data.count}
+                <span class="conversion-percent">(${data.conv_from_prev.toFixed(1)}% / ${data.conv_from_total.toFixed(1)}%)</span>
+            </td>
+        `;
+    }
 
-    // ===== COMPARISON =====
-    comparisonBtn.addEventListener('click', async () => {
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(value || 0);
+    }
 
-        const year = document.getElementById('comparison-year').value;
-        const groupBy = document.getElementById('comparison-group-by').value;
-        const periodType = document.getElementById('comparison-period-type').value;
-
-        const params = new URLSearchParams({
-            action: 'get_statistics_comparison',
-            year: year,
-            group_by: groupBy,
-            period_type: periodType
-        });
-
-        const res = await fetch(`?${params.toString()}`);
-        const data = await res.json();
-
-        renderComparison(data);
+    // --- Обработчики событий ---
+    filterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        loadStatistics();
     });
 
-    function renderComparison(data) {
+    resetBtn.addEventListener('click', () => {
+        filterForm.reset();
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDateInput._flatpickr.setDate(firstDayOfMonth);
+        endDateInput._flatpickr.setDate(today);
+        loadStatistics();
+    });
 
-        comparisonHead.innerHTML = '';
-        comparisonBody.innerHTML = '';
-
-        const periods = Object.keys(data[0]?.values || {});
-
-        let head = '<tr><th>Группа</th>';
-
-        periods.forEach(p => head += `<th>${p}</th>`);
-
-        head += '</tr>';
-
-        comparisonHead.innerHTML = head;
-
-        data.forEach(row => {
-
-            let tr = `<tr><td>${row.group_name}</td>`;
-
-            periods.forEach(p => {
-                tr += `<td>${row.values[p]?.total?.count || 0}</td>`;
-            });
-
-            tr += '</tr>';
-            comparisonBody.innerHTML += tr;
-        });
-    }
-
-    await loadSalesDepartments();
-    await loadStatistics();
+    // --- Запуск ---
+    initialize();
 };
