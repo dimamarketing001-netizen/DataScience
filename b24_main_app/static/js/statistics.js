@@ -63,12 +63,49 @@ App.initializeStatistics = async function () {
     const CURRENCY_METRICS = new Set(['expenses','cpl','cpo','invoices_sum']);
     const PERCENT_METRICS  = new Set(['romi']);
 
+    // Воронка: порядок метрик для расчёта конверсии
+    // Каждая метрика конвертируется от предыдущей в воронке
+    const FUNNEL_ORDER = [
+        'total', 'answered', 'meeting_scheduled', 'arrival', 'success',
+        'clients', 'clients_with_payment', 'deals', 'deals_with_payment'
+    ];
+
     // Палитра цветов для группировок
     const GROUP_COLORS = [
         '#0b66c3','#e74c3c','#27ae60','#f39c12','#8e44ad',
         '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
         '#e67e22','#9b59b6','#2ecc71','#e91e63','#ff5722'
     ];
+
+    // =========================================================
+    // РАСЧЁТ КОНВЕРСИИ МЕЖДУ ВЫБРАННЫМИ МЕТРИКАМИ
+    // Строим карту: metric -> denominator_metric
+    // Берём только те метрики которые выбраны пользователем
+    // =========================================================
+    function buildConversionMap(selectedMetrics) {
+        // convMap[metric] = метрика-знаменатель (из выбранных)
+        const convMap = {};
+        const selected = new Set(selectedMetrics);
+
+        // Для каждой метрики в воронке ищем ближайший предыдущий выбранный знаменатель
+        for (let i = 0; i < FUNNEL_ORDER.length; i++) {
+            const metric = FUNNEL_ORDER[i];
+            if (!selected.has(metric)) continue;
+
+            // Ищем ближайшую предыдущую выбранную метрику как знаменатель
+            let denominator = null;
+            for (let j = i - 1; j >= 0; j--) {
+                if (selected.has(FUNNEL_ORDER[j])) {
+                    denominator = FUNNEL_ORDER[j];
+                    break;
+                }
+            }
+            convMap[metric] = denominator; // null = нет знаменателя (первая метрика)
+        }
+
+        // Метрики вне воронки (expenses, cpl, cpo, invoices_sum, romi) — без конверсии
+        return convMap;
+    }
 
     // =========================================================
     // МУЛЬТИФИЛЬТР
@@ -296,14 +333,12 @@ App.initializeStatistics = async function () {
     // РЕЖИМ ПЕРИОДА + АТРИБУТ
     // =========================================================
     function initPeriodModeHandlers() {
-        // Общая статистика
         periodModeSelect.addEventListener('change', () => {
             const isStrict = periodModeSelect.value === 'strict';
             periodModeHint.style.display    = isStrict ? 'flex' : 'none';
             attributionWrap.style.display   = isStrict ? ''     : 'none';
         });
 
-        // Сравнение
         cmpPeriodMode.addEventListener('change', () => {
             const isStrict = cmpPeriodMode.value === 'strict';
             cmpPeriodModeHint.style.display  = isStrict ? 'flex' : 'none';
@@ -345,7 +380,6 @@ App.initializeStatistics = async function () {
         params.set('grouping',    groupingSelect.value || 'source');
         params.set('period_mode', periodModeSelect.value || 'standard');
 
-        // Атрибут — только для strict
         if (periodModeSelect.value === 'strict') {
             params.set('attribution', attributionSelect.value || 'last_touch');
         }
@@ -644,7 +678,7 @@ App.initializeStatistics = async function () {
             cmpTableBody.innerHTML = '';
             cmpEmpty.style.display = 'block';
             _destroyCharts();
-            cmpChartsWrap.innerHTML = '';
+            if (cmpChartsWrap) cmpChartsWrap.innerHTML = '';
         });
     }
 
@@ -685,7 +719,6 @@ App.initializeStatistics = async function () {
         params.set('metrics',     selectedMetrics.join(','));
         params.set('period_mode', cmpPeriodMode.value || 'standard');
 
-        // Атрибут — только для strict
         if (cmpPeriodMode.value === 'strict') {
             params.set('attribution', cmpAttribution.value || 'last_touch');
         }
@@ -719,9 +752,6 @@ App.initializeStatistics = async function () {
 
     // =========================================================
     // ТАБЛИЦА СРАВНЕНИЯ
-    // Структура:
-    // [Группировка] | [Январь: метрика1, метрика2...] | [Февраль: ...] | ...
-    // В каждой ячейке: значение + конверсия + дельта к предыдущему периоду
     // =========================================================
     function renderComparisonTable(data, selectedMetrics) {
         if (!data || !data.rows || data.rows.length === 0) {
@@ -736,8 +766,10 @@ App.initializeStatistics = async function () {
         const groupLabels  = data.group_labels || {};
         const metricCount  = selectedMetrics.length;
 
+        // Строим карту конверсий между выбранными метриками
+        const convMap = buildConversionMap(selectedMetrics);
+
         // ---- ЗАГОЛОВОК ----
-        // Строка 1: [Группировка] [Январь colspan=M] [Февраль colspan=M] ...
         let head1 = `<tr>
             <th class="cmp-th-group col-sticky" rowspan="2">
                 ${data.grouping
@@ -749,7 +781,6 @@ App.initializeStatistics = async function () {
         });
         head1 += '</tr>';
 
-        // Строка 2: под каждым периодом — названия метрик
         let head2 = '<tr>';
         periodLabels.forEach(() => {
             selectedMetrics.forEach(metric => {
@@ -769,7 +800,7 @@ App.initializeStatistics = async function () {
             row.periods.forEach(period => {
                 selectedMetrics.forEach(metric => {
                     const mdata = period.metrics[metric];
-                    bodyHtml += renderCmpDataCell(metric, mdata);
+                    bodyHtml += renderCmpDataCell(metric, mdata, convMap, period, selectedMetrics);
                 });
             });
 
@@ -779,68 +810,88 @@ App.initializeStatistics = async function () {
         cmpTableBody.innerHTML = bodyHtml;
     }
 
-    // Ячейка с данными:
-    // Строка 1: значение (+ конверсия inline)
-    // Строка 2: дельта к предыдущему периоду (+ дельта конверсии)
-    function renderCmpDataCell(metric, mdata) {
+    // =========================================================
+    // ЯЧЕЙКА ДАННЫХ ТАБЛИЦЫ СРАВНЕНИЯ
+    // Строка 1: значение (+ конверсия от выбранного знаменателя)
+    // Строка 2: дельта к предыдущему периоду (всегда с новой строки)
+    // =========================================================
+    function renderCmpDataCell(metric, mdata, convMap, period, selectedMetrics) {
         if (!mdata) {
             return `<td class="cmp-td"><div class="cmp-cell-inner">
-                <span class="cmp-cell-value">—</span>
+                <div class="cmp-cell-top">
+                    <span class="cmp-cell-value">—</span>
+                </div>
             </div></td>`;
         }
 
         const val     = mdata.value;
-        const conv    = mdata.conv;
-        const hasConv = CONVERSION_METRICS.has(metric);
         const pctPrev = mdata.pct_from_prev;
-        const pctConv = mdata.pct_conv_from_prev;
 
         const valStr = formatMetricValue(metric, val);
 
-        // Конверсия inline после значения
+        // -------------------------------------------------------
+        // Конверсия: считаем относительно знаменателя из выбранных метрик
+        // convMap[metric] = метрика-знаменатель (из выбранных пользователем)
+        // -------------------------------------------------------
         let convHtml = '';
-        if (hasConv && conv !== null && conv !== undefined) {
-            convHtml = `<span class="conversion-percent">&nbsp;(${(+conv).toFixed(1)}%)</span>`;
+        const denominatorMetric = convMap ? convMap[metric] : null;
+        if (denominatorMetric && period && period.metrics) {
+            const denomData = period.metrics[denominatorMetric];
+            const denomVal  = denomData ? (denomData.value || 0) : 0;
+            if (denomVal > 0 && val !== null && val !== undefined) {
+                const convPct = (val / denomVal * 100).toFixed(1);
+                convHtml = `<span class="conversion-percent">&nbsp;(${convPct}%)</span>`;
+            }
         }
 
+        // -------------------------------------------------------
+        // Дельты — всегда с новой строки, одинаковый размер
+        // -------------------------------------------------------
+        let deltaItems = [];
+
         // Дельта значения к предыдущему периоду
-        let deltaHtml = '';
         if (pctPrev !== null && pctPrev !== undefined) {
             const isUp   = pctPrev > 0;
             const isDown = pctPrev < 0;
             const sign   = isUp ? '+' : '';
             const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
             const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
-            deltaHtml += `<span class="cmp-delta ${cls}">${arrow}${sign}${pctPrev.toFixed(1)}%</span>`;
+            deltaItems.push(
+                `<span class="cmp-delta cmp-delta-fixed ${cls}">${arrow}&nbsp;${sign}${pctPrev.toFixed(1)}%</span>`
+            );
         }
 
-        // Дельта конверсии к предыдущему периоду (в пп)
-        if (hasConv && pctConv !== null && pctConv !== undefined) {
+        // Дельта конверсии к предыдущему периоду (в пп) — из бэкенда
+        // Используем pct_conv_from_prev только если есть конверсия в бэкенде
+        const pctConv = mdata.pct_conv_from_prev;
+        if (CONVERSION_METRICS.has(metric) && pctConv !== null && pctConv !== undefined) {
             const isUp   = pctConv > 0;
             const isDown = pctConv < 0;
             const sign   = isUp ? '+' : '';
             const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
             const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
-            deltaHtml += `<span class="cmp-delta cmp-delta-conv ${cls}">${arrow}${sign}${pctConv.toFixed(1)}пп</span>`;
+            deltaItems.push(
+                `<span class="cmp-delta cmp-delta-fixed cmp-delta-conv ${cls}">${arrow}&nbsp;${sign}${pctConv.toFixed(1)}пп</span>`
+            );
         }
+
+        const deltasHtml = deltaItems.length > 0
+            ? `<div class="cmp-cell-deltas">${deltaItems.join('')}</div>`
+            : '';
 
         return `<td class="cmp-td">
             <div class="cmp-cell-inner">
                 <div class="cmp-cell-top">
                     <span class="cmp-cell-value">${valStr}</span>${convHtml}
                 </div>
-                ${deltaHtml ? `<div class="cmp-cell-deltas">${deltaHtml}</div>` : ''}
+                ${deltasHtml}
             </div>
         </td>`;
     }
 
     // =========================================================
     // ГРАФИКИ СРАВНЕНИЯ (Chart.js)
-    // Для каждой метрики — отдельный мини-график
-    // Линии = группировки, разные цвета
-    // Если метрика имеет конверсию — правая ось Y для конверсии (пунктир)
     // =========================================================
-
     function _destroyCharts() {
         _chartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
         _chartInstances = [];
@@ -851,18 +902,30 @@ App.initializeStatistics = async function () {
         if (!cmpChartsWrap) return;
         cmpChartsWrap.innerHTML = '';
 
+        // Проверяем наличие Chart.js
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js не загружен');
+            cmpChartsWrap.innerHTML =
+                `<div style="padding:16px;color:#e74c3c;text-align:center;">
+                    ⚠️ Не удалось загрузить библиотеку графиков (Chart.js).
+                    Проверьте интернет-соединение.
+                </div>`;
+            return;
+        }
+
         if (!data || !data.rows || data.rows.length === 0) return;
 
         const periodLabels = data.period_labels || [];
         const rows         = data.rows;
         const groupLabels  = data.group_labels || {};
 
-        // Для каждой метрики — свой блок с canvas
-        selectedMetrics.forEach((metric, mIdx) => {
-            const metricLabel = METRIC_LABELS[metric] || metric;
-            const hasConv     = CONVERSION_METRICS.has(metric);
+        // Строим карту конверсий для графиков
+        const convMap = buildConversionMap(selectedMetrics);
 
-            // Обёртка графика
+        selectedMetrics.forEach((metric) => {
+            const metricLabel = METRIC_LABELS[metric] || metric;
+            const hasConv     = !!(convMap[metric]); // есть знаменатель среди выбранных
+
             const chartBlock = document.createElement('div');
             chartBlock.className = 'cmp-chart-block';
 
@@ -876,14 +939,13 @@ App.initializeStatistics = async function () {
             chartBlock.appendChild(canvas);
             cmpChartsWrap.appendChild(chartBlock);
 
-            // Датасеты: для каждой группировки — линия значений
             const datasets = [];
 
             rows.forEach((row, rowIdx) => {
                 const color      = GROUP_COLORS[rowIdx % GROUP_COLORS.length];
                 const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
 
-                // Значения
+                // Значения метрики
                 const valData = row.periods.map(p => {
                     const m = p.metrics[metric];
                     return m ? (m.value || 0) : 0;
@@ -903,10 +965,15 @@ App.initializeStatistics = async function () {
                 });
 
                 // Конверсия — пунктирная линия на правой оси
+                // Считаем из выбранных метрик (convMap)
                 if (hasConv) {
+                    const denomMetric = convMap[metric];
                     const convData = row.periods.map(p => {
-                        const m = p.metrics[metric];
-                        return m && m.conv !== null ? (m.conv || 0) : 0;
+                        const mVal     = p.metrics[metric];
+                        const denomVal = p.metrics[denomMetric];
+                        const v  = mVal    ? (mVal.value    || 0) : 0;
+                        const dv = denomVal ? (denomVal.value || 0) : 0;
+                        return dv > 0 ? parseFloat((v / dv * 100).toFixed(2)) : 0;
                     });
 
                     datasets.push({
@@ -925,15 +992,14 @@ App.initializeStatistics = async function () {
                 }
             });
 
-            // Настройки осей
             const scales = {
                 x: {
-                    grid: { color: '#f0f0f0' },
+                    grid:  { color: '#f0f0f0' },
                     ticks: { font: { size: 11 }, color: '#535c69' }
                 },
                 y: {
                     position: 'left',
-                    grid: { color: '#f0f0f0' },
+                    grid:  { color: '#f0f0f0' },
                     ticks: {
                         font: { size: 11 }, color: '#535c69',
                         callback: (val) => {
@@ -959,46 +1025,56 @@ App.initializeStatistics = async function () {
                     },
                     title: {
                         display: true,
-                        text: 'Конверсия %',
-                        font: { size: 10 },
-                        color: '#9aabb8'
+                        text:    'Конверсия %',
+                        font:    { size: 10 },
+                        color:   '#9aabb8'
                     }
                 };
             }
 
-            const chart = new Chart(canvas, {
-                type: 'line',
-                data: { labels: periodLabels, datasets },
-                options: {
-                    responsive:          true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { font: { size: 11 }, boxWidth: 14, padding: 10 }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => {
-                                    const ds    = ctx.dataset;
-                                    const isConv= ds.yAxisID === 'y2';
-                                    const val   = ctx.parsed.y;
-                                    if (isConv) return `${ds.label}: ${val.toFixed(1)}%`;
-                                    if (CURRENCY_METRICS.has(metric))
-                                        return `${ds.label}: ${formatCurrency(val)}`;
-                                    if (PERCENT_METRICS.has(metric))
-                                        return `${ds.label}: ${val.toFixed(2)}%`;
-                                    return `${ds.label}: ${val}`;
+            try {
+                const chart = new Chart(canvas, {
+                    type: 'line',
+                    data: { labels: periodLabels, datasets },
+                    options: {
+                        responsive:          true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    font: { size: 11 }, boxWidth: 14, padding: 10
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const ds     = ctx.dataset;
+                                        const isConv = ds.yAxisID === 'y2';
+                                        const val    = ctx.parsed.y;
+                                        if (isConv)
+                                            return `${ds.label}: ${val.toFixed(1)}%`;
+                                        if (CURRENCY_METRICS.has(metric))
+                                            return `${ds.label}: ${formatCurrency(val)}`;
+                                        if (PERCENT_METRICS.has(metric))
+                                            return `${ds.label}: ${val.toFixed(2)}%`;
+                                        return `${ds.label}: ${val}`;
+                                    }
                                 }
                             }
-                        }
-                    },
-                    scales
-                }
-            });
-
-            _chartInstances.push(chart);
+                        },
+                        scales
+                    }
+                });
+                _chartInstances.push(chart);
+            } catch(chartErr) {
+                console.error('Ошибка создания графика:', chartErr);
+                chartBlock.innerHTML +=
+                    `<div style="color:#e74c3c;font-size:12px;padding:8px;">
+                        Ошибка отрисовки графика
+                    </div>`;
+            }
         });
     }
 
