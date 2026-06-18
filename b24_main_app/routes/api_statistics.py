@@ -1177,9 +1177,9 @@ def get_comparison_data():
                     wn += 1
                     continue
                 periods.append({
-                    'label':     f"Нед.{wn}",
+                    'label': f"Нед.{wn} ({d.strftime('%d.%m')}–{end.strftime('%d.%m')})",
                     'date_from': d.strftime('%Y-%m-%d'),
-                    'date_to':   end.strftime('%Y-%m-%d')
+                    'date_to': end.strftime('%Y-%m-%d')
                 })
                 d += dt_mod.timedelta(days=7)
                 wn += 1

@@ -45,9 +45,11 @@ App.initializeStatistics = async function () {
 
     let sourcesCache   = [];
     let salesDeptCache = [];
-
-    // Хранилище Chart.js инстансов для уничтожения при перерисовке
     let _chartInstances = [];
+
+    // Текущие данные таблицы — нужны для меток в попапе
+    // {lead_id: Set{группы}} — строится при рендере таблицы
+    let _currentLeadGroups = {};
 
     const CONVERSION_METRICS = new Set([
         'answered','meeting_scheduled','arrival','success','clients_with_payment'
@@ -63,14 +65,23 @@ App.initializeStatistics = async function () {
     const CURRENCY_METRICS = new Set(['expenses','cpl','cpo','invoices_sum']);
     const PERCENT_METRICS  = new Set(['romi']);
 
-    // Воронка: порядок метрик для расчёта конверсии
-    // Каждая метрика конвертируется от предыдущей в воронке
     const FUNNEL_ORDER = [
         'total', 'answered', 'meeting_scheduled', 'arrival', 'success',
         'clients', 'clients_with_payment', 'deals', 'deals_with_payment'
     ];
 
-    // Палитра цветов для группировок
+    // Конфигурация групп лидов для меток в попапе
+    // key — ключ в ids_*, label — название метки, color — цвет
+    const LEAD_GROUP_BADGES = [
+        { key: 'ids_answered',          label: 'Дозвон',       color: '#0b66c3' },
+        { key: 'ids_meeting_scheduled', label: 'Встреча',       color: '#8e44ad' },
+        { key: 'ids_arrival',           label: 'Приход',        color: '#27ae60' },
+        { key: 'ids_success',           label: 'Успех',         color: '#f39c12' },
+        { key: 'ids_clients',           label: 'Клиент',        color: '#16a085' },
+        { key: 'ids_deals',             label: 'Сделка',        color: '#e74c3c' },
+        { key: 'ids_deals_with_payment',label: 'Оплата',        color: '#c0392b' },
+    ];
+
     const GROUP_COLORS = [
         '#0b66c3','#e74c3c','#27ae60','#f39c12','#8e44ad',
         '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
@@ -78,21 +89,14 @@ App.initializeStatistics = async function () {
     ];
 
     // =========================================================
-    // РАСЧЁТ КОНВЕРСИИ МЕЖДУ ВЫБРАННЫМИ МЕТРИКАМИ
-    // Строим карту: metric -> denominator_metric
-    // Берём только те метрики которые выбраны пользователем
+    // КАРТА КОНВЕРСИЙ
     // =========================================================
     function buildConversionMap(selectedMetrics) {
-        // convMap[metric] = метрика-знаменатель (из выбранных)
         const convMap = {};
         const selected = new Set(selectedMetrics);
-
-        // Для каждой метрики в воронке ищем ближайший предыдущий выбранный знаменатель
         for (let i = 0; i < FUNNEL_ORDER.length; i++) {
             const metric = FUNNEL_ORDER[i];
             if (!selected.has(metric)) continue;
-
-            // Ищем ближайшую предыдущую выбранную метрику как знаменатель
             let denominator = null;
             for (let j = i - 1; j >= 0; j--) {
                 if (selected.has(FUNNEL_ORDER[j])) {
@@ -100,10 +104,8 @@ App.initializeStatistics = async function () {
                     break;
                 }
             }
-            convMap[metric] = denominator; // null = нет знаменателя (первая метрика)
+            convMap[metric] = denominator;
         }
-
-        // Метрики вне воронки (expenses, cpl, cpo, invoices_sum, romi) — без конверсии
         return convMap;
     }
 
@@ -126,7 +128,6 @@ App.initializeStatistics = async function () {
             optsCont.innerHTML = '';
             const filtered = config.items.filter(i =>
                 i.name.toLowerCase().includes(q));
-
             filtered.forEach(item => {
                 const isSelected = state.selected.includes(item.id);
                 const isExcluded = state.excluded.includes(item.id);
@@ -138,10 +139,10 @@ App.initializeStatistics = async function () {
                     <span class="mf-option-name">${item.name}</span>
                     <span class="mf-option-actions">
                         <button type="button"
-                            class="mf-btn-include ${isSelected ? 'mf-btn-active':''}"
+                            class="mf-btn-include ${isSelected?'mf-btn-active':''}"
                             title="Включить">✓</button>
                         <button type="button"
-                            class="mf-btn-exclude ${isExcluded ? 'mf-btn-active mf-btn-exc-active':''}"
+                            class="mf-btn-exclude ${isExcluded?'mf-btn-active mf-btn-exc-active':''}"
                             title="Исключить">✕</button>
                     </span>`;
                 row.querySelector('.mf-btn-include').addEventListener('click', e => {
@@ -166,11 +167,8 @@ App.initializeStatistics = async function () {
                 });
                 optsCont.appendChild(row);
             });
-
-            if (filtered.length === 0) {
-                optsCont.innerHTML =
-                    `<div class="mf-no-results">Ничего не найдено</div>`;
-            }
+            if (filtered.length === 0)
+                optsCont.innerHTML = `<div class="mf-no-results">Ничего не найдено</div>`;
         }
 
         function renderTags() {
@@ -182,8 +180,7 @@ App.initializeStatistics = async function () {
                 const tag = document.createElement('span');
                 tag.className = 'mf-tag mf-tag-include';
                 tag.innerHTML = `${item.name}
-                    <span class="mf-tag-remove"
-                        data-id="${id}" data-type="include">×</span>`;
+                    <span class="mf-tag-remove" data-id="${id}" data-type="include">×</span>`;
                 tagsCont.appendChild(tag);
             });
             state.excluded.forEach(id => {
@@ -192,8 +189,7 @@ App.initializeStatistics = async function () {
                 const tag = document.createElement('span');
                 tag.className = 'mf-tag mf-tag-exclude';
                 tag.innerHTML = `НЕ ${item.name}
-                    <span class="mf-tag-remove"
-                        data-id="${id}" data-type="exclude">×</span>`;
+                    <span class="mf-tag-remove" data-id="${id}" data-type="exclude">×</span>`;
                 tagsCont.appendChild(tag);
             });
             tagsCont.querySelectorAll('.mf-tag-remove').forEach(btn => {
@@ -335,10 +331,9 @@ App.initializeStatistics = async function () {
     function initPeriodModeHandlers() {
         periodModeSelect.addEventListener('change', () => {
             const isStrict = periodModeSelect.value === 'strict';
-            periodModeHint.style.display    = isStrict ? 'flex' : 'none';
-            attributionWrap.style.display   = isStrict ? ''     : 'none';
+            periodModeHint.style.display  = isStrict ? 'flex' : 'none';
+            attributionWrap.style.display = isStrict ? ''     : 'none';
         });
-
         cmpPeriodMode.addEventListener('change', () => {
             const isStrict = cmpPeriodMode.value === 'strict';
             cmpPeriodModeHint.style.display  = isStrict ? 'flex' : 'none';
@@ -435,6 +430,42 @@ App.initializeStatistics = async function () {
             </tr>`;
     }
 
+    // =========================================================
+    // ПОСТРОЕНИЕ КАРТЫ ГРУПП ЛИДОВ
+    // {lead_id: ['answered', 'meeting_scheduled', ...]}
+    // Используется в попапе для отображения меток
+    // =========================================================
+    function buildLeadGroupsMap(data) {
+        // data — массив строк таблицы (ответ get_statistics_grouped)
+        const map = {}; // lead_id (string) -> Set of group keys
+
+        // Группы и соответствующие им ids_* поля
+        const groupFields = [
+            { key: 'ids_answered',           group: 'ids_answered' },
+            { key: 'ids_meeting_scheduled',  group: 'ids_meeting_scheduled' },
+            { key: 'ids_arrival',            group: 'ids_arrival' },
+            { key: 'ids_success',            group: 'ids_success' },
+            { key: 'ids_clients',            group: 'ids_clients' },
+            { key: 'ids_deals',              group: 'ids_deals' },
+            { key: 'ids_deals_with_payment', group: 'ids_deals_with_payment' },
+        ];
+
+        data.forEach(row => {
+            if (row.source_name === 'Итого') return; // пропускаем итог
+
+            groupFields.forEach(({ key, group }) => {
+                const ids = row[key] || [];
+                ids.forEach(id => {
+                    const sid = String(id);
+                    if (!map[sid]) map[sid] = new Set();
+                    map[sid].add(group);
+                });
+            });
+        });
+
+        return map;
+    }
+
     function renderTableBody(data) {
         tableBody.innerHTML = '';
         if (!data || data.length === 0) {
@@ -442,6 +473,10 @@ App.initializeStatistics = async function () {
                 `<tr><td colspan="15">Нет данных за выбранный период.</td></tr>`;
             return;
         }
+
+        // Строим карту групп для попапа детализации
+        _currentLeadGroups = buildLeadGroupsMap(data);
+
         data.forEach(row => {
             const tr = document.createElement('tr');
             if (row.source_name === "Итого") tr.classList.add('summary-row');
@@ -556,6 +591,27 @@ App.initializeStatistics = async function () {
     }
 
     // =========================================================
+    // МЕТКИ ГРУПП ДЛЯ ЛИДА В ПОПАПЕ
+    // Возвращает HTML строку с цветными бейджами
+    // =========================================================
+    function renderLeadGroupBadges(leadId) {
+        const sid    = String(leadId);
+        const groups = _currentLeadGroups[sid];
+        if (!groups || groups.size === 0) return '';
+
+        const badges = LEAD_GROUP_BADGES
+            .filter(g => groups.has(g.key))
+            .map(g => `<span class="detail-group-badge"
+                style="background:${g.color}18;color:${g.color};
+                       border:1px solid ${g.color}44;">
+                ${g.label}
+            </span>`)
+            .join('');
+
+        return badges ? `<span class="detail-group-badges">${badges}</span>` : '';
+    }
+
+    // =========================================================
     // POPUP ДЕТАЛИЗАЦИИ
     // =========================================================
     function initLeadsDetailPopup() {
@@ -592,28 +648,53 @@ App.initializeStatistics = async function () {
                 `<div style="padding:16px;color:#828b95;">Нет данных.</div>`;
             return;
         }
-        let col1 = type === 'contact' ? 'Контакт' : type === 'deal' ? 'Сделка' : 'Лид';
+
+        const col1 = type === 'contact' ? 'Контакт' : type === 'deal' ? 'Сделка' : 'Лид';
+
+        // Для контактов и сделок метки берём по связанному лиду
+        // Для лидов — напрямую по id
         const rows = items.map(item => {
             const mainLink = `<a href="${item.url}" target="_blank"
                 class="detail-link">${item.name||`#${item.id}`}</a>`;
+
+            // Определяем lead_id для меток:
+            // - тип lead: item.id это и есть lead_id
+            // - тип contact/deal: нет прямой связи с lead_id в ответе,
+            //   но ids_clients/ids_deals содержат contact_id/deal_id
+            //   поэтому для контактов и сделок метки не показываем
+            //   (они показываются только для лидов)
+            let badgesHtml = '';
+            if (type === 'lead') {
+                badgesHtml = renderLeadGroupBadges(item.id);
+            }
+
             let contactCell = `<span style="color:#c6cdd3;">—</span>`;
             if (item.contact) contactCell = `<a href="${item.contact.url}"
                 target="_blank" class="detail-link detail-link-secondary">
                 ${item.contact.name}</a>`;
+
             let dealCell = `<span style="color:#c6cdd3;">—</span>`;
             if (item.deal) dealCell = `<a href="${item.deal.url}"
                 target="_blank" class="detail-link detail-link-secondary">
                 ${item.deal.title}</a>`;
+
             const dateVal = item.deal
                 ? formatDate(item.deal.date_create)
                 : formatDate(item.date_create);
+
             return `<tr class="detail-row">
-                <td class="detail-td detail-td-main">${mainLink}</td>
+                <td class="detail-td detail-td-main">
+                    <div class="detail-main-wrap">
+                        ${mainLink}
+                        ${badgesHtml}
+                    </div>
+                </td>
                 <td class="detail-td detail-td-secondary">${contactCell}</td>
                 <td class="detail-td detail-td-secondary">${dealCell}</td>
                 <td class="detail-td detail-td-date">${dateVal}</td>
             </tr>`;
         }).join('');
+
         leadsDetailContent.innerHTML = `
             <table class="detail-table">
                 <thead><tr>
@@ -752,6 +833,11 @@ App.initializeStatistics = async function () {
 
     // =========================================================
     // ТАБЛИЦА СРАВНЕНИЯ
+    // Структура заголовка для недель:
+    // Строка 0 (только weeks): [group] [Январь colspan=N*M] [Февраль ...] ...
+    // Строка 1: [group rowspan] [Нед.1 (01.01-07.01) colspan=M] [Нед.2...] ...
+    // Строка 2: [метрики]
+    // Для месяцев: 2 строки (период + метрики)
     // =========================================================
     function renderComparisonTable(data, selectedMetrics) {
         if (!data || !data.rows || data.rows.length === 0) {
@@ -761,49 +847,103 @@ App.initializeStatistics = async function () {
             return;
         }
 
+        const periods      = data.rows[0].periods; // берём из первой строки
         const periodLabels = data.period_labels || [];
         const rows         = data.rows;
         const groupLabels  = data.group_labels || {};
         const metricCount  = selectedMetrics.length;
+        const isWeek       = data.period_type === 'week';
+        const convMap      = buildConversionMap(selectedMetrics);
 
-        // Строим карту конверсий между выбранными метриками
-        const convMap = buildConversionMap(selectedMetrics);
+        const groupThLabel = data.grouping
+            ? (METRIC_LABELS[data.grouping] || data.grouping)
+            : 'Группировка';
 
-        // ---- ЗАГОЛОВОК ----
-        let head1 = `<tr>
-            <th class="cmp-th-group col-sticky" rowspan="2">
-                ${data.grouping
-                    ? (METRIC_LABELS[data.grouping] || data.grouping)
-                    : 'Группировка'}
-            </th>`;
-        periodLabels.forEach(label => {
-            head1 += `<th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
-        });
-        head1 += '</tr>';
+        let headHtml = '';
 
-        let head2 = '<tr>';
-        periodLabels.forEach(() => {
-            selectedMetrics.forEach(metric => {
-                head2 += `<th class="cmp-th-metric">${METRIC_LABELS[metric] || metric}</th>`;
+        if (isWeek) {
+            // -------------------------------------------------------
+            // Для недель: 3 строки заголовка
+            // Строка 1: [group rowspan=3] + месяца (colspan = кол-во недель * metricCount)
+            // Строка 2: недели (colspan = metricCount)
+            // Строка 3: метрики
+            // -------------------------------------------------------
+
+            // Группируем периоды по месяцам
+            // Каждый период имеет date_from — берём из него месяц
+            const monthGroups = []; // [{monthLabel, count}]
+            periods.forEach(p => {
+                const df = p.date_from; // 'YYYY-MM-DD'
+                const d  = new Date(df + 'T00:00:00');
+                const monthLabel = d.toLocaleString('ru-RU', { month: 'long' })
+                    .replace(/^./, c => c.toUpperCase()); // Январь, Февраль...
+
+                if (monthGroups.length === 0 ||
+                    monthGroups[monthGroups.length - 1].label !== monthLabel) {
+                    monthGroups.push({ label: monthLabel, count: 1 });
+                } else {
+                    monthGroups[monthGroups.length - 1].count++;
+                }
             });
-        });
-        head2 += '</tr>';
 
-        cmpTableHead.innerHTML = head1 + head2;
+            // Строка 1: group + месяца
+            headHtml += `<tr>
+                <th class="cmp-th-group col-sticky" rowspan="3">${groupThLabel}</th>`;
+            monthGroups.forEach(mg => {
+                headHtml += `<th class="cmp-th-month"
+                    colspan="${mg.count * metricCount}">${mg.label}</th>`;
+            });
+            headHtml += '</tr>';
+
+            // Строка 2: недели с датами
+            headHtml += '<tr>';
+            periodLabels.forEach(label => {
+                headHtml += `<th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
+            });
+            headHtml += '</tr>';
+
+            // Строка 3: метрики
+            headHtml += '<tr>';
+            periodLabels.forEach(() => {
+                selectedMetrics.forEach(metric => {
+                    headHtml += `<th class="cmp-th-metric">${METRIC_LABELS[metric]||metric}</th>`;
+                });
+            });
+            headHtml += '</tr>';
+
+        } else {
+            // -------------------------------------------------------
+            // Для месяцев: 2 строки (как было)
+            // Строка 1: [group rowspan=2] + периоды
+            // Строка 2: метрики
+            // -------------------------------------------------------
+            headHtml += `<tr>
+                <th class="cmp-th-group col-sticky" rowspan="2">${groupThLabel}</th>`;
+            periodLabels.forEach(label => {
+                headHtml += `<th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
+            });
+            headHtml += '</tr><tr>';
+            periodLabels.forEach(() => {
+                selectedMetrics.forEach(metric => {
+                    headHtml += `<th class="cmp-th-metric">${METRIC_LABELS[metric]||metric}</th>`;
+                });
+            });
+            headHtml += '</tr>';
+        }
+
+        cmpTableHead.innerHTML = headHtml;
 
         // ---- ТЕЛО ----
         let bodyHtml = '';
         rows.forEach(row => {
             const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
             bodyHtml += `<tr><td class="cmp-td-group col-sticky">${groupLabel}</td>`;
-
             row.periods.forEach(period => {
                 selectedMetrics.forEach(metric => {
                     const mdata = period.metrics[metric];
-                    bodyHtml += renderCmpDataCell(metric, mdata, convMap, period, selectedMetrics);
+                    bodyHtml += renderCmpDataCell(metric, mdata, convMap, period);
                 });
             });
-
             bodyHtml += '</tr>';
         });
 
@@ -812,10 +952,8 @@ App.initializeStatistics = async function () {
 
     // =========================================================
     // ЯЧЕЙКА ДАННЫХ ТАБЛИЦЫ СРАВНЕНИЯ
-    // Строка 1: значение (+ конверсия от выбранного знаменателя)
-    // Строка 2: дельта к предыдущему периоду (всегда с новой строки)
     // =========================================================
-    function renderCmpDataCell(metric, mdata, convMap, period, selectedMetrics) {
+    function renderCmpDataCell(metric, mdata, convMap, period) {
         if (!mdata) {
             return `<td class="cmp-td"><div class="cmp-cell-inner">
                 <div class="cmp-cell-top">
@@ -826,13 +964,9 @@ App.initializeStatistics = async function () {
 
         const val     = mdata.value;
         const pctPrev = mdata.pct_from_prev;
+        const valStr  = formatMetricValue(metric, val);
 
-        const valStr = formatMetricValue(metric, val);
-
-        // -------------------------------------------------------
-        // Конверсия: считаем относительно знаменателя из выбранных метрик
-        // convMap[metric] = метрика-знаменатель (из выбранных пользователем)
-        // -------------------------------------------------------
+        // Конверсия от выбранного знаменателя
         let convHtml = '';
         const denominatorMetric = convMap ? convMap[metric] : null;
         if (denominatorMetric && period && period.metrics) {
@@ -844,32 +978,27 @@ App.initializeStatistics = async function () {
             }
         }
 
-        // -------------------------------------------------------
-        // Дельты — всегда с новой строки, одинаковый размер
-        // -------------------------------------------------------
+        // Дельты
         let deltaItems = [];
 
-        // Дельта значения к предыдущему периоду
         if (pctPrev !== null && pctPrev !== undefined) {
-            const isUp   = pctPrev > 0;
+            const isUp  = pctPrev > 0;
             const isDown = pctPrev < 0;
-            const sign   = isUp ? '+' : '';
-            const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
-            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
+            const sign  = isUp ? '+' : '';
+            const cls   = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
+            const arrow = isUp ? '↑' : isDown ? '↓' : '→';
             deltaItems.push(
                 `<span class="cmp-delta cmp-delta-fixed ${cls}">${arrow}&nbsp;${sign}${pctPrev.toFixed(1)}%</span>`
             );
         }
 
-        // Дельта конверсии к предыдущему периоду (в пп) — из бэкенда
-        // Используем pct_conv_from_prev только если есть конверсия в бэкенде
         const pctConv = mdata.pct_conv_from_prev;
         if (CONVERSION_METRICS.has(metric) && pctConv !== null && pctConv !== undefined) {
-            const isUp   = pctConv > 0;
+            const isUp  = pctConv > 0;
             const isDown = pctConv < 0;
-            const sign   = isUp ? '+' : '';
-            const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
-            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
+            const sign  = isUp ? '+' : '';
+            const cls   = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
+            const arrow = isUp ? '↑' : isDown ? '↓' : '→';
             deltaItems.push(
                 `<span class="cmp-delta cmp-delta-fixed cmp-delta-conv ${cls}">${arrow}&nbsp;${sign}${pctConv.toFixed(1)}пп</span>`
             );
@@ -902,13 +1031,11 @@ App.initializeStatistics = async function () {
         if (!cmpChartsWrap) return;
         cmpChartsWrap.innerHTML = '';
 
-        // Проверяем наличие Chart.js
         if (typeof Chart === 'undefined') {
             console.error('Chart.js не загружен');
             cmpChartsWrap.innerHTML =
                 `<div style="padding:16px;color:#e74c3c;text-align:center;">
-                    ⚠️ Не удалось загрузить библиотеку графиков (Chart.js).
-                    Проверьте интернет-соединение.
+                    ⚠️ Chart.js не загружен. Проверьте интернет-соединение.
                 </div>`;
             return;
         }
@@ -918,13 +1045,11 @@ App.initializeStatistics = async function () {
         const periodLabels = data.period_labels || [];
         const rows         = data.rows;
         const groupLabels  = data.group_labels || {};
-
-        // Строим карту конверсий для графиков
-        const convMap = buildConversionMap(selectedMetrics);
+        const convMap      = buildConversionMap(selectedMetrics);
 
         selectedMetrics.forEach((metric) => {
             const metricLabel = METRIC_LABELS[metric] || metric;
-            const hasConv     = !!(convMap[metric]); // есть знаменатель среди выбранных
+            const hasConv     = !!(convMap[metric]);
 
             const chartBlock = document.createElement('div');
             chartBlock.className = 'cmp-chart-block';
@@ -945,7 +1070,6 @@ App.initializeStatistics = async function () {
                 const color      = GROUP_COLORS[rowIdx % GROUP_COLORS.length];
                 const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
 
-                // Значения метрики
                 const valData = row.periods.map(p => {
                     const m = p.metrics[metric];
                     return m ? (m.value || 0) : 0;
@@ -964,14 +1088,12 @@ App.initializeStatistics = async function () {
                     fill:            false,
                 });
 
-                // Конверсия — пунктирная линия на правой оси
-                // Считаем из выбранных метрик (convMap)
                 if (hasConv) {
                     const denomMetric = convMap[metric];
                     const convData = row.periods.map(p => {
                         const mVal     = p.metrics[metric];
                         const denomVal = p.metrics[denomMetric];
-                        const v  = mVal    ? (mVal.value    || 0) : 0;
+                        const v  = mVal     ? (mVal.value     || 0) : 0;
                         const dv = denomVal ? (denomVal.value || 0) : 0;
                         return dv > 0 ? parseFloat((v / dv * 100).toFixed(2)) : 0;
                     });
@@ -1003,11 +1125,10 @@ App.initializeStatistics = async function () {
                     ticks: {
                         font: { size: 11 }, color: '#535c69',
                         callback: (val) => {
-                            if (CURRENCY_METRICS.has(metric)) {
+                            if (CURRENCY_METRICS.has(metric))
                                 return new Intl.NumberFormat('ru-RU', {
                                     notation: 'compact', compactDisplay: 'short'
                                 }).format(val) + ' ₽';
-                            }
                             if (PERCENT_METRICS.has(metric)) return val + '%';
                             return val;
                         }
@@ -1024,10 +1145,8 @@ App.initializeStatistics = async function () {
                         callback: (val) => val + '%'
                     },
                     title: {
-                        display: true,
-                        text:    'Конверсия %',
-                        font:    { size: 10 },
-                        color:   '#9aabb8'
+                        display: true, text: 'Конверсия %',
+                        font: { size: 10 }, color: '#9aabb8'
                     }
                 };
             }
@@ -1043,9 +1162,7 @@ App.initializeStatistics = async function () {
                         plugins: {
                             legend: {
                                 position: 'top',
-                                labels: {
-                                    font: { size: 11 }, boxWidth: 14, padding: 10
-                                }
+                                labels: { font: { size: 11 }, boxWidth: 14, padding: 10 }
                             },
                             tooltip: {
                                 callbacks: {
@@ -1053,8 +1170,7 @@ App.initializeStatistics = async function () {
                                         const ds     = ctx.dataset;
                                         const isConv = ds.yAxisID === 'y2';
                                         const val    = ctx.parsed.y;
-                                        if (isConv)
-                                            return `${ds.label}: ${val.toFixed(1)}%`;
+                                        if (isConv) return `${ds.label}: ${val.toFixed(1)}%`;
                                         if (CURRENCY_METRICS.has(metric))
                                             return `${ds.label}: ${formatCurrency(val)}`;
                                         if (PERCENT_METRICS.has(metric))
