@@ -22,14 +22,16 @@
                     <div class="ui-form-content">
                         <div class="filter-grid stats-filter-grid">
 
-                            <!-- Дата от -->
-                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
-                                <input type="text" id="stats-start-date" class="ui-ctl-element" placeholder="Дата от...">
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100
+                                        ui-ctl-after-icon ui-ctl-icon-calendar">
+                                <input type="text" id="stats-start-date"
+                                       class="ui-ctl-element" placeholder="Дата от...">
                             </div>
 
-                            <!-- Дата до -->
-                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100 ui-ctl-after-icon ui-ctl-icon-calendar">
-                                <input type="text" id="stats-end-date" class="ui-ctl-element" placeholder="Дата до...">
+                            <div class="ui-ctl ui-ctl-textbox ui-ctl-w100
+                                        ui-ctl-after-icon ui-ctl-icon-calendar">
+                                <input type="text" id="stats-end-date"
+                                       class="ui-ctl-element" placeholder="Дата до...">
                             </div>
 
                             <!-- Источник -->
@@ -37,13 +39,17 @@
                                 <div class="multi-filter-label">Источник</div>
                                 <div class="multi-filter-box" id="stats-source-box">
                                     <div class="multi-filter-placeholder">Все источники</div>
-                                    <div class="multi-filter-dropdown" id="stats-source-dropdown" style="display:none;">
+                                    <div class="multi-filter-dropdown"
+                                         id="stats-source-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
-                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                            <input type="text" class="multi-filter-search"
+                                                   placeholder="Поиск...">
                                         </div>
-                                        <div class="multi-filter-options" id="stats-source-options"></div>
+                                        <div class="multi-filter-options"
+                                             id="stats-source-options"></div>
                                         <div class="multi-filter-footer">
-                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                            <button type="button"
+                                                    class="multi-filter-clear">Сбросить</button>
                                         </div>
                                     </div>
                                 </div>
@@ -55,13 +61,17 @@
                                 <div class="multi-filter-label">Отдел продаж</div>
                                 <div class="multi-filter-box" id="stats-dept-box">
                                     <div class="multi-filter-placeholder">Не выбрано</div>
-                                    <div class="multi-filter-dropdown" id="stats-dept-dropdown" style="display:none;">
+                                    <div class="multi-filter-dropdown"
+                                         id="stats-dept-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
-                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                            <input type="text" class="multi-filter-search"
+                                                   placeholder="Поиск...">
                                         </div>
-                                        <div class="multi-filter-options" id="stats-dept-options"></div>
+                                        <div class="multi-filter-options"
+                                             id="stats-dept-options"></div>
                                         <div class="multi-filter-footer">
-                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                            <button type="button"
+                                                    class="multi-filter-clear">Сбросить</button>
                                         </div>
                                     </div>
                                 </div>
@@ -90,12 +100,15 @@
                         </div>
 
                         <!-- Подсказка режима -->
-                        <div id="stats-period-mode-hint" class="period-mode-hint" style="display:none;">
+                        <div id="stats-period-mode-hint"
+                             class="period-mode-hint" style="display:none;">
                             <span class="period-mode-hint-icon">ℹ️</span>
                             <span class="period-mode-hint-text">
-                                <b>Режим «В разрезе периода»:</b> учитываются только те лиды, у которых
-                                дата изменения статуса попадает в указанный период.
-                                Сделки и счета также фильтруются по дате создания в этом периоде.
+                                <b>Режим «В разрезе периода»:</b>
+                                берутся лиды созданные в периоде.
+                                Статусы учитываются только если они были установлены
+                                в этом периоде. Сделки и счета — только созданные
+                                в этом же периоде.
                             </span>
                         </div>
 
@@ -104,12 +117,12 @@
                 <div class="ui-form-row ui-form-row-bottom-buttons">
                     <div class="ui-form-content">
                         <button type="submit" class="ui-btn ui-btn-primary">Применить</button>
-                        <button type="button" id="stats-reset-btn" class="ui-btn ui-btn-light-border">Сбросить</button>
+                        <button type="button" id="stats-reset-btn"
+                                class="ui-btn ui-btn-light-border">Сбросить</button>
                     </div>
                 </div>
             </form>
 
-            <!-- Таблица -->
             <div class="expenses-table-container">
                 <table class="expenses-table">
                     <thead id="statistics-table-head"></thead>
@@ -126,16 +139,19 @@
                 <div class="ui-form-row">
                     <div class="ui-form-content">
 
-                        <div class="filter-grid stats-filter-grid" style="margin-bottom:12px;">
+                        <div class="filter-grid stats-filter-grid"
+                             style="margin-bottom:12px;">
 
                             <!-- Год -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl ui-ctl-after-icon
+                                        ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="cmp-year" class="ui-ctl-element"></select>
                             </div>
 
                             <!-- Тип периода -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl ui-ctl-after-icon
+                                        ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="cmp-period-type" class="ui-ctl-element">
                                     <option value="month">По месяцам</option>
@@ -144,7 +160,8 @@
                             </div>
 
                             <!-- Группировка -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl ui-ctl-after-icon
+                                        ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="cmp-grouping" class="ui-ctl-element">
                                     <option value="">Без группировки</option>
@@ -155,7 +172,8 @@
                             </div>
 
                             <!-- Режим периода -->
-                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                            <div class="ui-ctl ui-ctl-after-icon
+                                        ui-ctl-dropdown ui-ctl-w100">
                                 <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                                 <select id="cmp-period-mode" class="ui-ctl-element">
                                     <option value="standard">Стандартный режим</option>
@@ -164,21 +182,27 @@
                             </div>
 
                             <!-- Значения группировки -->
-                            <div class="multi-filter-wrap" id="cmp-group-value-wrap" style="display:none;">
+                            <div class="multi-filter-wrap"
+                                 id="cmp-group-value-wrap" style="display:none;">
                                 <div class="multi-filter-label">Значение группировки</div>
                                 <div class="multi-filter-box" id="cmp-group-value-box">
                                     <div class="multi-filter-placeholder">Все</div>
-                                    <div class="multi-filter-dropdown" id="cmp-group-value-dropdown" style="display:none;">
+                                    <div class="multi-filter-dropdown"
+                                         id="cmp-group-value-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
-                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                            <input type="text" class="multi-filter-search"
+                                                   placeholder="Поиск...">
                                         </div>
-                                        <div class="multi-filter-options" id="cmp-group-value-options"></div>
+                                        <div class="multi-filter-options"
+                                             id="cmp-group-value-options"></div>
                                         <div class="multi-filter-footer">
-                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                            <button type="button"
+                                                    class="multi-filter-clear">Сбросить</button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="multi-filter-tags" id="cmp-group-value-tags"></div>
+                                <div class="multi-filter-tags"
+                                     id="cmp-group-value-tags"></div>
                             </div>
 
                             <!-- Отдел продаж -->
@@ -186,13 +210,17 @@
                                 <div class="multi-filter-label">Отдел продаж</div>
                                 <div class="multi-filter-box" id="cmp-dept-box">
                                     <div class="multi-filter-placeholder">Не выбрано</div>
-                                    <div class="multi-filter-dropdown" id="cmp-dept-dropdown" style="display:none;">
+                                    <div class="multi-filter-dropdown"
+                                         id="cmp-dept-dropdown" style="display:none;">
                                         <div class="multi-filter-search-wrap">
-                                            <input type="text" class="multi-filter-search" placeholder="Поиск...">
+                                            <input type="text" class="multi-filter-search"
+                                                   placeholder="Поиск...">
                                         </div>
-                                        <div class="multi-filter-options" id="cmp-dept-options"></div>
+                                        <div class="multi-filter-options"
+                                             id="cmp-dept-options"></div>
                                         <div class="multi-filter-footer">
-                                            <button type="button" class="multi-filter-clear">Сбросить</button>
+                                            <button type="button"
+                                                    class="multi-filter-clear">Сбросить</button>
                                         </div>
                                     </div>
                                 </div>
@@ -201,51 +229,84 @@
 
                         </div>
 
-                        <!-- Подсказка режима (сравнение) -->
-                        <div id="cmp-period-mode-hint" class="period-mode-hint" style="display:none;">
+                        <!-- Подсказка режима -->
+                        <div id="cmp-period-mode-hint"
+                             class="period-mode-hint" style="display:none;">
                             <span class="period-mode-hint-icon">ℹ️</span>
                             <span class="period-mode-hint-text">
-                                <b>Режим «В разрезе периода»:</b> для каждого периода учитываются
-                                только лиды с датой изменения статуса в этом периоде,
-                                а также сделки и счета, созданные в этом периоде.
+                                <b>Режим «В разрезе периода»:</b>
+                                для каждого периода учитываются лиды созданные в нём,
+                                статусы установленные в нём, сделки и счета созданные в нём.
                             </span>
                         </div>
 
-                        <!-- Выбор показателей -->
+                        <!-- Показатели -->
                         <div class="stats-metrics-picker">
                             <div class="stats-metrics-header">
                                 <span class="stats-metrics-label">Показатели:</span>
                                 <button type="button" id="cmp-select-all-metrics"
                                         class="ui-btn ui-btn-light-border"
-                                        style="padding:4px 12px; font-size:12px;">
+                                        style="padding:4px 12px;font-size:12px;">
                                     Выбрать все
                                 </button>
                                 <button type="button" id="cmp-clear-all-metrics"
                                         class="ui-btn ui-btn-light-border"
-                                        style="padding:4px 12px; font-size:12px;">
+                                        style="padding:4px 12px;font-size:12px;">
                                     Снять все
                                 </button>
                             </div>
                             <div class="stats-metrics-list" id="cmp-metrics-list">
                                 <div class="stats-metrics-col">
-                                    <label><input type="checkbox" value="expenses"> Расходы</label>
-                                    <label><input type="checkbox" value="total"> Лиды</label>
-                                    <label><input type="checkbox" value="cpl"> CPL</label>
-                                    <label><input type="checkbox" value="answered"> Дозвон</label>
-                                    <label><input type="checkbox" value="meeting_scheduled"> Назначена встреча</label>
+                                    <label>
+                                        <input type="checkbox" value="expenses"> Расходы
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="total"> Лиды
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="cpl"> CPL
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="answered"> Дозвон
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="meeting_scheduled">
+                                        Назначена встреча
+                                    </label>
                                 </div>
                                 <div class="stats-metrics-col">
-                                    <label><input type="checkbox" value="arrival"> Приход</label>
-                                    <label><input type="checkbox" value="success"> Успех</label>
-                                    <label><input type="checkbox" value="clients"> Клиенты</label>
-                                    <label><input type="checkbox" value="clients_with_payment"> Клиенты с оплатой</label>
-                                    <label><input type="checkbox" value="deals"> Сделки</label>
+                                    <label>
+                                        <input type="checkbox" value="arrival"> Приход
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="success"> Успех
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="clients"> Клиенты
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="clients_with_payment">
+                                        Клиенты с оплатой
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="deals"> Сделки
+                                    </label>
                                 </div>
                                 <div class="stats-metrics-col">
-                                    <label><input type="checkbox" value="deals_with_payment"> Сделки с оплатой</label>
-                                    <label><input type="checkbox" value="cpo"> CPO</label>
-                                    <label><input type="checkbox" value="invoices_sum"> Сумма счетов</label>
-                                    <label><input type="checkbox" value="romi"> ROMI</label>
+                                    <label>
+                                        <input type="checkbox" value="deals_with_payment">
+                                        Сделки с оплатой
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="cpo"> CPO
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="invoices_sum">
+                                        Сумма счетов
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" value="romi"> ROMI
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -255,8 +316,10 @@
 
                 <div class="ui-form-row ui-form-row-bottom-buttons">
                     <div class="ui-form-content">
-                        <button type="submit" class="ui-btn ui-btn-primary">Построить</button>
-                        <button type="button" id="cmp-reset-btn" class="ui-btn ui-btn-light-border">Сбросить</button>
+                        <button type="submit"
+                                class="ui-btn ui-btn-primary">Построить</button>
+                        <button type="button" id="cmp-reset-btn"
+                                class="ui-btn ui-btn-light-border">Сбросить</button>
                     </div>
                 </div>
             </form>
@@ -268,7 +331,7 @@
                     <tbody id="comparison-table-body"></tbody>
                 </table>
                 <div id="comparison-empty"
-                     style="display:block; padding:24px; color:#828b95; text-align:center;">
+                     style="display:block;padding:24px;color:#828b95;text-align:center;">
                     Настройте фильтры и нажмите «Построить».
                 </div>
             </div>
@@ -277,20 +340,22 @@
 
         <!-- ===================== ВКЛАДКА: НАСТРОЙКИ ===================== -->
         <div class="stats-tab-content" id="stats-tab-settings">
-
             <div style="margin-bottom:24px;">
-                <div class="ui-form-title-text" style="font-size:16px; margin-bottom:12px;">
+                <div class="ui-form-title-text"
+                     style="font-size:16px;margin-bottom:12px;">
                     Пользовательские имена UTM-параметров
                 </div>
-                <p style="color:#828b95; font-size:13px; margin-bottom:16px;">
+                <p style="color:#828b95;font-size:13px;margin-bottom:16px;">
                     Задайте читаемые названия для значений utm_campaign и utm_content.
                     Если имя не задано — отображается исходное значение.
                 </p>
 
                 <form id="utm-label-form" class="ui-form" style="margin-bottom:20px;">
                     <div class="filter-grid"
-                         style="grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:end;">
-                        <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100">
+                         style="grid-template-columns:1fr 1fr 2fr auto;
+                                gap:10px;align-items:end;">
+                        <div class="ui-ctl ui-ctl-after-icon
+                                    ui-ctl-dropdown ui-ctl-w100">
                             <div class="ui-ctl-after ui-ctl-icon-angle"></div>
                             <select id="utm-label-type" class="ui-ctl-element">
                                 <option value="utm_campaign">utm_campaign</option>
@@ -298,11 +363,12 @@
                             </select>
                         </div>
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="utm-label-value" class="ui-ctl-element"
-                                   placeholder="Значение UTM...">
+                            <input type="text" id="utm-label-value"
+                                   class="ui-ctl-element" placeholder="Значение UTM...">
                         </div>
                         <div class="ui-ctl ui-ctl-textbox ui-ctl-w100">
-                            <input type="text" id="utm-label-name" class="ui-ctl-element"
+                            <input type="text" id="utm-label-name"
+                                   class="ui-ctl-element"
                                    placeholder="Пользовательское имя...">
                         </div>
                         <button type="submit" class="ui-btn ui-btn-primary"
@@ -317,19 +383,20 @@
                                 <th>Тип</th>
                                 <th>Значение UTM</th>
                                 <th>Пользовательское имя</th>
-                                <th style="width:80px; text-align:center;">Действия</th>
+                                <th style="width:80px;text-align:center;">Действия</th>
                             </tr>
                         </thead>
                         <tbody id="utm-labels-body">
                             <tr>
                                 <td colspan="4"
-                                    style="text-align:center; color:#828b95;">Загрузка...</td>
+                                    style="text-align:center;color:#828b95;">
+                                    Загрузка...
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div><!-- /stats-tab-settings -->
 
     </div><!-- /ui-card -->
@@ -343,7 +410,9 @@
             </div>
             <div class="leads-detail-body">
                 <div id="leads-detail-content">
-                    <div style="text-align:center; padding:20px; color:#828b95;">Загрузка...</div>
+                    <div style="text-align:center;padding:20px;color:#828b95;">
+                        Загрузка...
+                    </div>
                 </div>
             </div>
         </div>

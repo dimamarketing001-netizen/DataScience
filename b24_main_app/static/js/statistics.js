@@ -27,26 +27,23 @@ App.initializeStatistics = async function () {
     const cmpTableBody      = document.getElementById('comparison-table-body');
     const cmpEmpty          = document.getElementById('comparison-empty');
 
-    const utmLabelForm      = document.getElementById('utm-label-form');
-    const utmLabelType      = document.getElementById('utm-label-type');
-    const utmLabelValue     = document.getElementById('utm-label-value');
-    const utmLabelName      = document.getElementById('utm-label-name');
-    const utmLabelsBody     = document.getElementById('utm-labels-body');
+    const utmLabelForm   = document.getElementById('utm-label-form');
+    const utmLabelType   = document.getElementById('utm-label-type');
+    const utmLabelValue  = document.getElementById('utm-label-value');
+    const utmLabelName   = document.getElementById('utm-label-name');
+    const utmLabelsBody  = document.getElementById('utm-labels-body');
 
     const leadsDetailOverlay = document.getElementById('leads-detail-overlay');
     const leadsDetailTitle   = document.getElementById('leads-detail-title');
     const leadsDetailContent = document.getElementById('leads-detail-content');
     const leadsDetailClose   = document.getElementById('leads-detail-close');
 
-    // Кэш
     let sourcesCache   = [];
     let salesDeptCache = [];
 
-    // Метрики с конверсией
     const CONVERSION_METRICS = new Set([
         'answered','meeting_scheduled','arrival','success','clients_with_payment'
     ]);
-
     const METRIC_LABELS = {
         expenses:'Расходы', total:'Лиды', cpl:'CPL',
         answered:'Дозвон', meeting_scheduled:'Назначена встреча',
@@ -59,7 +56,7 @@ App.initializeStatistics = async function () {
     const PERCENT_METRICS  = new Set(['romi']);
 
     // =========================================================
-    // МУЛЬТИФИЛЬТР — универсальный компонент
+    // МУЛЬТИФИЛЬТР
     // =========================================================
     function createMultiFilter(config) {
         const box      = document.getElementById(config.boxId);
@@ -75,103 +72,89 @@ App.initializeStatistics = async function () {
             if (!optsCont) return;
             const q = search ? search.value.toLowerCase() : '';
             optsCont.innerHTML = '';
-
             const filtered = config.items.filter(i =>
-                i.name.toLowerCase().includes(q)
-            );
+                i.name.toLowerCase().includes(q));
 
             filtered.forEach(item => {
                 const isSelected = state.selected.includes(item.id);
                 const isExcluded = state.excluded.includes(item.id);
-
                 const row = document.createElement('div');
                 row.className = 'mf-option-row';
                 if (isSelected) row.classList.add('mf-selected');
                 if (isExcluded) row.classList.add('mf-excluded');
-
                 row.innerHTML = `
                     <span class="mf-option-name">${item.name}</span>
                     <span class="mf-option-actions">
                         <button type="button"
-                            class="mf-btn-include ${isSelected ? 'mf-btn-active' : ''}"
+                            class="mf-btn-include ${isSelected ? 'mf-btn-active':''}"
                             title="Включить">✓</button>
                         <button type="button"
-                            class="mf-btn-exclude ${isExcluded ? 'mf-btn-active mf-btn-exc-active' : ''}"
+                            class="mf-btn-exclude ${isExcluded ? 'mf-btn-active mf-btn-exc-active':''}"
                             title="Исключить">✕</button>
                     </span>`;
-
-                row.querySelector('.mf-btn-include').addEventListener('click', (e) => {
+                row.querySelector('.mf-btn-include').addEventListener('click', e => {
                     e.stopPropagation();
-                    if (isSelected) {
-                        state.selected = state.selected.filter(x => x !== item.id);
-                    } else {
+                    if (isSelected) state.selected = state.selected.filter(x => x !== item.id);
+                    else {
                         state.selected.push(item.id);
                         state.excluded = state.excluded.filter(x => x !== item.id);
                     }
                     renderTags(); render();
                     if (config.onChange) config.onChange(state.selected, state.excluded);
                 });
-
-                row.querySelector('.mf-btn-exclude').addEventListener('click', (e) => {
+                row.querySelector('.mf-btn-exclude').addEventListener('click', e => {
                     e.stopPropagation();
-                    if (isExcluded) {
-                        state.excluded = state.excluded.filter(x => x !== item.id);
-                    } else {
+                    if (isExcluded) state.excluded = state.excluded.filter(x => x !== item.id);
+                    else {
                         state.excluded.push(item.id);
                         state.selected = state.selected.filter(x => x !== item.id);
                     }
                     renderTags(); render();
                     if (config.onChange) config.onChange(state.selected, state.excluded);
                 });
-
                 optsCont.appendChild(row);
             });
 
             if (filtered.length === 0) {
-                optsCont.innerHTML = `
-                    <div class="mf-no-results">Ничего не найдено</div>`;
+                optsCont.innerHTML =
+                    `<div class="mf-no-results">Ничего не найдено</div>`;
             }
         }
 
         function renderTags() {
             if (!tagsCont) return;
             tagsCont.innerHTML = '';
-
             state.selected.forEach(id => {
                 const item = config.items.find(i => i.id === id);
                 if (!item) return;
                 const tag = document.createElement('span');
                 tag.className = 'mf-tag mf-tag-include';
                 tag.innerHTML = `${item.name}
-                    <span class="mf-tag-remove" data-id="${id}" data-type="include">×</span>`;
+                    <span class="mf-tag-remove"
+                        data-id="${id}" data-type="include">×</span>`;
                 tagsCont.appendChild(tag);
             });
-
             state.excluded.forEach(id => {
                 const item = config.items.find(i => i.id === id);
                 if (!item) return;
                 const tag = document.createElement('span');
                 tag.className = 'mf-tag mf-tag-exclude';
                 tag.innerHTML = `НЕ ${item.name}
-                    <span class="mf-tag-remove" data-id="${id}" data-type="exclude">×</span>`;
+                    <span class="mf-tag-remove"
+                        data-id="${id}" data-type="exclude">×</span>`;
                 tagsCont.appendChild(tag);
             });
-
             tagsCont.querySelectorAll('.mf-tag-remove').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const id   = btn.dataset.id;
-                    const type = btn.dataset.type;
-                    if (type === 'include') {
+                    const id = btn.dataset.id, type = btn.dataset.type;
+                    if (type === 'include')
                         state.selected = state.selected.filter(x => x !== id);
-                    } else {
+                    else
                         state.excluded = state.excluded.filter(x => x !== id);
-                    }
                     renderTags(); render();
                     if (config.onChange) config.onChange(state.selected, state.excluded);
                 });
             });
-
-            // Плейсхолдер
             const ph = box.querySelector('.multi-filter-placeholder');
             if (ph) {
                 const total = state.selected.length + state.excluded.length;
@@ -181,30 +164,25 @@ App.initializeStatistics = async function () {
             }
         }
 
-        // Открытие/закрытие
-        box.addEventListener('click', (e) => {
+        box.addEventListener('click', e => {
             if (e.target.closest('.multi-filter-dropdown')) return;
             state.open = !state.open;
             if (dropdown) dropdown.style.display = state.open ? 'block' : 'none';
             if (state.open) render();
         });
-
         if (search) {
             search.addEventListener('input', render);
             search.addEventListener('click', e => e.stopPropagation());
         }
-
         if (clearBtn) {
-            clearBtn.addEventListener('click', (e) => {
+            clearBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                state.selected = [];
-                state.excluded = [];
+                state.selected = []; state.excluded = [];
                 renderTags(); render();
                 if (config.onChange) config.onChange([], []);
             });
         }
-
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', e => {
             if (!box.contains(e.target)) {
                 state.open = false;
                 if (dropdown) dropdown.style.display = 'none';
@@ -214,15 +192,8 @@ App.initializeStatistics = async function () {
         return {
             getSelected: () => [...state.selected],
             getExcluded: () => [...state.excluded],
-            reset() {
-                state.selected = [];
-                state.excluded = [];
-                renderTags();
-            },
-            setItems(items) {
-                config.items = items;
-                render();
-            }
+            reset() { state.selected = []; state.excluded = []; renderTags(); },
+            setItems(items) { config.items = items; render(); }
         };
     }
 
@@ -252,57 +223,40 @@ App.initializeStatistics = async function () {
         try {
             initTabs();
 
-            const today         = new Date();
-            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const today = new Date();
+            const first = new Date(today.getFullYear(), today.getMonth(), 1);
             flatpickr(startDateInput, {
-                locale: "ru", dateFormat: "Y-m-d", defaultDate: firstDayOfMonth
+                locale:"ru", dateFormat:"Y-m-d", defaultDate: first
             });
             flatpickr(endDateInput, {
-                locale: "ru", dateFormat: "Y-m-d", defaultDate: today
+                locale:"ru", dateFormat:"Y-m-d", defaultDate: today
             });
 
-            // Источники
             sourcesCache = await getLeadSources();
-
-            // Мультифильтры — общая статистика
             window._mfStatsSource = createMultiFilter({
-                boxId: 'stats-source-box',
-                dropdownId: 'stats-source-dropdown',
-                optionsId: 'stats-source-options',
-                tagsId: 'stats-source-tags',
-                placeholder: 'Все источники',
-                items: sourcesCache.map(s => ({ id: s.id, name: s.name }))
+                boxId:'stats-source-box', dropdownId:'stats-source-dropdown',
+                optionsId:'stats-source-options', tagsId:'stats-source-tags',
+                placeholder:'Все источники',
+                items: sourcesCache.map(s => ({ id:s.id, name:s.name }))
             });
 
-            // Отделы продаж
             salesDeptCache = await getSalesDeptEnum();
-
             window._mfStatsDept = createMultiFilter({
-                boxId: 'stats-dept-box',
-                dropdownId: 'stats-dept-dropdown',
-                optionsId: 'stats-dept-options',
-                tagsId: 'stats-dept-tags',
-                placeholder: 'Не выбрано',
-                items: salesDeptCache.map(s => ({ id: s.id, name: s.value }))
+                boxId:'stats-dept-box', dropdownId:'stats-dept-dropdown',
+                optionsId:'stats-dept-options', tagsId:'stats-dept-tags',
+                placeholder:'Не выбрано',
+                items: salesDeptCache.map(s => ({ id:s.id, name:s.value }))
             });
-
-            // Мультифильтры — сравнение
             window._mfCmpDept = createMultiFilter({
-                boxId: 'cmp-dept-box',
-                dropdownId: 'cmp-dept-dropdown',
-                optionsId: 'cmp-dept-options',
-                tagsId: 'cmp-dept-tags',
-                placeholder: 'Не выбрано',
-                items: salesDeptCache.map(s => ({ id: s.id, name: s.value }))
+                boxId:'cmp-dept-box', dropdownId:'cmp-dept-dropdown',
+                optionsId:'cmp-dept-options', tagsId:'cmp-dept-tags',
+                placeholder:'Не выбрано',
+                items: salesDeptCache.map(s => ({ id:s.id, name:s.value }))
             });
-
             window._mfCmpGroupValue = createMultiFilter({
-                boxId: 'cmp-group-value-box',
-                dropdownId: 'cmp-group-value-dropdown',
-                optionsId: 'cmp-group-value-options',
-                tagsId: 'cmp-group-value-tags',
-                placeholder: 'Все',
-                items: []
+                boxId:'cmp-group-value-box', dropdownId:'cmp-group-value-dropdown',
+                optionsId:'cmp-group-value-options', tagsId:'cmp-group-value-tags',
+                placeholder:'Все', items:[]
             });
 
             populateYears();
@@ -324,16 +278,13 @@ App.initializeStatistics = async function () {
     }
 
     // =========================================================
-    // РЕЖИМ ПЕРИОДА — подсказки
+    // РЕЖИМ ПЕРИОДА
     // =========================================================
     function initPeriodModeHandlers() {
-        // Общая статистика
         periodModeSelect.addEventListener('change', () => {
             periodModeHint.style.display =
                 periodModeSelect.value === 'strict' ? 'flex' : 'none';
         });
-
-        // Сравнение
         cmpPeriodMode.addEventListener('change', () => {
             cmpPeriodModeHint.style.display =
                 cmpPeriodMode.value === 'strict' ? 'flex' : 'none';
@@ -345,9 +296,9 @@ App.initializeStatistics = async function () {
     // =========================================================
     async function getLeadSources() {
         return new Promise((resolve, reject) => {
-            BX24.callMethod('crm.status.entity.items', { entityId: 'SOURCE' }, (result) => {
+            BX24.callMethod('crm.status.entity.items', { entityId:'SOURCE' }, result => {
                 if (result.error()) reject(new Error("Не удалось загрузить источники"));
-                else resolve(result.data().map(i => ({ id: i.STATUS_ID, name: i.NAME })));
+                else resolve(result.data().map(i => ({ id:i.STATUS_ID, name:i.NAME })));
             });
         });
     }
@@ -367,7 +318,6 @@ App.initializeStatistics = async function () {
     // =========================================================
     async function loadStatistics() {
         App.showLoader();
-
         const params = new URLSearchParams();
         params.set('action',      'get_statistics_grouped');
         params.set('date_from',   startDateInput.value);
@@ -403,7 +353,7 @@ App.initializeStatistics = async function () {
     }
 
     // =========================================================
-    // РЕНДЕРИНГ ТАБЛИЦЫ
+    // РЕНДЕРИНГ ТАБЛИЦЫ (ОБЩАЯ СТАТИСТИКА)
     // =========================================================
     function renderTableHead() {
         tableHead.innerHTML = `
@@ -433,20 +383,19 @@ App.initializeStatistics = async function () {
                 `<tr><td colspan="15">Нет данных за выбранный период.</td></tr>`;
             return;
         }
-
         data.forEach(row => {
             const tr = document.createElement('tr');
             if (row.source_name === "Итого") tr.classList.add('summary-row');
 
-            const idsTotal     = (row.ids_total || []).join(',');
-            const idsAnswered  = (row.ids_answered || []).join(',');
-            const idsMeeting   = (row.ids_meeting_scheduled || []).join(',');
-            const idsArrival   = (row.ids_arrival || []).join(',');
-            const idsSuccess   = (row.ids_success || []).join(',');
-            const idsClients   = (row.ids_clients || []).join(',');
-            const idsClientsWP = (row.ids_clients_with_payment || []).join(',');
-            const idsDeals     = (row.ids_deals || []).join(',');
-            const idsDealsWP   = (row.ids_deals_with_payment || []).join(',');
+            const idsTotal     = (row.ids_total||[]).join(',');
+            const idsAnswered  = (row.ids_answered||[]).join(',');
+            const idsMeeting   = (row.ids_meeting_scheduled||[]).join(',');
+            const idsArrival   = (row.ids_arrival||[]).join(',');
+            const idsSuccess   = (row.ids_success||[]).join(',');
+            const idsClients   = (row.ids_clients||[]).join(',');
+            const idsClientsWP = (row.ids_clients_with_payment||[]).join(',');
+            const idsDeals     = (row.ids_deals||[]).join(',');
+            const idsDealsWP   = (row.ids_deals_with_payment||[]).join(',');
 
             tr.innerHTML = `
                 <td class="group-1 col-sticky">${row.source_name}</td>
@@ -457,21 +406,21 @@ App.initializeStatistics = async function () {
                     <span class="cell-value">${row.total}</span>
                 </td>
                 <td class="group-2">${formatCurrency(row.cpl)}</td>
-                ${createLeadCell(row.answered,
-                    'group-3', idsAnswered,  `Дозвон: ${row.source_name}`)}
-                ${createLeadCell(row.meeting_scheduled,
-                    'group-3', idsMeeting,   `Назначена встреча: ${row.source_name}`)}
-                ${createLeadCell(row.arrival,
-                    'group-3', idsArrival,   `Приход: ${row.source_name}`)}
-                ${createLeadCell(row.success,
-                    'group-3', idsSuccess,   `Успех: ${row.source_name}`)}
+                ${createLeadCell(row.answered,'group-3',idsAnswered,
+                    `Дозвон: ${row.source_name}`)}
+                ${createLeadCell(row.meeting_scheduled,'group-3',idsMeeting,
+                    `Назначена встреча: ${row.source_name}`)}
+                ${createLeadCell(row.arrival,'group-3',idsArrival,
+                    `Приход: ${row.source_name}`)}
+                ${createLeadCell(row.success,'group-3',idsSuccess,
+                    `Успех: ${row.source_name}`)}
                 <td class="group-4 clickable-cell"
                     data-ids="${idsClients}" data-type="contact"
                     data-title="Клиенты: ${row.source_name}">
                     <span class="cell-value">${row.clients}</span>
                 </td>
-                ${createContactCell(row.clients_with_payment,
-                    'group-4', idsClientsWP, `Клиенты с оплатой: ${row.source_name}`)}
+                ${createContactCell(row.clients_with_payment,'group-4',
+                    idsClientsWP,`Клиенты с оплатой: ${row.source_name}`)}
                 <td class="group-4 clickable-cell"
                     data-ids="${idsDeals}" data-type="deal"
                     data-title="Сделки: ${row.source_name}">
@@ -484,7 +433,7 @@ App.initializeStatistics = async function () {
                 </td>
                 <td class="group-4">${formatCurrency(row.cpo)}</td>
                 <td class="group-5">${formatCurrency(row.invoices_sum)}</td>
-                <td class="group-5">${(row.romi || 0).toFixed(2)}%</td>
+                <td class="group-5">${(row.romi||0).toFixed(2)}%</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -499,15 +448,12 @@ App.initializeStatistics = async function () {
         });
     }
 
-    // Ячейка с конверсией для лидов
     function createLeadCell(data, groupClass, ids, title) {
         if (!data) return `<td class="${groupClass}">-</td>`;
         const hasIds = ids && data.count > 0;
         return `
-            <td class="${groupClass}${hasIds ? ' clickable-cell' : ''}"
-                ${hasIds
-                    ? `data-ids="${ids}" data-type="lead" data-title="${title}"`
-                    : ''}>
+            <td class="${groupClass}${hasIds?' clickable-cell':''}"
+                ${hasIds?`data-ids="${ids}" data-type="lead" data-title="${title}"`:''}> 
                 <span class="cell-value">${data.count}</span>
                 <span class="conversion-percent">
                     (${data.conv_from_prev.toFixed(1)}%&nbsp;/&nbsp;${data.conv_from_total.toFixed(1)}%)
@@ -515,15 +461,12 @@ App.initializeStatistics = async function () {
             </td>`;
     }
 
-    // Ячейка с конверсией для контактов
     function createContactCell(data, groupClass, ids, title) {
         if (!data) return `<td class="${groupClass}">-</td>`;
         const hasIds = ids && data.count > 0;
         return `
-            <td class="${groupClass}${hasIds ? ' clickable-cell' : ''}"
-                ${hasIds
-                    ? `data-ids="${ids}" data-type="contact" data-title="${title}"`
-                    : ''}>
+            <td class="${groupClass}${hasIds?' clickable-cell':''}"
+                ${hasIds?`data-ids="${ids}" data-type="contact" data-title="${title}"`:''}> 
                 <span class="cell-value">${data.count}</span>
                 <span class="conversion-percent">
                     (${data.conv_from_prev.toFixed(1)}%&nbsp;/&nbsp;${data.conv_from_total.toFixed(1)}%)
@@ -536,14 +479,14 @@ App.initializeStatistics = async function () {
     // =========================================================
     function formatCurrency(value) {
         return new Intl.NumberFormat('ru-RU', {
-            style: 'currency', currency: 'RUB', minimumFractionDigits: 0
-        }).format(value || 0);
+            style:'currency', currency:'RUB', minimumFractionDigits:0
+        }).format(value||0);
     }
 
     function formatDate(dateStr) {
         if (!dateStr) return '';
         try { return new Date(dateStr).toLocaleDateString('ru-RU'); }
-        catch (e) { return dateStr; }
+        catch(e) { return dateStr; }
     }
 
     function formatMetricValue(metric, val) {
@@ -560,7 +503,7 @@ App.initializeStatistics = async function () {
         leadsDetailClose.addEventListener('click', () => {
             leadsDetailOverlay.style.display = 'none';
         });
-        leadsDetailOverlay.addEventListener('click', (e) => {
+        leadsDetailOverlay.addEventListener('click', e => {
             if (e.target === leadsDetailOverlay)
                 leadsDetailOverlay.style.display = 'none';
         });
@@ -569,10 +512,9 @@ App.initializeStatistics = async function () {
     async function openDetailPopup(ids, type, title) {
         if (!ids) return;
         leadsDetailTitle.textContent = title || 'Детализация';
-        leadsDetailContent.innerHTML = `
-            <div style="text-align:center;padding:20px;color:#828b95;">Загрузка...</div>`;
+        leadsDetailContent.innerHTML =
+            `<div style="text-align:center;padding:20px;color:#828b95;">Загрузка...</div>`;
         leadsDetailOverlay.style.display = 'flex';
-
         try {
             let action = 'get_lead_details';
             if (type === 'contact') action = 'get_contact_details';
@@ -585,65 +527,42 @@ App.initializeStatistics = async function () {
         }
     }
 
-    // Единая таблица: Лид | Контакт | Сделка | Дата
     function renderDetailList(items, type) {
         if (!items || items.length === 0) {
             leadsDetailContent.innerHTML =
                 `<div style="padding:16px;color:#828b95;">Нет данных.</div>`;
             return;
         }
-
-        let col1Label = 'Лид';
-        if (type === 'contact') col1Label = 'Контакт';
-        if (type === 'deal')    col1Label = 'Сделка';
-
+        let col1 = type === 'contact' ? 'Контакт' : type === 'deal' ? 'Сделка' : 'Лид';
         const rows = items.map(item => {
-            const mainLink = `
-                <a href="${item.url}" target="_blank" class="detail-link">
-                    ${item.name || `#${item.id}`}
-                </a>`;
-
+            const mainLink = `<a href="${item.url}" target="_blank"
+                class="detail-link">${item.name||`#${item.id}`}</a>`;
             let contactCell = `<span style="color:#c6cdd3;">—</span>`;
-            if (item.contact) {
-                contactCell = `
-                    <a href="${item.contact.url}" target="_blank"
-                       class="detail-link detail-link-secondary">
-                        ${item.contact.name}
-                    </a>`;
-            }
-
+            if (item.contact) contactCell = `<a href="${item.contact.url}"
+                target="_blank" class="detail-link detail-link-secondary">
+                ${item.contact.name}</a>`;
             let dealCell = `<span style="color:#c6cdd3;">—</span>`;
-            if (item.deal) {
-                dealCell = `
-                    <a href="${item.deal.url}" target="_blank"
-                       class="detail-link detail-link-secondary">
-                        ${item.deal.title}
-                    </a>`;
-            }
-
+            if (item.deal) dealCell = `<a href="${item.deal.url}"
+                target="_blank" class="detail-link detail-link-secondary">
+                ${item.deal.title}</a>`;
             const dateVal = item.deal
                 ? formatDate(item.deal.date_create)
                 : formatDate(item.date_create);
-
-            return `
-                <tr class="detail-row">
-                    <td class="detail-td detail-td-main">${mainLink}</td>
-                    <td class="detail-td detail-td-secondary">${contactCell}</td>
-                    <td class="detail-td detail-td-secondary">${dealCell}</td>
-                    <td class="detail-td detail-td-date">${dateVal}</td>
-                </tr>`;
+            return `<tr class="detail-row">
+                <td class="detail-td detail-td-main">${mainLink}</td>
+                <td class="detail-td detail-td-secondary">${contactCell}</td>
+                <td class="detail-td detail-td-secondary">${dealCell}</td>
+                <td class="detail-td detail-td-date">${dateVal}</td>
+            </tr>`;
         }).join('');
-
         leadsDetailContent.innerHTML = `
             <table class="detail-table">
-                <thead>
-                    <tr>
-                        <th class="detail-th">${col1Label}</th>
-                        <th class="detail-th">Контакт</th>
-                        <th class="detail-th">Сделка</th>
-                        <th class="detail-th">Дата</th>
-                    </tr>
-                </thead>
+                <thead><tr>
+                    <th class="detail-th">${col1}</th>
+                    <th class="detail-th">Контакт</th>
+                    <th class="detail-th">Сделка</th>
+                    <th class="detail-th">Дата</th>
+                </tr></thead>
                 <tbody>${rows}</tbody>
             </table>`;
     }
@@ -664,10 +583,8 @@ App.initializeStatistics = async function () {
     function initMetricsButtons() {
         const allCbs = () =>
             document.querySelectorAll('#cmp-metrics-list input[type="checkbox"]');
-
         document.getElementById('cmp-select-all-metrics')
             .addEventListener('click', () => allCbs().forEach(cb => cb.checked = true));
-
         document.getElementById('cmp-clear-all-metrics')
             .addEventListener('click', () => allCbs().forEach(cb => cb.checked = false));
     }
@@ -684,12 +601,10 @@ App.initializeStatistics = async function () {
                 window._mfCmpGroupValue.setItems([]);
             }
         });
-
-        cmpForm.addEventListener('submit', async (e) => {
+        cmpForm.addEventListener('submit', async e => {
             e.preventDefault();
             await loadComparisonData();
         });
-
         cmpResetBtn.addEventListener('click', () => {
             cmpForm.reset();
             populateYears();
@@ -708,17 +623,14 @@ App.initializeStatistics = async function () {
     async function populateCmpGroupValues(grouping) {
         let items = [];
         if (grouping === 'source') {
-            items = sourcesCache.map(s => ({ id: s.id, name: s.name }));
+            items = sourcesCache.map(s => ({ id:s.id, name:s.name }));
         } else {
             try {
                 const labels = await apiCall('get_utm_labels', {});
                 items = labels
                     .filter(l => l.utm_type === grouping)
-                    .map(l => ({
-                        id: l.utm_value,
-                        name: l.custom_name || l.utm_value
-                    }));
-            } catch (e) {
+                    .map(l => ({ id:l.utm_value, name:l.custom_name||l.utm_value }));
+            } catch(e) {
                 console.warn('Не удалось загрузить UTM-метки');
             }
         }
@@ -737,7 +649,6 @@ App.initializeStatistics = async function () {
         }
 
         App.showLoader();
-
         const params = new URLSearchParams();
         params.set('action',      'get_comparison_data');
         params.set('year',        cmpYear.value);
@@ -764,7 +675,7 @@ App.initializeStatistics = async function () {
             if (data.error) throw new Error(data.error);
             renderComparisonTable(data, selectedMetrics);
             cmpEmpty.style.display = 'none';
-        } catch (e) {
+        } catch(e) {
             console.error("Ошибка загрузки сравнения:", e);
             await App.Notify.error('Ошибка', e.message);
         } finally {
@@ -774,7 +685,15 @@ App.initializeStatistics = async function () {
 
     // =========================================================
     // ТАБЛИЦА СРАВНЕНИЯ
-    // Строки = группировки, Столбцы = периоды × метрики
+    //
+    // Структура по эскизу:
+    // Строки = группировки (источники / utm / "Все")
+    // Столбцы = периоды
+    // Под каждым значением — конверсия inline (для нужных метрик)
+    // ПЛАШКИ — между столбцами периодов (в отдельном столбце-разделителе)
+    //
+    // Схема заголовка:
+    // [Группировка] | [Январь colspan=N] | [плашка] | [Февраль colspan=N] | [плашка] | ...
     // =========================================================
     function renderComparisonTable(data, selectedMetrics) {
         if (!data || !data.rows || data.rows.length === 0) {
@@ -788,45 +707,61 @@ App.initializeStatistics = async function () {
         const rows         = data.rows;
         const groupLabels  = data.group_labels || {};
         const metricCount  = selectedMetrics.length;
+        const periodCount  = periodLabels.length;
 
         // ---- ЗАГОЛОВОК ----
-        let headHtml = `<tr>
+        // Строка 1: [Группировка] [Январь, colspan=M] [разделитель] [Февраль, colspan=M] ...
+        // Разделитель — столбец для плашек между периодами
+        // Плашек будет (periodCount - 1) штук
+
+        let head1 = `<tr>
             <th class="cmp-th-group col-sticky" rowspan="2">
                 ${data.grouping
                     ? (METRIC_LABELS[data.grouping] || data.grouping)
                     : 'Группировка'}
             </th>`;
 
-        periodLabels.forEach(label => {
-            headHtml += `
-                <th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
+        periodLabels.forEach((label, idx) => {
+            head1 += `<th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
+            // После каждого периода (кроме последнего) — столбец для плашек
+            if (idx < periodCount - 1) {
+                head1 += `<th class="cmp-th-badge-col" rowspan="2"></th>`;
+            }
         });
-        headHtml += '</tr><tr>';
+        head1 += '</tr>';
 
-        periodLabels.forEach(() => {
+        // Строка 2: под каждым периодом — названия метрик
+        let head2 = '<tr>';
+        periodLabels.forEach((_label, idx) => {
             selectedMetrics.forEach(metric => {
-                headHtml += `
-                    <th class="cmp-th-metric">
-                        ${METRIC_LABELS[metric] || metric}
-                    </th>`;
+                head2 += `<th class="cmp-th-metric">
+                    ${METRIC_LABELS[metric] || metric}
+                </th>`;
             });
+            // Пропускаем добавление th для badge-col — он уже rowspan=2
         });
-        headHtml += '</tr>';
-        cmpTableHead.innerHTML = headHtml;
+        head2 += '</tr>';
+
+        cmpTableHead.innerHTML = head1 + head2;
 
         // ---- ТЕЛО ----
         let bodyHtml = '';
         rows.forEach(row => {
-            const groupLabel =
-                groupLabels[row.group_key] || row.group_key || 'Все';
-            bodyHtml += `<tr>
-                <td class="cmp-td-group col-sticky">${groupLabel}</td>`;
+            const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
+            bodyHtml += `<tr><td class="cmp-td-group col-sticky">${groupLabel}</td>`;
 
-            row.periods.forEach(period => {
+            row.periods.forEach((period, pIdx) => {
+                // Ячейки данных за период
                 selectedMetrics.forEach(metric => {
                     const mdata = period.metrics[metric];
-                    bodyHtml += renderCmpCell(metric, mdata);
+                    bodyHtml += renderCmpDataCell(metric, mdata);
                 });
+
+                // Столбец плашек между периодами
+                if (pIdx < periodCount - 1) {
+                    const nextPeriod = row.periods[pIdx + 1];
+                    bodyHtml += renderBadgeCell(selectedMetrics, period, nextPeriod);
+                }
             });
 
             bodyHtml += '</tr>';
@@ -835,71 +770,111 @@ App.initializeStatistics = async function () {
         cmpTableBody.innerHTML = bodyHtml;
     }
 
-    // Одна ячейка таблицы сравнения
-    function renderCmpCell(metric, mdata) {
-        if (!mdata) return `<td class="cmp-td"><div class="cmp-cell-inner">—</div></td>`;
+    // Ячейка с данными (значение + конверсия inline)
+    function renderCmpDataCell(metric, mdata) {
+        if (!mdata) {
+            return `<td class="cmp-td"><div class="cmp-cell-inner">
+                <span class="cmp-cell-value">—</span>
+            </div></td>`;
+        }
 
         const val     = mdata.value;
-        const pctPrev = mdata.pct_from_prev;
         const conv    = mdata.conv;
-        const pctConv = mdata.pct_conv_from_prev;
         const hasConv = CONVERSION_METRICS.has(metric);
 
-        // Значение
         const valStr = formatMetricValue(metric, val);
 
-        // Конверсия рядом со значением (как в общей статистике)
+        // Конверсия сразу после значения (как в общей статистике)
         let convHtml = '';
         if (hasConv && conv !== null && conv !== undefined) {
-            convHtml = `<span class="conversion-percent">(${(+conv).toFixed(1)}%)</span>`;
+            convHtml = `<span class="conversion-percent">&nbsp;(${(+conv).toFixed(1)}%)</span>`;
         }
 
-        // Плашка % к предыдущему — значение
-        let badgeValHtml = '';
-        if (pctPrev !== null && pctPrev !== undefined) {
-            const isUp   = pctPrev > 0;
-            const isDown = pctPrev < 0;
-            const sign   = isUp ? '+' : '';
-            const cls    = isUp ? 'cmp-badge-up' : isDown ? 'cmp-badge-down' : 'cmp-badge-flat';
-            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
-            badgeValHtml = `
-                <span class="cmp-badge ${cls}">
-                    ${arrow}&nbsp;${sign}${pctPrev.toFixed(1)}%
+        return `<td class="cmp-td">
+            <div class="cmp-cell-inner">
+                <span class="cmp-cell-value">${valStr}</span>${convHtml}
+            </div>
+        </td>`;
+    }
+
+    // Столбец плашек между двумя периодами
+    // Показывает плашку для КАЖДОЙ метрики:
+    // % изменения значения от текущего к следующему периоду
+    // и % изменения конверсии (если применимо)
+    function renderBadgeCell(selectedMetrics, currentPeriod, nextPeriod) {
+        let badgesHtml = '';
+
+        selectedMetrics.forEach(metric => {
+            const curr = currentPeriod.metrics[metric];
+            const next = nextPeriod ? nextPeriod.metrics[metric] : null;
+
+            if (!curr || !next) {
+                badgesHtml += `<div class="cmp-badge-row">
+                    <span class="cmp-badge cmp-badge-flat cmp-badge-fixed">—</span>
+                </div>`;
+                return;
+            }
+
+            const currVal  = curr.value  || 0;
+            const nextVal  = next.value  || 0;
+            const currConv = curr.conv;
+            const nextConv = next.conv;
+            const hasConv  = CONVERSION_METRICS.has(metric);
+
+            // % изменения значения: (next - curr) / curr * 100
+            let pctVal = null;
+            if (currVal > 0) {
+                pctVal = ((nextVal - currVal) / currVal * 100);
+            }
+
+            // Плашка значения
+            let valBadge = '';
+            if (pctVal !== null) {
+                const isUp   = pctVal > 0;
+                const isDown = pctVal < 0;
+                const sign   = isUp ? '+' : '';
+                const cls    = isUp ? 'cmp-badge-up'
+                             : isDown ? 'cmp-badge-down'
+                             : 'cmp-badge-flat';
+                const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
+                valBadge = `<span class="cmp-badge ${cls} cmp-badge-fixed">
+                    ${arrow}&nbsp;${sign}${pctVal.toFixed(1)}%
                 </span>`;
-        }
+            } else {
+                valBadge = `<span class="cmp-badge cmp-badge-flat cmp-badge-fixed">—</span>`;
+            }
 
-        // Плашка % к предыдущему — конверсия
-        let badgeConvHtml = '';
-        if (hasConv && pctConv !== null && pctConv !== undefined) {
-            const isUp   = pctConv > 0;
-            const isDown = pctConv < 0;
-            const sign   = isUp ? '+' : '';
-            const cls    = isUp ? 'cmp-badge-up' : isDown ? 'cmp-badge-down' : 'cmp-badge-flat';
-            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
-            badgeConvHtml = `
-                <span class="cmp-badge cmp-badge-conv ${cls}">
-                    ${arrow}&nbsp;${sign}${pctConv.toFixed(1)}пп
+            // Плашка конверсии (только для метрик с конверсией)
+            let convBadge = '';
+            if (hasConv && currConv !== null && currConv !== undefined
+                       && nextConv !== null && nextConv !== undefined) {
+                const diffConv = nextConv - currConv;
+                const isUp     = diffConv > 0;
+                const isDown   = diffConv < 0;
+                const sign     = isUp ? '+' : '';
+                const cls      = isUp ? 'cmp-badge-up'
+                               : isDown ? 'cmp-badge-down'
+                               : 'cmp-badge-flat';
+                const arrow    = isUp ? '↑' : isDown ? '↓' : '→';
+                convBadge = `<span class="cmp-badge cmp-badge-conv ${cls} cmp-badge-fixed">
+                    ${arrow}&nbsp;${sign}${diffConv.toFixed(1)}пп
                 </span>`;
-        }
+            }
 
-        return `
-            <td class="cmp-td">
-                <div class="cmp-cell-inner">
-                    <div class="cmp-cell-top">
-                        <span class="cmp-cell-value">${valStr}</span>${convHtml}
-                    </div>
-                    <div class="cmp-cell-badges">
-                        ${badgeValHtml}${badgeConvHtml}
-                    </div>
-                </div>
-            </td>`;
+            badgesHtml += `<div class="cmp-badge-row">
+                ${valBadge}
+                ${convBadge}
+            </div>`;
+        });
+
+        return `<td class="cmp-td-badge">${badgesHtml}</td>`;
     }
 
     // =========================================================
     // НАСТРОЙКИ UTM
     // =========================================================
     function initSettingsHandlers() {
-        utmLabelForm.addEventListener('submit', async (e) => {
+        utmLabelForm.addEventListener('submit', async e => {
             e.preventDefault();
             const utm_type    = utmLabelType.value;
             const utm_value   = utmLabelValue.value.trim();
@@ -915,7 +890,7 @@ App.initializeStatistics = async function () {
                 utmLabelName.value  = '';
                 await loadUtmLabels();
                 await App.Notify.success('Готово', 'Метка сохранена.');
-            } catch (e) {
+            } catch(e) {
                 await App.Notify.error('Ошибка', e.message);
             } finally {
                 App.hideLoader();
@@ -924,24 +899,22 @@ App.initializeStatistics = async function () {
     }
 
     async function loadUtmLabels() {
-        utmLabelsBody.innerHTML = `
-            <tr><td colspan="4"
-                style="text-align:center;color:#828b95;">Загрузка...</td></tr>`;
+        utmLabelsBody.innerHTML =
+            `<tr><td colspan="4" style="text-align:center;color:#828b95;">
+                Загрузка...</td></tr>`;
         try {
             const labels = await apiCall('get_utm_labels', {});
             renderUtmLabels(labels);
-        } catch (e) {
-            utmLabelsBody.innerHTML = `
-                <tr><td colspan="4"
-                    style="color:red;">Ошибка: ${e.message}</td></tr>`;
+        } catch(e) {
+            utmLabelsBody.innerHTML =
+                `<tr><td colspan="4" style="color:red;">Ошибка: ${e.message}</td></tr>`;
         }
     }
 
     function renderUtmLabels(labels) {
         if (!labels || labels.length === 0) {
-            utmLabelsBody.innerHTML = `
-                <tr><td colspan="4"
-                    style="text-align:center;color:#828b95;">
+            utmLabelsBody.innerHTML =
+                `<tr><td colspan="4" style="text-align:center;color:#828b95;">
                     Нет меток. Добавьте первую.</td></tr>`;
             return;
         }
@@ -949,11 +922,10 @@ App.initializeStatistics = async function () {
             <tr>
                 <td>${l.utm_type}</td>
                 <td>${l.utm_value}</td>
-                <td>${l.custom_name ||
-                    '<span style="color:#828b95;">—</span>'}</td>
+                <td>${l.custom_name||'<span style="color:#828b95;">—</span>'}</td>
                 <td style="text-align:center;">
                     <span class="action-icon" data-id="${l.id}"
-                          style="color:#e74c3c;cursor:pointer;">🗑</span>
+                        style="color:#e74c3c;cursor:pointer;">🗑</span>
                 </td>
             </tr>`).join('');
 
@@ -963,7 +935,7 @@ App.initializeStatistics = async function () {
                     App.showLoader();
                     await apiCall('delete_utm_label', { id: btn.dataset.id });
                     await loadUtmLabels();
-                } catch (e) {
+                } catch(e) {
                     await App.Notify.error('Ошибка', e.message);
                 } finally {
                     App.hideLoader();
@@ -975,7 +947,7 @@ App.initializeStatistics = async function () {
     // =========================================================
     // ОБРАБОТЧИКИ — ОБЩАЯ СТАТИСТИКА
     // =========================================================
-    filterForm.addEventListener('submit', (e) => {
+    filterForm.addEventListener('submit', e => {
         e.preventDefault();
         loadStatistics();
     });
@@ -1021,8 +993,8 @@ App.initializeStatistics = async function () {
     async function apiCallPost(action, body) {
         const url = buildApiUrl(action, {});
         const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
             body: JSON.stringify(body)
         });
         if (!response.ok) throw new Error(response.statusText);
