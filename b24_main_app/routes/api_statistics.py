@@ -14,6 +14,9 @@ LEAD_STATUS_GROUPS = {
     "success": ["CONVERTED"]
 }
 
+# Порядок групп от низшей к высшей (для first_touch логики)
+LEAD_STATUS_GROUP_ORDER = ["answered", "meeting_scheduled", "arrival", "success"]
+
 SALES_DEPT_FIELD = "UF_CRM_1779024295"
 B24_PORTAL = "https://b24-p41gmg.bitrix24.ru"
 CONVERSION_METRICS = {"answered", "meeting_scheduled", "arrival", "success", "clients_with_payment"}
@@ -310,51 +313,36 @@ def _load_utm_label_map(conn):
 
 
 # =====================================================================
-# НОВАЯ ФУНКЦИЯ: получение истории статусов лидов за период (батчами)
-# Использует crm.stagehistory.list с entityTypeId=1 (лид)
-# Фильтрует по OWNER_ID (список ID лидов) и CREATED_TIME (период)
-# Возвращает dict: {lead_id: last_status_id_in_period}
-# Если у лида нет записей истории в периоде — его нет в словаре
+# ИСТОРИЯ СТАТУСОВ: ПОСЛЕДНЕЕ КАСАНИЕ (last_touch)
+# Берём последний статус лида в периоде
 # =====================================================================
 
 def _get_leads_effective_statuses_in_period(lead_ids, date_from, date_to):
     """
     Получает историю статусов лидов за период через crm.stagehistory.list.
-
-    Логика:
-    - Запрашиваем историю для всех лидов пакетами по 50 ID (ограничение B24 на фильтр @)
-    - Фильтруем по CREATED_TIME — только записи внутри периода
-    - Для каждого лида берём последнюю запись истории в периоде
-    - Возвращаем {lead_id: status_id}
-
-    Если у лида нет записей истории в периоде — он НЕ попадает в словарь,
-    значит статус не менялся в периоде → считаем '__CREATED_ONLY__'
+    Возвращает {lead_id: last_status_id_in_period}
+    Если у лида нет записей истории в периоде — его нет в словаре → '__CREATED_ONLY__'
     """
     if not lead_ids:
         return {}
 
-    result_map = {}  # {lead_id: last_status_id}
-    # История по лиду: {lead_id: [записи отсортированные по ID asc]}
+    result_map     = {}
     history_by_lead = defaultdict(list)
-
-    # Разбиваем на батчи по 50 лидов
-    batch_size = 50
-    lead_ids_list = list(lead_ids)
+    batch_size     = 50
+    lead_ids_list  = list(lead_ids)
 
     logger.info(
-        f"_get_leads_effective_statuses_in_period: "
+        f"_get_leads_effective_statuses_in_period (last_touch): "
         f"всего лидов={len(lead_ids_list)}, period={date_from} — {date_to}"
     )
 
     for i in range(0, len(lead_ids_list), batch_size):
         batch = lead_ids_list[i:i + batch_size]
         logger.info(
-            f"  Запрашиваем историю статусов: батч {i//batch_size + 1}, "
-            f"лидов в батче={len(batch)}"
+            f"  Батч {i//batch_size + 1}: запрашиваем историю для {len(batch)} лидов"
         )
-
         params = {
-            'entityTypeId': 1,  # лид
+            'entityTypeId': 1,
             'order': {'ID': 'ASC'},
             'filter': {
                 '@OWNER_ID': batch,
@@ -363,34 +351,158 @@ def _get_leads_effective_statuses_in_period(lead_ids, date_from, date_to):
             },
             'select': ['ID', 'OWNER_ID', 'STATUS_ID', 'CREATED_TIME']
         }
-
         items = fetch_paginated_stage_history('crm.stagehistory.list', params)
-        logger.info(f"  Получено записей истории в батче: {len(items)}")
-
+        logger.info(f"  Получено записей в батче: {len(items)}")
         for item in items:
-            owner_id  = str(item.get('OWNER_ID', ''))
-            status_id = item.get('STATUS_ID', '')
+            owner_id = str(item.get('OWNER_ID', ''))
             if owner_id:
                 history_by_lead[owner_id].append({
                     'id':        item.get('ID'),
-                    'status_id': status_id,
+                    'status_id': item.get('STATUS_ID', ''),
                     'created':   item.get('CREATED_TIME', '')
                 })
 
-    # Для каждого лида берём последний статус в периоде
-    # (история уже отсортирована по ID ASC, значит последний элемент = последний статус)
     for lead_id, records in history_by_lead.items():
         if records:
-            last = records[-1]
+            last = records[-1]  # уже отсортировано по ID ASC
             result_map[lead_id] = last['status_id']
             logger.debug(
-                f"  Лид {lead_id}: последний статус в периоде = {last['status_id']} "
-                f"(запись ID={last['id']}, время={last['created']})"
+                f"  Лид {lead_id}: last_touch статус={last['status_id']} "
+                f"(время={last['created']})"
             )
 
     logger.info(
-        f"_get_leads_effective_statuses_in_period: "
-        f"лидов с историей в периоде={len(result_map)} из {len(lead_ids_list)}"
+        f"  Итого лидов с историей в периоде: {len(result_map)} из {len(lead_ids_list)}"
+    )
+    return result_map
+
+
+# =====================================================================
+# ИСТОРИЯ СТАТУСОВ: ПЕРВОЕ КАСАНИЕ (first_touch)
+# Для каждой группы статусов берём дату ПЕРВОГО попадания в группу
+# Запрашиваем ПОЛНУЮ историю лида (без фильтра по дате),
+# находим первое вхождение в каждую группу и проверяем попадает ли оно в период
+# =====================================================================
+
+def _get_leads_first_touch_statuses(lead_ids, date_from, date_to):
+    """
+    Для каждого лида определяет какие группы статусов были достигнуты
+    ВПЕРВЫЕ в указанном периоде.
+
+    Возвращает:
+    {
+        lead_id: {
+            'answered': True/False,          # первое попадание в группу было в периоде
+            'meeting_scheduled': True/False,
+            'arrival': True/False,
+            'success': True/False,
+            'last_status_in_period': 'STATUS_ID' или None  # последний статус в периоде
+        }
+    }
+
+    Логика:
+    1. Запрашиваем ПОЛНУЮ историю лида (без фильтра дат) — чтобы найти ПЕРВОЕ вхождение
+    2. Для каждой группы находим запись с минимальным ID (самая ранняя)
+    3. Проверяем: дата этой записи попадает в период?
+    4. Если да — лид засчитывается в эту группу за данный период
+    5. Также определяем последний статус лида В периоде (для CONVERTED → сделки)
+    """
+    if not lead_ids:
+        return {}
+
+    result_map      = {}
+    full_history    = defaultdict(list)  # {lead_id: все записи истории}
+    batch_size      = 50
+    lead_ids_list   = list(lead_ids)
+
+    logger.info(
+        f"_get_leads_first_touch_statuses: "
+        f"всего лидов={len(lead_ids_list)}, period={date_from} — {date_to}"
+    )
+
+    dt_from, dt_to = _get_period_datetimes(date_from, date_to)
+
+    # Запрашиваем ПОЛНУЮ историю (без фильтра по дате)
+    for i in range(0, len(lead_ids_list), batch_size):
+        batch = lead_ids_list[i:i + batch_size]
+        logger.info(
+            f"  Батч {i//batch_size + 1}: полная история для {len(batch)} лидов"
+        )
+        params = {
+            'entityTypeId': 1,
+            'order': {'ID': 'ASC'},
+            'filter': {
+                '@OWNER_ID': batch,
+            },
+            'select': ['ID', 'OWNER_ID', 'STATUS_ID', 'CREATED_TIME']
+        }
+        items = fetch_paginated_stage_history('crm.stagehistory.list', params)
+        logger.info(f"  Получено записей в батче: {len(items)}")
+        for item in items:
+            owner_id = str(item.get('OWNER_ID', ''))
+            if owner_id:
+                full_history[owner_id].append({
+                    'id':        int(item.get('ID', 0)),
+                    'status_id': item.get('STATUS_ID', ''),
+                    'created':   item.get('CREATED_TIME', '')
+                })
+
+    # Обрабатываем историю каждого лида
+    for lead_id in lead_ids_list:
+        records = full_history.get(lead_id, [])
+        # Сортируем по ID (хронологически)
+        records_sorted = sorted(records, key=lambda r: r['id'])
+
+        lead_result = {
+            'answered':          False,
+            'meeting_scheduled': False,
+            'arrival':           False,
+            'success':           False,
+            'last_status_in_period': None
+        }
+
+        # Для каждой группы ищем ПЕРВОЕ вхождение любого статуса из группы
+        for group in LEAD_STATUS_GROUP_ORDER:
+            group_statuses = set(LEAD_STATUS_GROUPS[group])
+            # Первая запись истории где статус входит в группу
+            first_in_group = None
+            for rec in records_sorted:
+                if rec['status_id'] in group_statuses:
+                    first_in_group = rec
+                    break  # нашли первое — дальше не смотрим
+
+            if first_in_group:
+                # Проверяем: дата первого вхождения попадает в период?
+                first_dt = _dt_from_str(first_in_group['created'])
+                if first_dt and dt_from <= first_dt <= dt_to:
+                    lead_result[group] = True
+                    logger.debug(
+                        f"  Лид {lead_id}: группа '{group}' — первое вхождение "
+                        f"статус={first_in_group['status_id']} "
+                        f"время={first_in_group['created']} → В ПЕРИОДЕ ✓"
+                    )
+                else:
+                    logger.debug(
+                        f"  Лид {lead_id}: группа '{group}' — первое вхождение "
+                        f"статус={first_in_group['status_id']} "
+                        f"время={first_in_group['created']} → ВНЕ ПЕРИОДА ✗"
+                    )
+
+        # Определяем последний статус лида В периоде (для CONVERTED → сделки)
+        in_period = [r for r in records_sorted
+                     if _date_in_period(r['created'], dt_from, dt_to)]
+        if in_period:
+            lead_result['last_status_in_period'] = in_period[-1]['status_id']
+
+        result_map[lead_id] = lead_result
+
+    converted_count = sum(
+        1 for v in result_map.values()
+        if v.get('last_status_in_period') == 'CONVERTED'
+    )
+    logger.info(
+        f"  first_touch: обработано лидов={len(result_map)}, "
+        f"CONVERTED в периоде={converted_count}"
     )
     return result_map
 
@@ -402,16 +514,19 @@ def _get_leads_effective_statuses_in_period(lead_ids, date_from, date_to):
 def get_statistics_grouped():
     """
     Два режима:
-    standard — берём лиды по DATE_CREATE, все связанные данные без доп. фильтров
-    strict   — берём лиды по DATE_CREATE, статусы учитываем только если они
-               установлены/изменены в том же периоде (через crm.stagehistory.list),
-               сделки и счета — только созданные в периоде
+    standard  — берём лиды по DATE_CREATE, текущие статусы без доп. фильтров
+    strict    — берём лиды по DATE_CREATE, статусы только изменённые в периоде
+
+    Атрибут (только для strict):
+    last_touch — последний статус лида в периоде (как раньше)
+    first_touch — для каждой группы берём дату первого попадания в группу
     """
     try:
-        date_from   = request.args.get('date_from')
-        date_to     = request.args.get('date_to')
-        grouping    = request.args.get('grouping', 'source')
-        period_mode = request.args.get('period_mode', 'standard')
+        date_from    = request.args.get('date_from')
+        date_to      = request.args.get('date_to')
+        grouping     = request.args.get('grouping', 'source')
+        period_mode  = request.args.get('period_mode', 'standard')
+        attribution  = request.args.get('attribution', 'last_touch')
 
         source_ids          = _parse_list_param('source_id')
         source_ids_exclude  = _parse_list_param('source_id_exclude')
@@ -423,13 +538,13 @@ def get_statistics_grouped():
 
         logger.info(
             f"get_statistics_grouped: date_from={date_from}, date_to={date_to}, "
-            f"period_mode={period_mode}, grouping={grouping}, "
-            f"source_ids={source_ids}, sales_depts={sales_depts}"
+            f"period_mode={period_mode}, attribution={attribution}, "
+            f"grouping={grouping}, source_ids={source_ids}, sales_depts={sales_depts}"
         )
 
         dt_from, dt_to = _get_period_datetimes(date_from, date_to)
 
-        # --- Всегда фильтруем лиды по DATE_CREATE ---
+        # --- Лиды по DATE_CREATE ---
         lead_filter = {
             '>=DATE_CREATE': f"{date_from}T00:00:00",
             '<=DATE_CREATE': f"{date_to}T23:59:59"
@@ -448,7 +563,6 @@ def get_statistics_grouped():
 
         logger.info(f"Получено лидов: {len(all_leads)}")
 
-        # Исключения
         if source_ids_exclude:
             before = len(all_leads)
             all_leads = [l for l in all_leads
@@ -487,58 +601,69 @@ def get_statistics_grouped():
             cursor.close()
             conn.close()
 
-        # --- Определяем эффективные статусы лидов ---
-        lead_effective_statuses = {}
         all_lead_ids = [l['ID'] for l in all_leads]
 
-        if period_mode == 'strict':
-            logger.info(
-                f"Режим STRICT: запрашиваем историю статусов для {len(all_lead_ids)} лидов"
-            )
-            # Получаем последний статус каждого лида в периоде через историю
-            history_map = _get_leads_effective_statuses_in_period(
-                all_lead_ids, date_from, date_to
-            )
-            for lead in all_leads:
-                lid = lead['ID']
-                if lid in history_map:
-                    # У лида была смена статуса в периоде — берём последний статус
-                    lead_effective_statuses[lid] = history_map[lid]
-                else:
-                    # У лида не было смены статуса в периоде
-                    # → считаем что статус не определён в периоде
-                    lead_effective_statuses[lid] = '__CREATED_ONLY__'
+        # ---------------------------------------------------------------
+        # Определяем статусы в зависимости от режима и атрибута
+        # ---------------------------------------------------------------
+        # Для standard — просто текущий статус
+        # Для strict + last_touch — последний статус в периоде из истории
+        # Для strict + first_touch — специальная структура по группам
+        # ---------------------------------------------------------------
 
-            converted_in_period = sum(
-                1 for s in lead_effective_statuses.values() if s == 'CONVERTED'
-            )
-            logger.info(
-                f"STRICT: лидов с историей в периоде={len(history_map)}, "
-                f"CONVERTED в периоде={converted_in_period}"
-            )
+        # Для last_touch и standard: {lead_id: status_id или '__CREATED_ONLY__'}
+        lead_effective_statuses = {}
+        # Для first_touch: {lead_id: {group: True/False, last_status_in_period: ...}}
+        lead_first_touch_data   = {}
+
+        if period_mode == 'strict':
+            if attribution == 'first_touch':
+                logger.info(
+                    f"Режим STRICT + FIRST_TOUCH: "
+                    f"запрашиваем полную историю для {len(all_lead_ids)} лидов"
+                )
+                lead_first_touch_data = _get_leads_first_touch_statuses(
+                    all_lead_ids, date_from, date_to
+                )
+            else:
+                # last_touch
+                logger.info(
+                    f"Режим STRICT + LAST_TOUCH: "
+                    f"запрашиваем историю в периоде для {len(all_lead_ids)} лидов"
+                )
+                history_map = _get_leads_effective_statuses_in_period(
+                    all_lead_ids, date_from, date_to
+                )
+                for lead in all_leads:
+                    lid = lead['ID']
+                    lead_effective_statuses[lid] = (
+                        history_map[lid] if lid in history_map else '__CREATED_ONLY__'
+                    )
         else:
-            logger.info("Режим STANDARD: используем текущие статусы лидов")
+            # standard
             for lead in all_leads:
                 lead_effective_statuses[lead['ID']] = lead.get('STATUS_ID')
 
         # --- Контакты конвертированных лидов ---
-        if period_mode == 'strict':
+        if period_mode == 'strict' and attribution == 'first_touch':
+            contact_ids_for_deals = list(set([
+                l['CONTACT_ID'] for l in all_leads
+                if lead_first_touch_data.get(l['ID'], {}).get('last_status_in_period') == 'CONVERTED'
+                and l.get('CONTACT_ID')
+            ]))
+        elif period_mode == 'strict':
             contact_ids_for_deals = list(set([
                 l['CONTACT_ID'] for l in all_leads
                 if lead_effective_statuses.get(l['ID']) == 'CONVERTED'
                 and l.get('CONTACT_ID')
             ]))
-            logger.info(
-                f"STRICT: уникальных контактов для поиска сделок={len(contact_ids_for_deals)}"
-            )
         else:
             contact_ids_for_deals = list(set([
                 l['CONTACT_ID'] for l in all_leads
                 if l.get('STATUS_ID') == 'CONVERTED' and l.get('CONTACT_ID')
             ]))
-            logger.info(
-                f"STANDARD: уникальных контактов для поиска сделок={len(contact_ids_for_deals)}"
-            )
+
+        logger.info(f"Контактов для поиска сделок: {len(contact_ids_for_deals)}")
 
         # --- Сделки ---
         deals = fetch_paginated_data('crm.deal.list', {
@@ -575,8 +700,7 @@ def get_statistics_grouped():
                             dt_from, dt_to
                         )]
             logger.info(
-                f"STRICT: счетов после фильтрации по периоду: "
-                f"{len(invoices)} (было {inv_before})"
+                f"STRICT: счетов после фильтрации: {len(invoices)} (было {inv_before})"
             )
 
         paid_deal_ids    = {inv['UF_DEAL_ID'] for inv in invoices if inv['STATUS_ID'] == 'P'}
@@ -613,9 +737,8 @@ def get_statistics_grouped():
         })
 
         for lead in all_leads:
-            key        = get_group_key(lead)
-            stats      = stats_by_group[key]
-            eff_status = lead_effective_statuses.get(lead['ID'])
+            key   = get_group_key(lead)
+            stats = stats_by_group[key]
 
             stats['total'] += 1
             stats['display_name'] = get_group_display_name(key)
@@ -624,36 +747,83 @@ def get_statistics_grouped():
             if not stats['source_id_for_expenses']:
                 stats['source_id_for_expenses'] = str(lead.get('SOURCE_ID', ''))
 
-            # Если статус '__CREATED_ONLY__' — лид создан но статус не менялся в периоде
-            if eff_status == '__CREATED_ONLY__' or eff_status is None:
-                logger.debug(f"Лид {lead['ID']}: только создан, статусы не считаем")
-                continue
+            # -------------------------------------------------------
+            # Подсчёт статусов в зависимости от режима и атрибута
+            # -------------------------------------------------------
+            if period_mode == 'strict' and attribution == 'first_touch':
+                ft = lead_first_touch_data.get(lead['ID'], {})
 
-            if eff_status in LEAD_STATUS_GROUPS['answered']:
-                stats['answered'] += 1
-                stats['ids_answered'].append(lead['ID'])
-            if eff_status in LEAD_STATUS_GROUPS['meeting_scheduled']:
-                stats['meeting_scheduled'] += 1
-                stats['ids_meeting_scheduled'].append(lead['ID'])
-            if eff_status in LEAD_STATUS_GROUPS['arrival']:
-                stats['arrival'] += 1
-                stats['ids_arrival'].append(lead['ID'])
-            if eff_status in LEAD_STATUS_GROUPS['success']:
-                stats['success'] += 1
-                stats['ids_success'].append(lead['ID'])
+                # Если у лида вообще нет истории в периоде — пропускаем
+                # (проверяем есть ли хоть одна True группа или last_status)
+                has_any = any([
+                    ft.get('answered'), ft.get('meeting_scheduled'),
+                    ft.get('arrival'),  ft.get('success'),
+                    ft.get('last_status_in_period')
+                ])
+                if not has_any:
+                    logger.debug(f"Лид {lead['ID']}: нет истории в периоде (first_touch)")
+                    continue
 
-            if eff_status == 'CONVERTED' and lead.get('CONTACT_ID'):
-                cid = lead['CONTACT_ID']
-                stats['clients'].add(cid)
-                contact_deals = deals_by_contact.get(cid, [])
-                stats['deals'].update(d['ID'] for d in contact_deals)
-                for deal in contact_deals:
-                    if deal['ID'] in paid_deal_ids:
-                        stats['deals_with_payment'].add(deal['ID'])
-                        stats['clients_with_payment'].add(cid)
-                for inv in invoices:
-                    if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
-                        stats['invoices_sum'] += float(inv.get('PRICE', 0))
+                if ft.get('answered'):
+                    stats['answered'] += 1
+                    stats['ids_answered'].append(lead['ID'])
+                if ft.get('meeting_scheduled'):
+                    stats['meeting_scheduled'] += 1
+                    stats['ids_meeting_scheduled'].append(lead['ID'])
+                if ft.get('arrival'):
+                    stats['arrival'] += 1
+                    stats['ids_arrival'].append(lead['ID'])
+                if ft.get('success'):
+                    stats['success'] += 1
+                    stats['ids_success'].append(lead['ID'])
+
+                # Сделки и клиенты — по last_status_in_period (CONVERTED)
+                if ft.get('last_status_in_period') == 'CONVERTED' and lead.get('CONTACT_ID'):
+                    cid = lead['CONTACT_ID']
+                    stats['clients'].add(cid)
+                    contact_deals = deals_by_contact.get(cid, [])
+                    stats['deals'].update(d['ID'] for d in contact_deals)
+                    for deal in contact_deals:
+                        if deal['ID'] in paid_deal_ids:
+                            stats['deals_with_payment'].add(deal['ID'])
+                            stats['clients_with_payment'].add(cid)
+                    for inv in invoices:
+                        if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
+                            stats['invoices_sum'] += float(inv.get('PRICE', 0))
+
+            else:
+                # standard или strict + last_touch
+                eff_status = lead_effective_statuses.get(lead['ID'])
+
+                if eff_status == '__CREATED_ONLY__' or eff_status is None:
+                    logger.debug(f"Лид {lead['ID']}: только создан, статусы не считаем")
+                    continue
+
+                if eff_status in LEAD_STATUS_GROUPS['answered']:
+                    stats['answered'] += 1
+                    stats['ids_answered'].append(lead['ID'])
+                if eff_status in LEAD_STATUS_GROUPS['meeting_scheduled']:
+                    stats['meeting_scheduled'] += 1
+                    stats['ids_meeting_scheduled'].append(lead['ID'])
+                if eff_status in LEAD_STATUS_GROUPS['arrival']:
+                    stats['arrival'] += 1
+                    stats['ids_arrival'].append(lead['ID'])
+                if eff_status in LEAD_STATUS_GROUPS['success']:
+                    stats['success'] += 1
+                    stats['ids_success'].append(lead['ID'])
+
+                if eff_status == 'CONVERTED' and lead.get('CONTACT_ID'):
+                    cid = lead['CONTACT_ID']
+                    stats['clients'].add(cid)
+                    contact_deals = deals_by_contact.get(cid, [])
+                    stats['deals'].update(d['ID'] for d in contact_deals)
+                    for deal in contact_deals:
+                        if deal['ID'] in paid_deal_ids:
+                            stats['deals_with_payment'].add(deal['ID'])
+                            stats['clients_with_payment'].add(cid)
+                    for inv in invoices:
+                        if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
+                            stats['invoices_sum'] += float(inv.get('PRICE', 0))
 
         # --- Формируем результат ---
         final_statistics = []
@@ -943,6 +1113,7 @@ def get_comparison_data():
         grouping    = request.args.get('grouping', '')
         metrics_raw = request.args.get('metrics', '')
         period_mode = request.args.get('period_mode', 'standard')
+        attribution = request.args.get('attribution', 'last_touch')
 
         group_values         = _parse_list_param('group_value')
         group_values_exclude = _parse_list_param('group_value_exclude')
@@ -965,47 +1136,57 @@ def get_comparison_data():
         logger.info(
             f"get_comparison_data: year={year}, period_type={period_type}, "
             f"grouping='{grouping}', period_mode={period_mode}, "
-            f"metrics={selected_metrics}, group_values={group_values}, "
-            f"source_ids={source_ids}, sales_depts={sales_depts}, "
-            f"sales_depts_exclude={sales_depts_exclude}, "
-            f"group_values_exclude={group_values_exclude}"
+            f"attribution={attribution}, metrics={selected_metrics}"
         )
 
         if not selected_metrics:
-            logger.warning("get_comparison_data: selected_metrics пустой!")
             return jsonify({'error': 'Не выбраны метрики'}), 400
 
         import calendar as cal_mod
+        import datetime as dt_mod
+
+        today = dt_mod.date.today()
+
         periods = []
         if period_type == 'month':
             for m in range(1, 13):
+                date_from_p = f"{year}-{m:02d}-01"
+                date_to_p   = f"{year}-{m:02d}-{cal_mod.monthrange(year, m)[1]:02d}"
+                # Пропускаем периоды в будущем (начало периода > сегодня)
+                if dt_mod.date.fromisoformat(date_from_p) > today:
+                    logger.info(f"Пропускаем будущий период: {_month_name(m)} {year}")
+                    continue
                 periods.append({
                     'label':     _month_name(m),
-                    'date_from': f"{year}-{m:02d}-01",
-                    'date_to':   f"{year}-{m:02d}-{cal_mod.monthrange(year, m)[1]:02d}"
+                    'date_from': date_from_p,
+                    'date_to':   date_to_p
                 })
         else:
-            import datetime
-            d = datetime.date(year, 1, 1)
+            d = dt_mod.date(year, 1, 1)
             while d.weekday() != 0:
-                d += datetime.timedelta(days=1)
+                d += dt_mod.timedelta(days=1)
             wn = 1
             while d.year == year:
-                end = d + datetime.timedelta(days=6)
+                end = d + dt_mod.timedelta(days=6)
                 if end.year > year:
-                    end = datetime.date(year, 12, 31)
+                    end = dt_mod.date(year, 12, 31)
+                # Пропускаем недели в будущем
+                if d > today:
+                    logger.info(f"Пропускаем будущую неделю: Нед.{wn} ({d})")
+                    d += dt_mod.timedelta(days=7)
+                    wn += 1
+                    continue
                 periods.append({
                     'label':     f"Нед.{wn}",
                     'date_from': d.strftime('%Y-%m-%d'),
                     'date_to':   end.strftime('%Y-%m-%d')
                 })
-                d += datetime.timedelta(days=7)
+                d += dt_mod.timedelta(days=7)
                 wn += 1
 
-        logger.info(f"get_comparison_data: периодов={len(periods)}")
+        logger.info(f"get_comparison_data: периодов после фильтрации будущих={len(periods)}")
 
         row_keys = group_values if group_values else ['__all__']
-        logger.info(f"get_comparison_data: row_keys={row_keys}")
 
         result_rows = []
         for rk in row_keys:
@@ -1015,22 +1196,22 @@ def get_comparison_data():
 
             for period in periods:
                 logger.info(
-                    f"  Считаем период: {period['label']} "
+                    f"  Период: {period['label']} "
                     f"({period['date_from']} — {period['date_to']}), "
-                    f"group_value='{gv}'"
+                    f"group='{gv}'"
                 )
                 try:
                     pdata = _compute_period_stats(
                         period['date_from'], period['date_to'],
                         grouping, gv, source_ids, sales_depts,
                         sales_depts_exclude, group_values_exclude,
-                        period_mode
+                        period_mode, attribution
                     )
-                    logger.info(f"  Результат периода {period['label']}: {pdata}")
+                    logger.info(f"  Результат {period['label']}: {pdata}")
                 except Exception as pe:
                     logger.error(
-                        f"  Ошибка в _compute_period_stats для периода "
-                        f"{period['label']}: {pe}", exc_info=True
+                        f"  Ошибка _compute_period_stats {period['label']}: {pe}",
+                        exc_info=True
                     )
                     pdata = _empty_period_stats()
 
@@ -1070,17 +1251,12 @@ def get_comparison_data():
 
         group_labels = _get_group_labels(grouping, row_keys)
 
-        response_data = {
+        return jsonify({
             'year': year, 'period_type': period_type,
             'grouping': grouping, 'selected_metrics': selected_metrics,
             'rows': result_rows, 'group_labels': group_labels,
             'period_labels': [p['label'] for p in periods]
-        }
-        logger.info(
-            f"get_comparison_data: успешно, строк={len(result_rows)}, "
-            f"периодов={len(periods)}"
-        )
-        return jsonify(response_data)
+        })
 
     except Exception as e:
         current_app.logger.error(f"Error in get_comparison_data: {e}", exc_info=True)
@@ -1088,22 +1264,19 @@ def get_comparison_data():
 
 
 def _empty_period_stats():
-    """Возвращает пустую структуру статистики за период (для обработки ошибок)."""
     return {
         'total': 0,
-        'answered': 0,        'answered_conv': 0.0,
-        'meeting_scheduled': 0, 'meeting_scheduled_conv': 0.0,
-        'arrival': 0,         'arrival_conv': 0.0,
-        'success': 0,         'success_conv': 0.0,
+        'answered': 0,           'answered_conv': 0.0,
+        'meeting_scheduled': 0,  'meeting_scheduled_conv': 0.0,
+        'arrival': 0,            'arrival_conv': 0.0,
+        'success': 0,            'success_conv': 0.0,
         'clients': 0,
         'clients_with_payment': 0, 'clients_with_payment_conv': 0.0,
         'deals': 0,
         'deals_with_payment': 0,
         'invoices_sum': 0.0,
         'expenses': 0.0,
-        'cpl': 0.0,
-        'cpo': 0.0,
-        'romi': 0.0
+        'cpl': 0.0, 'cpo': 0.0, 'romi': 0.0
     }
 
 
@@ -1130,21 +1303,19 @@ def _get_group_labels(grouping, row_keys):
 
 def _compute_period_stats(date_from, date_to, grouping, group_value,
                            source_ids, sales_depts, sales_depts_exclude,
-                           group_values_exclude, period_mode='standard'):
+                           group_values_exclude, period_mode='standard',
+                           attribution='last_touch'):
     """
-    Считает статистику за один период.
-    Standard: лиды по DATE_CREATE, статусы/сделки/счета — текущие.
-    Strict:   лиды по DATE_CREATE, статусы — только изменённые в периоде
-              (через crm.stagehistory.list), сделки/счета — только созданные в периоде.
+    Считает статистику за один период с поддержкой атрибута first_touch/last_touch.
     """
     dt_from, dt_to = _get_period_datetimes(date_from, date_to)
 
     logger.info(
-        f"_compute_period_stats: {date_from} — {date_to}, "
-        f"mode={period_mode}, grouping='{grouping}', group_value='{group_value}'"
+        f"_compute_period_stats: {date_from}—{date_to}, "
+        f"mode={period_mode}, attribution={attribution}, "
+        f"grouping='{grouping}', group_value='{group_value}'"
     )
 
-    # Всегда берём лиды по DATE_CREATE
     lead_filter = {
         '>=DATE_CREATE': f"{date_from}T00:00:00",
         '<=DATE_CREATE': f"{date_to}T23:59:59"
@@ -1167,8 +1338,6 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
                    'DATE_CREATE', 'DATE_MODIFY']
     })
 
-    logger.info(f"  Получено лидов до фильтрации исключений: {len(all_leads)}")
-
     if sales_depts_exclude:
         all_leads = [l for l in all_leads
                      if str(l.get(SALES_DEPT_FIELD, '')) not in sales_depts_exclude]
@@ -1177,26 +1346,28 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
                      if str(l.get('SOURCE_ID', '')) not in group_values_exclude]
 
     total = len(all_leads)
-    logger.info(f"  Лидов после исключений: {total}")
+    logger.info(f"  Лидов: {total}")
 
-    # Определяем эффективные статусы
-    lead_effective_statuses = {}
     all_lead_ids = [l['ID'] for l in all_leads]
 
+    # Определяем статусы
+    lead_effective_statuses = {}
+    lead_first_touch_data   = {}
+
     if period_mode == 'strict':
-        logger.info(f"  STRICT: запрашиваем историю статусов для {len(all_lead_ids)} лидов")
-        history_map = _get_leads_effective_statuses_in_period(
-            all_lead_ids, date_from, date_to
-        )
-        for lead in all_leads:
-            lid = lead['ID']
-            if lid in history_map:
-                lead_effective_statuses[lid] = history_map[lid]
-            else:
-                lead_effective_statuses[lid] = '__CREATED_ONLY__'
-        logger.info(
-            f"  STRICT: лидов с историей в периоде={len(history_map)} из {total}"
-        )
+        if attribution == 'first_touch':
+            lead_first_touch_data = _get_leads_first_touch_statuses(
+                all_lead_ids, date_from, date_to
+            )
+        else:
+            history_map = _get_leads_effective_statuses_in_period(
+                all_lead_ids, date_from, date_to
+            )
+            for lead in all_leads:
+                lid = lead['ID']
+                lead_effective_statuses[lid] = (
+                    history_map[lid] if lid in history_map else '__CREATED_ONLY__'
+                )
     else:
         for lead in all_leads:
             lead_effective_statuses[lead['ID']] = lead.get('STATUS_ID')
@@ -1208,8 +1379,14 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
     deals_with_payment_set = set()
     invoices_sum = 0.0
 
-    # Контакты конвертированных лидов
-    if period_mode == 'strict':
+    # Контакты
+    if period_mode == 'strict' and attribution == 'first_touch':
+        contact_ids = list(set([
+            l['CONTACT_ID'] for l in all_leads
+            if lead_first_touch_data.get(l['ID'], {}).get('last_status_in_period') == 'CONVERTED'
+            and l.get('CONTACT_ID')
+        ]))
+    elif period_mode == 'strict':
         contact_ids = list(set([
             l['CONTACT_ID'] for l in all_leads
             if lead_effective_statuses.get(l['ID']) == 'CONVERTED'
@@ -1221,19 +1398,14 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
             if l.get('STATUS_ID') == 'CONVERTED' and l.get('CONTACT_ID')
         ]))
 
-    logger.info(f"  Контактов для поиска сделок: {len(contact_ids)}")
-
     deals = fetch_paginated_data('crm.deal.list', {
         'filter': {'CONTACT_ID': contact_ids, 'CATEGORY_ID': 0},
         'select': ['ID', 'CONTACT_ID', 'DATE_CREATE']
     }) if contact_ids else []
 
-    logger.info(f"  Сделок до фильтрации: {len(deals)}")
-
     if period_mode == 'strict':
         deals = [d for d in deals
                  if _date_in_period(d.get('DATE_CREATE', ''), dt_from, dt_to)]
-        logger.info(f"  Сделок после фильтрации по периоду: {len(deals)}")
 
     deal_ids = [d['ID'] for d in deals]
     invoices = fetch_paginated_data('crm.invoice.list', {
@@ -1241,15 +1413,12 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
         'select': ['ID', 'UF_DEAL_ID', 'STATUS_ID', 'PRICE', 'DATE_CREATE', 'DATE_BILL']
     }) if deal_ids else []
 
-    logger.info(f"  Счетов до фильтрации: {len(invoices)}")
-
     if period_mode == 'strict':
         invoices = [inv for inv in invoices
                     if _date_in_period(
                         inv.get('DATE_CREATE', '') or inv.get('DATE_BILL', ''),
                         dt_from, dt_to
                     )]
-        logger.info(f"  Счетов после фильтрации по периоду: {len(invoices)}")
 
     paid_deal_ids    = {inv['UF_DEAL_ID'] for inv in invoices if inv['STATUS_ID'] == 'P'}
     deals_by_contact = defaultdict(list)
@@ -1257,28 +1426,55 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
         deals_by_contact[deal['CONTACT_ID']].append(deal)
 
     for lead in all_leads:
-        eff_status = lead_effective_statuses.get(lead['ID'])
+        if period_mode == 'strict' and attribution == 'first_touch':
+            ft = lead_first_touch_data.get(lead['ID'], {})
+            has_any = any([
+                ft.get('answered'), ft.get('meeting_scheduled'),
+                ft.get('arrival'),  ft.get('success'),
+                ft.get('last_status_in_period')
+            ])
+            if not has_any:
+                continue
 
-        if eff_status == '__CREATED_ONLY__' or eff_status is None:
-            continue
+            if ft.get('answered'):           answered += 1
+            if ft.get('meeting_scheduled'):  meeting_scheduled += 1
+            if ft.get('arrival'):            arrival += 1
+            if ft.get('success'):            success_count += 1
 
-        if eff_status in LEAD_STATUS_GROUPS['answered']:      answered += 1
-        if eff_status in LEAD_STATUS_GROUPS['meeting_scheduled']: meeting_scheduled += 1
-        if eff_status in LEAD_STATUS_GROUPS['arrival']:       arrival += 1
-        if eff_status in LEAD_STATUS_GROUPS['success']:       success_count += 1
+            if ft.get('last_status_in_period') == 'CONVERTED' and lead.get('CONTACT_ID'):
+                cid = lead['CONTACT_ID']
+                clients.add(cid)
+                contact_deals = deals_by_contact.get(cid, [])
+                deals_set.update(d['ID'] for d in contact_deals)
+                for deal in contact_deals:
+                    if deal['ID'] in paid_deal_ids:
+                        deals_with_payment_set.add(deal['ID'])
+                        clients_with_payment.add(cid)
+                for inv in invoices:
+                    if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
+                        invoices_sum += float(inv.get('PRICE', 0))
+        else:
+            eff_status = lead_effective_statuses.get(lead['ID'])
+            if eff_status == '__CREATED_ONLY__' or eff_status is None:
+                continue
 
-        if eff_status == 'CONVERTED' and lead.get('CONTACT_ID'):
-            cid = lead['CONTACT_ID']
-            clients.add(cid)
-            contact_deals = deals_by_contact.get(cid, [])
-            deals_set.update(d['ID'] for d in contact_deals)
-            for deal in contact_deals:
-                if deal['ID'] in paid_deal_ids:
-                    deals_with_payment_set.add(deal['ID'])
-                    clients_with_payment.add(cid)
-            for inv in invoices:
-                if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
-                    invoices_sum += float(inv.get('PRICE', 0))
+            if eff_status in LEAD_STATUS_GROUPS['answered']:      answered += 1
+            if eff_status in LEAD_STATUS_GROUPS['meeting_scheduled']: meeting_scheduled += 1
+            if eff_status in LEAD_STATUS_GROUPS['arrival']:       arrival += 1
+            if eff_status in LEAD_STATUS_GROUPS['success']:       success_count += 1
+
+            if eff_status == 'CONVERTED' and lead.get('CONTACT_ID'):
+                cid = lead['CONTACT_ID']
+                clients.add(cid)
+                contact_deals = deals_by_contact.get(cid, [])
+                deals_set.update(d['ID'] for d in contact_deals)
+                for deal in contact_deals:
+                    if deal['ID'] in paid_deal_ids:
+                        deals_with_payment_set.add(deal['ID'])
+                        clients_with_payment.add(cid)
+                for inv in invoices:
+                    if inv['UF_DEAL_ID'] in {d['ID'] for d in contact_deals}:
+                        invoices_sum += float(inv.get('PRICE', 0))
 
     # Расходы
     expenses = 0.0
@@ -1311,7 +1507,7 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
             expenses = float(row['total']) if row else 0.0
             cursor.close()
         except Exception as db_err:
-            logger.error(f"  Ошибка получения расходов: {db_err}", exc_info=True)
+            logger.error(f"  Ошибка расходов: {db_err}", exc_info=True)
         finally:
             conn.close()
 
@@ -1341,12 +1537,9 @@ def _compute_period_stats(date_from, date_to, grouping, group_value,
     }
 
     logger.info(
-        f"  Итог периода {date_from}—{date_to} ({period_mode}): "
-        f"total={total}, answered={answered}, meeting={meeting_scheduled}, "
-        f"arrival={arrival}, success={success_count}, "
-        f"clients={cc}, deals={dc}, dwp={dwp}, expenses={expenses}"
+        f"  Итог: total={total}, answered={answered}, meeting={meeting_scheduled}, "
+        f"arrival={arrival}, success={success_count}, clients={cc}, dwp={dwp}"
     )
-
     return result
 
 

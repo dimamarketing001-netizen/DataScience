@@ -11,6 +11,8 @@ App.initializeStatistics = async function () {
     const groupingSelect    = document.getElementById('stats-grouping-filter');
     const periodModeSelect  = document.getElementById('stats-period-mode');
     const periodModeHint    = document.getElementById('stats-period-mode-hint');
+    const attributionWrap   = document.getElementById('stats-attribution-wrap');
+    const attributionSelect = document.getElementById('stats-attribution');
     const resetBtn          = document.getElementById('stats-reset-btn');
     const tableHead         = document.getElementById('statistics-table-head');
     const tableBody         = document.getElementById('statistics-table-body');
@@ -22,10 +24,13 @@ App.initializeStatistics = async function () {
     const cmpGroupValueWrap = document.getElementById('cmp-group-value-wrap');
     const cmpPeriodMode     = document.getElementById('cmp-period-mode');
     const cmpPeriodModeHint = document.getElementById('cmp-period-mode-hint');
+    const cmpAttributionWrap= document.getElementById('cmp-attribution-wrap');
+    const cmpAttribution    = document.getElementById('cmp-attribution');
     const cmpResetBtn       = document.getElementById('cmp-reset-btn');
     const cmpTableHead      = document.getElementById('comparison-table-head');
     const cmpTableBody      = document.getElementById('comparison-table-body');
     const cmpEmpty          = document.getElementById('comparison-empty');
+    const cmpChartsWrap     = document.getElementById('comparison-charts-wrap');
 
     const utmLabelForm   = document.getElementById('utm-label-form');
     const utmLabelType   = document.getElementById('utm-label-type');
@@ -41,6 +46,9 @@ App.initializeStatistics = async function () {
     let sourcesCache   = [];
     let salesDeptCache = [];
 
+    // Хранилище Chart.js инстансов для уничтожения при перерисовке
+    let _chartInstances = [];
+
     const CONVERSION_METRICS = new Set([
         'answered','meeting_scheduled','arrival','success','clients_with_payment'
     ]);
@@ -54,6 +62,13 @@ App.initializeStatistics = async function () {
     };
     const CURRENCY_METRICS = new Set(['expenses','cpl','cpo','invoices_sum']);
     const PERCENT_METRICS  = new Set(['romi']);
+
+    // Палитра цветов для группировок
+    const GROUP_COLORS = [
+        '#0b66c3','#e74c3c','#27ae60','#f39c12','#8e44ad',
+        '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
+        '#e67e22','#9b59b6','#2ecc71','#e91e63','#ff5722'
+    ];
 
     // =========================================================
     // МУЛЬТИФИЛЬТР
@@ -278,16 +293,21 @@ App.initializeStatistics = async function () {
     }
 
     // =========================================================
-    // РЕЖИМ ПЕРИОДА
+    // РЕЖИМ ПЕРИОДА + АТРИБУТ
     // =========================================================
     function initPeriodModeHandlers() {
+        // Общая статистика
         periodModeSelect.addEventListener('change', () => {
-            periodModeHint.style.display =
-                periodModeSelect.value === 'strict' ? 'flex' : 'none';
+            const isStrict = periodModeSelect.value === 'strict';
+            periodModeHint.style.display    = isStrict ? 'flex' : 'none';
+            attributionWrap.style.display   = isStrict ? ''     : 'none';
         });
+
+        // Сравнение
         cmpPeriodMode.addEventListener('change', () => {
-            cmpPeriodModeHint.style.display =
-                cmpPeriodMode.value === 'strict' ? 'flex' : 'none';
+            const isStrict = cmpPeriodMode.value === 'strict';
+            cmpPeriodModeHint.style.display  = isStrict ? 'flex' : 'none';
+            cmpAttributionWrap.style.display = isStrict ? ''     : 'none';
         });
     }
 
@@ -324,6 +344,11 @@ App.initializeStatistics = async function () {
         params.set('date_to',     endDateInput.value);
         params.set('grouping',    groupingSelect.value || 'source');
         params.set('period_mode', periodModeSelect.value || 'standard');
+
+        // Атрибут — только для strict
+        if (periodModeSelect.value === 'strict') {
+            params.set('attribution', attributionSelect.value || 'last_touch');
+        }
 
         window._mfStatsSource.getSelected().forEach(v =>
             params.append('source_id[]', v));
@@ -608,7 +633,8 @@ App.initializeStatistics = async function () {
         cmpResetBtn.addEventListener('click', () => {
             cmpForm.reset();
             populateYears();
-            cmpGroupValueWrap.style.display = 'none';
+            cmpGroupValueWrap.style.display  = 'none';
+            cmpAttributionWrap.style.display = 'none';
             window._mfCmpGroupValue.reset();
             window._mfCmpDept.reset();
             cmpPeriodModeHint.style.display = 'none';
@@ -617,6 +643,8 @@ App.initializeStatistics = async function () {
             cmpTableHead.innerHTML = '';
             cmpTableBody.innerHTML = '';
             cmpEmpty.style.display = 'block';
+            _destroyCharts();
+            cmpChartsWrap.innerHTML = '';
         });
     }
 
@@ -657,6 +685,11 @@ App.initializeStatistics = async function () {
         params.set('metrics',     selectedMetrics.join(','));
         params.set('period_mode', cmpPeriodMode.value || 'standard');
 
+        // Атрибут — только для strict
+        if (cmpPeriodMode.value === 'strict') {
+            params.set('attribution', cmpAttribution.value || 'last_touch');
+        }
+
         window._mfCmpGroupValue.getSelected().forEach(v =>
             params.append('group_value[]', v));
         window._mfCmpGroupValue.getExcluded().forEach(v =>
@@ -674,6 +707,7 @@ App.initializeStatistics = async function () {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             renderComparisonTable(data, selectedMetrics);
+            renderComparisonCharts(data, selectedMetrics);
             cmpEmpty.style.display = 'none';
         } catch(e) {
             console.error("Ошибка загрузки сравнения:", e);
@@ -685,15 +719,9 @@ App.initializeStatistics = async function () {
 
     // =========================================================
     // ТАБЛИЦА СРАВНЕНИЯ
-    //
-    // Структура по эскизу:
-    // Строки = группировки (источники / utm / "Все")
-    // Столбцы = периоды
-    // Под каждым значением — конверсия inline (для нужных метрик)
-    // ПЛАШКИ — между столбцами периодов (в отдельном столбце-разделителе)
-    //
-    // Схема заголовка:
-    // [Группировка] | [Январь colspan=N] | [плашка] | [Февраль colspan=N] | [плашка] | ...
+    // Структура:
+    // [Группировка] | [Январь: метрика1, метрика2...] | [Февраль: ...] | ...
+    // В каждой ячейке: значение + конверсия + дельта к предыдущему периоду
     // =========================================================
     function renderComparisonTable(data, selectedMetrics) {
         if (!data || !data.rows || data.rows.length === 0) {
@@ -707,38 +735,26 @@ App.initializeStatistics = async function () {
         const rows         = data.rows;
         const groupLabels  = data.group_labels || {};
         const metricCount  = selectedMetrics.length;
-        const periodCount  = periodLabels.length;
 
         // ---- ЗАГОЛОВОК ----
-        // Строка 1: [Группировка] [Январь, colspan=M] [разделитель] [Февраль, colspan=M] ...
-        // Разделитель — столбец для плашек между периодами
-        // Плашек будет (periodCount - 1) штук
-
+        // Строка 1: [Группировка] [Январь colspan=M] [Февраль colspan=M] ...
         let head1 = `<tr>
             <th class="cmp-th-group col-sticky" rowspan="2">
                 ${data.grouping
                     ? (METRIC_LABELS[data.grouping] || data.grouping)
                     : 'Группировка'}
             </th>`;
-
-        periodLabels.forEach((label, idx) => {
+        periodLabels.forEach(label => {
             head1 += `<th class="cmp-th-period" colspan="${metricCount}">${label}</th>`;
-            // После каждого периода (кроме последнего) — столбец для плашек
-            if (idx < periodCount - 1) {
-                head1 += `<th class="cmp-th-badge-col" rowspan="2"></th>`;
-            }
         });
         head1 += '</tr>';
 
         // Строка 2: под каждым периодом — названия метрик
         let head2 = '<tr>';
-        periodLabels.forEach((_label, idx) => {
+        periodLabels.forEach(() => {
             selectedMetrics.forEach(metric => {
-                head2 += `<th class="cmp-th-metric">
-                    ${METRIC_LABELS[metric] || metric}
-                </th>`;
+                head2 += `<th class="cmp-th-metric">${METRIC_LABELS[metric] || metric}</th>`;
             });
-            // Пропускаем добавление th для badge-col — он уже rowspan=2
         });
         head2 += '</tr>';
 
@@ -750,18 +766,11 @@ App.initializeStatistics = async function () {
             const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
             bodyHtml += `<tr><td class="cmp-td-group col-sticky">${groupLabel}</td>`;
 
-            row.periods.forEach((period, pIdx) => {
-                // Ячейки данных за период
+            row.periods.forEach(period => {
                 selectedMetrics.forEach(metric => {
                     const mdata = period.metrics[metric];
                     bodyHtml += renderCmpDataCell(metric, mdata);
                 });
-
-                // Столбец плашек между периодами
-                if (pIdx < periodCount - 1) {
-                    const nextPeriod = row.periods[pIdx + 1];
-                    bodyHtml += renderBadgeCell(selectedMetrics, period, nextPeriod);
-                }
             });
 
             bodyHtml += '</tr>';
@@ -770,7 +779,9 @@ App.initializeStatistics = async function () {
         cmpTableBody.innerHTML = bodyHtml;
     }
 
-    // Ячейка с данными (значение + конверсия inline)
+    // Ячейка с данными:
+    // Строка 1: значение (+ конверсия inline)
+    // Строка 2: дельта к предыдущему периоду (+ дельта конверсии)
     function renderCmpDataCell(metric, mdata) {
         if (!mdata) {
             return `<td class="cmp-td"><div class="cmp-cell-inner">
@@ -781,93 +792,214 @@ App.initializeStatistics = async function () {
         const val     = mdata.value;
         const conv    = mdata.conv;
         const hasConv = CONVERSION_METRICS.has(metric);
+        const pctPrev = mdata.pct_from_prev;
+        const pctConv = mdata.pct_conv_from_prev;
 
         const valStr = formatMetricValue(metric, val);
 
-        // Конверсия сразу после значения (как в общей статистике)
+        // Конверсия inline после значения
         let convHtml = '';
         if (hasConv && conv !== null && conv !== undefined) {
             convHtml = `<span class="conversion-percent">&nbsp;(${(+conv).toFixed(1)}%)</span>`;
         }
 
+        // Дельта значения к предыдущему периоду
+        let deltaHtml = '';
+        if (pctPrev !== null && pctPrev !== undefined) {
+            const isUp   = pctPrev > 0;
+            const isDown = pctPrev < 0;
+            const sign   = isUp ? '+' : '';
+            const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
+            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
+            deltaHtml += `<span class="cmp-delta ${cls}">${arrow}${sign}${pctPrev.toFixed(1)}%</span>`;
+        }
+
+        // Дельта конверсии к предыдущему периоду (в пп)
+        if (hasConv && pctConv !== null && pctConv !== undefined) {
+            const isUp   = pctConv > 0;
+            const isDown = pctConv < 0;
+            const sign   = isUp ? '+' : '';
+            const cls    = isUp ? 'cmp-delta-up' : isDown ? 'cmp-delta-down' : 'cmp-delta-flat';
+            const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
+            deltaHtml += `<span class="cmp-delta cmp-delta-conv ${cls}">${arrow}${sign}${pctConv.toFixed(1)}пп</span>`;
+        }
+
         return `<td class="cmp-td">
             <div class="cmp-cell-inner">
-                <span class="cmp-cell-value">${valStr}</span>${convHtml}
+                <div class="cmp-cell-top">
+                    <span class="cmp-cell-value">${valStr}</span>${convHtml}
+                </div>
+                ${deltaHtml ? `<div class="cmp-cell-deltas">${deltaHtml}</div>` : ''}
             </div>
         </td>`;
     }
 
-    // Столбец плашек между двумя периодами
-    // Показывает плашку для КАЖДОЙ метрики:
-    // % изменения значения от текущего к следующему периоду
-    // и % изменения конверсии (если применимо)
-    function renderBadgeCell(selectedMetrics, currentPeriod, nextPeriod) {
-        let badgesHtml = '';
+    // =========================================================
+    // ГРАФИКИ СРАВНЕНИЯ (Chart.js)
+    // Для каждой метрики — отдельный мини-график
+    // Линии = группировки, разные цвета
+    // Если метрика имеет конверсию — правая ось Y для конверсии (пунктир)
+    // =========================================================
 
-        selectedMetrics.forEach(metric => {
-            const curr = currentPeriod.metrics[metric];
-            const next = nextPeriod ? nextPeriod.metrics[metric] : null;
+    function _destroyCharts() {
+        _chartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
+        _chartInstances = [];
+    }
 
-            if (!curr || !next) {
-                badgesHtml += `<div class="cmp-badge-row">
-                    <span class="cmp-badge cmp-badge-flat cmp-badge-fixed">—</span>
-                </div>`;
-                return;
+    function renderComparisonCharts(data, selectedMetrics) {
+        _destroyCharts();
+        if (!cmpChartsWrap) return;
+        cmpChartsWrap.innerHTML = '';
+
+        if (!data || !data.rows || data.rows.length === 0) return;
+
+        const periodLabels = data.period_labels || [];
+        const rows         = data.rows;
+        const groupLabels  = data.group_labels || {};
+
+        // Для каждой метрики — свой блок с canvas
+        selectedMetrics.forEach((metric, mIdx) => {
+            const metricLabel = METRIC_LABELS[metric] || metric;
+            const hasConv     = CONVERSION_METRICS.has(metric);
+
+            // Обёртка графика
+            const chartBlock = document.createElement('div');
+            chartBlock.className = 'cmp-chart-block';
+
+            const title = document.createElement('div');
+            title.className   = 'cmp-chart-title';
+            title.textContent = metricLabel;
+            chartBlock.appendChild(title);
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'cmp-chart-canvas';
+            chartBlock.appendChild(canvas);
+            cmpChartsWrap.appendChild(chartBlock);
+
+            // Датасеты: для каждой группировки — линия значений
+            const datasets = [];
+
+            rows.forEach((row, rowIdx) => {
+                const color      = GROUP_COLORS[rowIdx % GROUP_COLORS.length];
+                const groupLabel = groupLabels[row.group_key] || row.group_key || 'Все';
+
+                // Значения
+                const valData = row.periods.map(p => {
+                    const m = p.metrics[metric];
+                    return m ? (m.value || 0) : 0;
+                });
+
+                datasets.push({
+                    label:           groupLabel,
+                    data:            valData,
+                    borderColor:     color,
+                    backgroundColor: color + '22',
+                    borderWidth:     2,
+                    pointRadius:     4,
+                    pointHoverRadius:6,
+                    tension:         0.3,
+                    yAxisID:         'y',
+                    fill:            false,
+                });
+
+                // Конверсия — пунктирная линия на правой оси
+                if (hasConv) {
+                    const convData = row.periods.map(p => {
+                        const m = p.metrics[metric];
+                        return m && m.conv !== null ? (m.conv || 0) : 0;
+                    });
+
+                    datasets.push({
+                        label:           `${groupLabel} (конв.%)`,
+                        data:            convData,
+                        borderColor:     color,
+                        backgroundColor: 'transparent',
+                        borderWidth:     1.5,
+                        borderDash:      [5, 4],
+                        pointRadius:     3,
+                        pointHoverRadius:5,
+                        tension:         0.3,
+                        yAxisID:         'y2',
+                        fill:            false,
+                    });
+                }
+            });
+
+            // Настройки осей
+            const scales = {
+                x: {
+                    grid: { color: '#f0f0f0' },
+                    ticks: { font: { size: 11 }, color: '#535c69' }
+                },
+                y: {
+                    position: 'left',
+                    grid: { color: '#f0f0f0' },
+                    ticks: {
+                        font: { size: 11 }, color: '#535c69',
+                        callback: (val) => {
+                            if (CURRENCY_METRICS.has(metric)) {
+                                return new Intl.NumberFormat('ru-RU', {
+                                    notation: 'compact', compactDisplay: 'short'
+                                }).format(val) + ' ₽';
+                            }
+                            if (PERCENT_METRICS.has(metric)) return val + '%';
+                            return val;
+                        }
+                    }
+                }
+            };
+
+            if (hasConv) {
+                scales['y2'] = {
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        font: { size: 10 }, color: '#9aabb8',
+                        callback: (val) => val + '%'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Конверсия %',
+                        font: { size: 10 },
+                        color: '#9aabb8'
+                    }
+                };
             }
 
-            const currVal  = curr.value  || 0;
-            const nextVal  = next.value  || 0;
-            const currConv = curr.conv;
-            const nextConv = next.conv;
-            const hasConv  = CONVERSION_METRICS.has(metric);
+            const chart = new Chart(canvas, {
+                type: 'line',
+                data: { labels: periodLabels, datasets },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { size: 11 }, boxWidth: 14, padding: 10 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const ds    = ctx.dataset;
+                                    const isConv= ds.yAxisID === 'y2';
+                                    const val   = ctx.parsed.y;
+                                    if (isConv) return `${ds.label}: ${val.toFixed(1)}%`;
+                                    if (CURRENCY_METRICS.has(metric))
+                                        return `${ds.label}: ${formatCurrency(val)}`;
+                                    if (PERCENT_METRICS.has(metric))
+                                        return `${ds.label}: ${val.toFixed(2)}%`;
+                                    return `${ds.label}: ${val}`;
+                                }
+                            }
+                        }
+                    },
+                    scales
+                }
+            });
 
-            // % изменения значения: (next - curr) / curr * 100
-            let pctVal = null;
-            if (currVal > 0) {
-                pctVal = ((nextVal - currVal) / currVal * 100);
-            }
-
-            // Плашка значения
-            let valBadge = '';
-            if (pctVal !== null) {
-                const isUp   = pctVal > 0;
-                const isDown = pctVal < 0;
-                const sign   = isUp ? '+' : '';
-                const cls    = isUp ? 'cmp-badge-up'
-                             : isDown ? 'cmp-badge-down'
-                             : 'cmp-badge-flat';
-                const arrow  = isUp ? '↑' : isDown ? '↓' : '→';
-                valBadge = `<span class="cmp-badge ${cls} cmp-badge-fixed">
-                    ${arrow}&nbsp;${sign}${pctVal.toFixed(1)}%
-                </span>`;
-            } else {
-                valBadge = `<span class="cmp-badge cmp-badge-flat cmp-badge-fixed">—</span>`;
-            }
-
-            // Плашка конверсии (только для метрик с конверсией)
-            let convBadge = '';
-            if (hasConv && currConv !== null && currConv !== undefined
-                       && nextConv !== null && nextConv !== undefined) {
-                const diffConv = nextConv - currConv;
-                const isUp     = diffConv > 0;
-                const isDown   = diffConv < 0;
-                const sign     = isUp ? '+' : '';
-                const cls      = isUp ? 'cmp-badge-up'
-                               : isDown ? 'cmp-badge-down'
-                               : 'cmp-badge-flat';
-                const arrow    = isUp ? '↑' : isDown ? '↓' : '→';
-                convBadge = `<span class="cmp-badge cmp-badge-conv ${cls} cmp-badge-fixed">
-                    ${arrow}&nbsp;${sign}${diffConv.toFixed(1)}пп
-                </span>`;
-            }
-
-            badgesHtml += `<div class="cmp-badge-row">
-                ${valBadge}
-                ${convBadge}
-            </div>`;
+            _chartInstances.push(chart);
         });
-
-        return `<td class="cmp-td-badge">${badgesHtml}</td>`;
     }
 
     // =========================================================
@@ -957,9 +1089,11 @@ App.initializeStatistics = async function () {
         const first = new Date(today.getFullYear(), today.getMonth(), 1);
         startDateInput._flatpickr.setDate(first);
         endDateInput._flatpickr.setDate(today);
-        groupingSelect.value   = 'source';
-        periodModeSelect.value = 'standard';
-        periodModeHint.style.display = 'none';
+        groupingSelect.value     = 'source';
+        periodModeSelect.value   = 'standard';
+        attributionSelect.value  = 'last_touch';
+        periodModeHint.style.display  = 'none';
+        attributionWrap.style.display = 'none';
         window._mfStatsSource.reset();
         window._mfStatsDept.reset();
         loadStatistics();

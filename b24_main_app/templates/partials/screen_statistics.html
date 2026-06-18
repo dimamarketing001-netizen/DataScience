@@ -22,12 +22,14 @@
                     <div class="ui-form-content">
                         <div class="filter-grid stats-filter-grid">
 
+                            <!-- Дата от -->
                             <div class="ui-ctl ui-ctl-textbox ui-ctl-w100
                                         ui-ctl-after-icon ui-ctl-icon-calendar">
                                 <input type="text" id="stats-start-date"
                                        class="ui-ctl-element" placeholder="Дата от...">
                             </div>
 
+                            <!-- Дата до -->
                             <div class="ui-ctl ui-ctl-textbox ui-ctl-w100
                                         ui-ctl-after-icon ui-ctl-icon-calendar">
                                 <input type="text" id="stats-end-date"
@@ -97,18 +99,33 @@
                                 </select>
                             </div>
 
+                            <!-- Атрибут — показывается только в strict режиме -->
+                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"
+                                 id="stats-attribution-wrap" style="display:none;">
+                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                                <select id="stats-attribution" class="ui-ctl-element">
+                                    <option value="last_touch">Последнее касание</option>
+                                    <option value="first_touch">Первое касание</option>
+                                </select>
+                            </div>
+
                         </div>
 
-                        <!-- Подсказка режима -->
+                        <!-- Подсказка режима периода -->
                         <div id="stats-period-mode-hint"
                              class="period-mode-hint" style="display:none;">
                             <span class="period-mode-hint-icon">ℹ️</span>
                             <span class="period-mode-hint-text">
                                 <b>Режим «В разрезе периода»:</b>
                                 берутся лиды созданные в периоде.
-                                Статусы учитываются только если они были установлены
-                                в этом периоде. Сделки и счета — только созданные
-                                в этом же периоде.
+                                Статусы учитываются через историю изменений —
+                                только те что были установлены в этом периоде.
+                                Сделки и счета — только созданные в этом же периоде.
+                                <br>
+                                <b>Последнее касание</b> — учитывается последний статус
+                                лида в периоде.
+                                <b>Первое касание</b> — для каждой воронки учитывается
+                                дата первого попадания в группу статусов.
                             </span>
                         </div>
 
@@ -181,6 +198,16 @@
                                 </select>
                             </div>
 
+                            <!-- Атрибут — только для strict -->
+                            <div class="ui-ctl ui-ctl-after-icon ui-ctl-dropdown ui-ctl-w100"
+                                 id="cmp-attribution-wrap" style="display:none;">
+                                <div class="ui-ctl-after ui-ctl-icon-angle"></div>
+                                <select id="cmp-attribution" class="ui-ctl-element">
+                                    <option value="last_touch">Последнее касание</option>
+                                    <option value="first_touch">Первое касание</option>
+                                </select>
+                            </div>
+
                             <!-- Значения группировки -->
                             <div class="multi-filter-wrap"
                                  id="cmp-group-value-wrap" style="display:none;">
@@ -229,14 +256,18 @@
 
                         </div>
 
-                        <!-- Подсказка режима -->
+                        <!-- Подсказка режима периода -->
                         <div id="cmp-period-mode-hint"
                              class="period-mode-hint" style="display:none;">
                             <span class="period-mode-hint-icon">ℹ️</span>
                             <span class="period-mode-hint-text">
                                 <b>Режим «В разрезе периода»:</b>
                                 для каждого периода учитываются лиды созданные в нём,
-                                статусы установленные в нём, сделки и счета созданные в нём.
+                                статусы установленные в нём (через историю изменений),
+                                сделки и счета созданные в нём.
+                                <br>
+                                <b>Последнее касание</b> — последний статус в периоде.
+                                <b>Первое касание</b> — первое попадание в группу статусов.
                             </span>
                         </div>
 
@@ -335,6 +366,9 @@
                     Настройте фильтры и нажмите «Построить».
                 </div>
             </div>
+
+            <!-- ===================== ГРАФИКИ ===================== -->
+            <div id="comparison-charts-wrap" class="cmp-charts-wrap"></div>
 
         </div><!-- /stats-tab-comparison -->
 
