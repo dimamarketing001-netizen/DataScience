@@ -11,7 +11,7 @@ body {
 }
 
 .workarea-content-paddings {
-    max-width: 1600px; /* Увеличена максимальная ширина для новых столбцов */
+    max-width: 1600px;
     margin: 0 auto;
 }
 
@@ -28,7 +28,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     padding: 20px;
-    margin-bottom: 20px; /* Отступ между карточками */
+    margin-bottom: 20px;
 }
 
 /* --- Фильтры (общие) --- */
@@ -41,7 +41,7 @@ body {
 }
 
 .filter-item {
-    flex: 1 1 200px; /* Адаптивность для фильтров */
+    flex: 1 1 200px;
 }
 
 /* --- Дашборд --- */
@@ -60,7 +60,7 @@ body {
     padding: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    position: relative; /* Для позиционирования стрелки */
+    position: relative;
 }
 
 .status-card:hover {
@@ -87,10 +87,9 @@ body {
     color: #0b66c3;
 }
 
-/* --- Новый стиль для стрелки конверсии --- */
 .conversion-arrow {
     position: absolute;
-    top: -25px; /* Позиционируем над карточкой */
+    top: -25px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 14px;
@@ -98,8 +97,7 @@ body {
     color: #535c69;
 }
 
-
-/* --- Общие стили контролов (из прошлого проекта) --- */
+/* --- Общие стили контролов --- */
 .ui-ctl {
     position: relative;
     display: flex;
@@ -153,7 +151,6 @@ body {
     pointer-events: none;
 }
 
-/* Иконка календаря для полей даты */
 .ui-ctl-icon-calendar::after {
     content: '';
     display: block;
@@ -168,7 +165,6 @@ body {
     background-position: center;
     pointer-events: none;
 }
-
 
 .ui-btn {
     display: inline-block;
@@ -241,7 +237,7 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
+    0%   { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
@@ -266,7 +262,6 @@ body {
     cursor: not-allowed !important;
 }
 
-
 /*
  * ===================================================================
  *  Новая система уведомлений App.Notify
@@ -280,7 +275,7 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.4);
-    display: none; /* Управляется через JS */
+    display: none;
     justify-content: center;
     align-items: center;
     z-index: 3000;
@@ -347,7 +342,7 @@ body {
     justify-content: center;
 }
 
-/* --- Стили для модальных окон (перенесены из index.html) --- */
+/* --- Стили для модальных окон --- */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -355,7 +350,7 @@ body {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    display: none; /* Управляется через JS */
+    display: none;
     justify-content: center;
     align-items: center;
     z-index: 1000;
@@ -365,16 +360,15 @@ body {
     background: #fff;
     padding: 20px;
     border-radius: 8px;
-    width: 400px; /* Базовая ширина */
-    max-width: 90%; /* Максимальная ширина для адаптивности */
+    width: 400px;
+    max-width: 90%;
     text-align: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
-/* Align labels in modals to the left */
 .modal-content label {
     text-align: left;
-    display: block; /* Ensure label takes full width to align text */
+    display: block;
 }
 
 .modal-content .ui-form-label .ui-ctl-label-text {
@@ -413,6 +407,7 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     border-radius: 4px;
 }
+
 .client-search-results-item {
     padding: 8px 10px;
     cursor: pointer;
@@ -420,12 +415,15 @@ body {
     font-size: 14px;
     color: #333;
 }
+
 .client-search-results-item:last-child {
     border-bottom: none;
 }
+
 .client-search-results-item:hover {
     background-color: #f5f5f5;
 }
+
 .client-search-wrapper {
     position: relative;
 }
@@ -434,16 +432,18 @@ body {
 .expenses-table-container {
     margin-top: 20px;
     overflow-x: auto;
+    position: relative;
 }
 
 .expenses-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 0;
-    min-width: 1400px; /* Увеличено для новых столбцов */
+    min-width: 1400px;
 }
 
-.expenses-table th, .expenses-table td {
+.expenses-table th,
+.expenses-table td {
     border: 1px solid #eef2f4;
     padding: 12px 10px;
     text-align: left;
@@ -497,8 +497,10 @@ body {
 .conversion-percent {
     color: #828b95;
     font-size: 12px;
-    margin-left: 5px;
-    display: block; /* Для переноса на новую строку */
+    margin-left: 3px;
+    display: inline;
+    text-decoration: none !important;
+    white-space: nowrap;
 }
 
 /* Стили для группировки столбцов */
@@ -511,7 +513,6 @@ body {
 .expenses-table .group-4:last-of-type { border-right: 2px solid #aed5ff; }
 .expenses-table .group-5 { background-color: #f8f8f8; }
 
-
 /* --- Стили для формы фильтров --- */
 .filter-form {
     gap: 15px;
@@ -520,36 +521,33 @@ body {
 
 .filter-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Адаптивная сетка */
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 15px;
-    margin-bottom: 15px; /* Отступ между полями фильтра и кнопками */
+    margin-bottom: 15px;
 }
 
 .filter-grid > .ui-ctl {
-    width: 100%; /* Элементы внутри сетки занимают всю доступную ширину */
+    width: 100%;
 }
 
-/* Стили для строки с кнопками фильтра */
 .ui-form-row-bottom-buttons {
-    margin-top: 15px; /* Отступ сверху для кнопок */
+    margin-top: 15px;
     display: flex;
-    justify-content: flex-start; /* Выравнивание кнопок по левому краю */
+    justify-content: flex-start;
     gap: 10px;
 }
 
 .ui-form-row-bottom-buttons .ui-form-content {
     display: flex;
     gap: 10px;
-    width: auto; /* Позволяем содержимому определять свою ширину */
+    width: auto;
 }
 
-/* Отступ для кнопок сохранения/действий в формах */
 .ui-form-row-actions {
-    margin-top: 20px; /* Отступ сверху */
-    padding-top: 15px; /* Внутренний отступ */
-    border-top: 1px solid #eef2f4; /* Разделительная линия */
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eef2f4;
 }
-
 
 /* --- Стили для пагинации --- */
 .pagination-controls {
@@ -581,7 +579,7 @@ body {
     align-items: center;
     gap: 30px;
     padding: 40px 20px;
-    flex-wrap: wrap; /* Для адаптивности карточек */
+    flex-wrap: wrap;
 }
 
 .menu-card {
@@ -599,13 +597,6 @@ body {
 .menu-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-}
-
-.ui-disabled-card {
-    pointer-events: none;
-    opacity: 0.6;
-    filter: grayscale(1);
-    cursor: not-allowed !important;
 }
 
 .menu-card-icon {
@@ -639,13 +630,14 @@ body {
     margin-top: 20px;
 }
 
-.access-rules-table th, .access-rules-table td {
+.access-rules-table th,
+.access-rules-table td {
     border: 1px solid #eef2f4;
     padding: 10px 8px;
     text-align: left;
     font-size: 13px;
     color: #333;
-    vertical-align: top; /* Выравнивание по верху для лучшего вида групп */
+    vertical-align: top;
 }
 
 .access-rules-table th {
@@ -697,15 +689,14 @@ body {
 }
 
 .access-rules-table .actions-column .ui-btn {
-    width: 100%; /* Растягиваем кнопки на всю ширину ячейки */
-    box-sizing: border-box; /* Учитываем padding и border в ширине */
+    width: 100%;
+    box-sizing: border-box;
 }
-
 
 /* --- Адаптивность --- */
 @media (max-width: 768px) {
     .filter-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 2 колонки на средних экранах */
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
     .access-grid-cell .access-grid {
         flex-direction: column;
@@ -715,7 +706,7 @@ body {
 
 @media (max-width: 480px) {
     .filter-grid {
-        grid-template-columns: 1fr; /* 1 колонка на маленьких экранах */
+        grid-template-columns: 1fr;
     }
     .modal-content {
         width: 95%;
@@ -727,13 +718,9 @@ body {
 }
 
 /* Screen switching styles */
-.app-screen {
-    display: none;
-}
+.app-screen        { display: none; }
+.app-screen.active { display: block; }
 
-.app-screen.active {
-    display: block;
-}
 /* ===== ПОЛЕ ЗАГРУЗКИ ФАЙЛА (ПРИХОДЫ) ===== */
 .income-drop-zone {
     border: 2px dashed #b8c4d0;
@@ -829,6 +816,7 @@ body {
 .income-file-remove:hover {
     background: #fde;
 }
+
 /* ===== ПРОСМОТРЩИК ФАЙЛОВ ===== */
 .file-viewer-modal-content {
     width: 90vw;
@@ -926,15 +914,9 @@ body {
     flex-shrink: 0;
 }
 
-
 /* ===================================================================
    СТАТИСТИКА: STICKY ПЕРВЫЙ СТОЛБЕЦ
    =================================================================== */
-
-.expenses-table-container {
-    overflow-x: auto;
-    position: relative;
-}
 
 .expenses-table .col-sticky {
     position: sticky;
@@ -1055,10 +1037,10 @@ body {
     transition: background 0.15s;
 }
 
-.mf-option-row:last-child { border-bottom: none; }
-.mf-option-row:hover      { background: #f0f5fa; }
+.mf-option-row:last-child  { border-bottom: none; }
+.mf-option-row:hover       { background: #f0f5fa; }
 .mf-option-row.mf-selected { background: #eaf3ff; }
-.mf-option-row.mf-excluded  { background: #fff0f0; }
+.mf-option-row.mf-excluded { background: #fff0f0; }
 
 .mf-option-name {
     flex: 1;
@@ -1184,75 +1166,6 @@ body {
 .mf-tag-remove:hover { opacity: 1; }
 
 /* ===================================================================
-   STICKY ПЕРВЫЙ СТОЛБЕЦ
-   =================================================================== */
-
-.expenses-table-container {
-    overflow-x: auto;
-    position: relative;
-}
-
-.expenses-table .col-sticky {
-    position: sticky;
-    left: 0;
-    z-index: 3;
-    background-color: #fff;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.07);
-}
-
-.expenses-table thead .col-sticky {
-    background-color: #f8f9fa;
-    z-index: 4;
-}
-
-.expenses-table .summary-row .col-sticky {
-    background-color: #f0f5fa;
-}
-
-.expenses-table tr:nth-child(even) .col-sticky {
-    background-color: #fdfdfd;
-}
-
-.expenses-table tr:not(.summary-row):hover .col-sticky {
-    background-color: #f0f0f0;
-}
-
-/* ===================================================================
-   КЛИКАБЕЛЬНЫЕ ЯЧЕЙКИ
-   =================================================================== */
-
-.clickable-cell {
-    cursor: pointer;
-    color: inherit;
-    text-decoration: none;
-}
-
-.clickable-cell:hover {
-    background-color: #e8f0fb !important;
-}
-
-.clickable-cell .cell-value {
-    color: #0b66c3;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.clickable-cell:hover .cell-value {
-    color: #0a58a6;
-}
-
-.conversion-percent {
-    color: #828b95;
-    font-size: 12px;
-    margin-left: 3px;
-    display: inline;
-    text-decoration: none !important;
-    white-space: nowrap;
-}
-
-/* ===================================================================
    ВКЛАДКИ
    =================================================================== */
 
@@ -1374,6 +1287,32 @@ body {
 }
 
 /* ===================================================================
+   КЛИКАБЕЛЬНЫЕ ЯЧЕЙКИ
+   =================================================================== */
+
+.clickable-cell {
+    cursor: pointer;
+    color: inherit;
+    text-decoration: none;
+}
+
+.clickable-cell:hover {
+    background-color: #e8f0fb !important;
+}
+
+.clickable-cell .cell-value {
+    color: #0b66c3;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.clickable-cell:hover .cell-value {
+    color: #0a58a6;
+}
+
+/* ===================================================================
    ТАБЛИЦА СРАВНЕНИЯ — СТРУКТУРА
    =================================================================== */
 
@@ -1429,17 +1368,7 @@ body {
     padding: 6px 8px;
     text-align: center;
     white-space: nowrap;
-    min-width: 90px;
-}
-
-/* Заголовок столбца плашек */
-.cmp-th-badge-col {
-    background: #fafafa;
-    width: 70px;
-    min-width: 70px;
-    max-width: 70px;
-    border-left: 1px dashed #d0d8e0;
-    border-right: 1px dashed #d0d8e0;
+    min-width: 100px;
 }
 
 /* Ячейка группировки в теле */
@@ -1462,20 +1391,33 @@ body {
     padding: 8px 10px;
     text-align: center;
     vertical-align: middle;
-    min-width: 90px;
+    min-width: 100px;
     background: #fff;
 }
 
-.cmp-table tr:nth-child(even) .cmp-td    { background: #fdfdfd; }
-.cmp-table tr:hover .cmp-td              { background: #f5f8ff; }
-.cmp-table tr:hover .cmp-td-group        { background: #f0f5fa; }
+.cmp-table tr:nth-child(even) .cmp-td { background: #fdfdfd; }
+.cmp-table tr:hover .cmp-td           { background: #f5f8ff; }
+.cmp-table tr:hover .cmp-td-group     { background: #f0f5fa; }
 
 /* ===================================================================
-   ЯЧЕЙКА ДАННЫХ: ЗНАЧЕНИЕ + КОНВЕРСИЯ INLINE
+   ЯЧЕЙКА ДАННЫХ: ЗНАЧЕНИЕ + КОНВЕРСИЯ + ДЕЛЬТА (INLINE)
+   Структура:
+   .cmp-cell-inner (вертикальный flex)
+     └─ .cmp-cell-top    → значение + конверсия в одну строку
+     └─ .cmp-cell-deltas → дельты ко предыдущему периоду
    =================================================================== */
 
-/* Внутри ячейки данных — значение и конверсия в одну строку */
 .cmp-cell-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+/* Первая строка: значение + конверсия */
+.cmp-cell-top {
     display: flex;
     align-items: baseline;
     justify-content: center;
@@ -1491,8 +1433,8 @@ body {
     white-space: nowrap;
 }
 
-/* Конверсия сразу после значения — как в общей статистике */
-.cmp-cell-inner .conversion-percent {
+/* Конверсия сразу после значения */
+.cmp-cell-top .conversion-percent {
     font-size: 11px;
     color: #9aabb8;
     margin-left: 3px;
@@ -1500,86 +1442,97 @@ body {
     white-space: nowrap;
 }
 
-/* ===================================================================
-   СТОЛБЕЦ ПЛАШЕК МЕЖДУ ПЕРИОДАМИ
-   =================================================================== */
-
-/* Ячейка столбца плашек */
-.cmp-td-badge {
-    width: 70px;
-    min-width: 70px;
-    max-width: 70px;
-    padding: 4px 2px;
-    vertical-align: middle;
-    text-align: center;
-    background: #fafafa;
-    border-left: 1px dashed #d0d8e0;
-    border-right: 1px dashed #d0d8e0;
-}
-
-/* Одна строка плашек (для одной метрики) */
-.cmp-badge-row {
+/* Вторая строка: дельты */
+.cmp-cell-deltas {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 3px 0;
-    border-bottom: 1px solid #eef2f4;
-}
-
-.cmp-badge-row:last-child {
-    border-bottom: none;
+    flex-wrap: wrap;
+    gap: 4px;
 }
 
 /* ===================================================================
-   ПЛАШКИ
+   ДЕЛЬТЫ INLINE (вместо отдельного столбца плашек)
    =================================================================== */
 
-.cmp-badge {
+/* Базовый стиль дельты */
+.cmp-delta {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
-    border-radius: 20px;
+    gap: 1px;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
-    line-height: 1.4;
-    text-align: center;
+    border-radius: 3px;
+    padding: 1px 4px;
 }
 
-/* Фиксированный размер плашек — все одинаковые */
-.cmp-badge-fixed {
-    min-width: 60px;
-    padding: 2px 6px;
-    box-sizing: border-box;
-}
-
-/* Рост — зелёный */
-.cmp-badge-up {
-    background: #e6f9ef;
+/* Дельта роста — зелёная */
+.cmp-delta-up {
     color: #1a7a3a;
-    border: 1px solid #b8e8cc;
+    background: #e6f9ef;
 }
 
-/* Падение — красный */
-.cmp-badge-down {
-    background: #fde8e8;
+/* Дельта падения — красная */
+.cmp-delta-down {
     color: #c0392b;
-    border: 1px solid #f5b8b8;
+    background: #fde8e8;
 }
 
-/* Без изменений — серый */
-.cmp-badge-flat {
-    background: #f0f0f0;
+/* Без изменений — серая */
+.cmp-delta-flat {
     color: #828b95;
-    border: 1px solid #ddd;
+    background: #f0f0f0;
 }
 
-/* Плашка конверсии — чуть меньше шрифт */
-.cmp-badge-conv {
+/* Дельта конверсии — чуть меньше и светлее */
+.cmp-delta-conv {
     font-size: 10px;
+    opacity: 0.85;
+}
+
+/* ===================================================================
+   ГРАФИКИ СРАВНЕНИЯ (Chart.js)
+   =================================================================== */
+
+/* Обёртка всех графиков — сетка */
+.cmp-charts-wrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 20px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #eef2f4;
+}
+
+/* Один блок графика */
+.cmp-chart-block {
+    background: #fff;
+    border: 1px solid #e5eaef;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 280px;
+}
+
+/* Заголовок графика */
+.cmp-chart-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    text-align: center;
+    letter-spacing: 0.01em;
+}
+
+/* Canvas — занимает всё доступное место в блоке */
+.cmp-chart-canvas {
+    flex: 1;
+    min-height: 220px;
+    max-height: 320px;
+    width: 100% !important;
 }
 
 /* ===================================================================
@@ -1674,7 +1627,7 @@ body {
 #utm-labels-table tbody tr:hover { background: #f5f7f8; }
 
 /* ===================================================================
-   СОВМЕСТИМОСТЬ
+   СОВМЕСТИМОСТЬ (устаревшие классы — оставлены для других экранов)
    =================================================================== */
 
 .cmp-delta-pos { color: #27ae60; font-weight: 600; }
@@ -1685,28 +1638,27 @@ body {
    =================================================================== */
 
 @media (max-width: 900px) {
-    .stats-metrics-col   { min-width: 140px; }
-    .cmp-th-metric       { min-width: 70px; font-size: 10px; }
-    .cmp-td              { min-width: 70px; }
-    .cmp-td-badge        { width: 56px; min-width: 56px; max-width: 56px; }
-    .cmp-th-badge-col    { width: 56px; min-width: 56px; }
-    .cmp-badge-fixed     { min-width: 48px; font-size: 10px; }
+    .stats-metrics-col { min-width: 140px; }
+    .cmp-th-metric     { min-width: 70px; font-size: 10px; }
+    .cmp-td            { min-width: 70px; }
+    .cmp-charts-wrap   { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
-    .stats-tab-btn       { padding: 8px 12px; font-size: 13px; }
+    .stats-tab-btn         { padding: 8px 12px; font-size: 13px; }
     .multi-filter-dropdown { min-width: 200px; max-width: 95vw; }
-    .leads-detail-modal  { width: 98vw; max-height: 90vh; }
-    .detail-td-secondary { display: none; }
-    .stats-metrics-col   { min-width: 120px; }
-    .period-mode-hint    { font-size: 12px; }
-    .cmp-td-badge        { display: none; }
-    .cmp-th-badge-col    { display: none; }
+    .leads-detail-modal    { width: 98vw; max-height: 90vh; }
+    .detail-td-secondary   { display: none; }
+    .stats-metrics-col     { min-width: 120px; }
+    .period-mode-hint      { font-size: 12px; }
+    .cmp-charts-wrap       { grid-template-columns: 1fr; gap: 14px; }
+    .cmp-chart-block       { min-height: 240px; }
 }
 
 @media (max-width: 480px) {
-    .stats-tab-btn    { padding: 6px 10px; font-size: 12px; }
+    .stats-tab-btn      { padding: 6px 10px; font-size: 12px; }
     .stats-metrics-list { flex-direction: column; }
     .stats-metrics-col  { min-width: unset; width: 100%; }
-    .cmp-cell-value   { font-size: 13px; }
+    .cmp-cell-value     { font-size: 13px; }
+    .cmp-delta          { font-size: 10px; }
 }
